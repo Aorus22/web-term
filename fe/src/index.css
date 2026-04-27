@@ -1,0 +1,4 @@
+/* Minimal reset for WebTerm */
+* {
+  box-sizing: border-box;
+}

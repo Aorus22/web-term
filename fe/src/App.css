@@ -1,0 +1,173 @@
+/* === Global Reset === */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #0a0a0a;
+  color: #ededed;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+}
+
+/* === Terminal Container (when connected) === */
+.terminal-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: #111;
+  border-bottom: 1px solid #222;
+  flex-shrink: 0;
+}
+
+.terminal-title {
+  font-size: 13px;
+  color: #888;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.disconnect-btn {
+  background: none;
+  border: 1px solid #333;
+  color: #888;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.disconnect-btn:hover {
+  border-color: #e55;
+  color: #e55;
+}
+
+.terminal-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.terminal-wrapper > div {
+  height: 100%;
+}
+
+/* === Connection Form (when disconnected) === */
+.connect-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  background: #0a0a0a;
+}
+
+.connect-card {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 20px;
+}
+
+.connect-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 4px;
+}
+
+.connect-subtitle {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 32px;
+}
+
+.connect-error {
+  background: #2a1515;
+  border: 1px solid #5a2222;
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: #f87171;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+}
+
+.form-group input {
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #ededed;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.form-group input::placeholder {
+  color: #444;
+}
+
+.form-group input:focus {
+  border-color: #555;
+}
+
+.connect-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+
+.connect-btn:hover {
+  background: #ddd;
+}
+
+.connect-btn:active {
+  background: #bbb;
+}
