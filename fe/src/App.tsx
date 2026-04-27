@@ -128,7 +128,6 @@ function App() {
           <Terminal
             ref={ref}
             autoResize
-            theme="solarized-dark"
             cursorBlink
             onData={handleData}
             onResize={handleResize}
