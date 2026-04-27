@@ -45,7 +45,10 @@ Plans:
   3. User can edit and delete existing connections with confirmation on destructive actions
   4. User can type user@host:port in a quick-connect bar to connect without saving
   5. User can export and import connections as JSON for backup
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 02-01-PLAN.md — Go backend: REST API, SQLite, encryption, security hardening
+- [ ] 02-02-PLAN.md — React frontend: shadcn setup, sidebar, connection CRUD UI, quick-connect, export/import
 **UI hint**: yes
 
 ### Phase 3: SSH Terminal
@@ -82,6 +85,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
-| 2. Connection Management | 0/? | Not started | - |
+| 2. Connection Management | 0/2 | Planned | - |
 | 3. SSH Terminal | 0/? | Not started | - |
 | 4. Multi-Tab & Polish | 0/? | Not started | - |
