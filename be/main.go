@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -51,6 +52,13 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	var wsMu sync.Mutex
+	wsWrite := func(msgType int, data []byte) error {
+		wsMu.Lock()
+		defer wsMu.Unlock()
+		return conn.WriteMessage(msgType, data)
+	}
+
 	log.Printf("WebSocket connection established from %s", conn.RemoteAddr())
 
 	// Step 1: Read the initial connect message (text frame).
@@ -62,25 +70,25 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 
 	if msgType != websocket.TextMessage {
 		log.Printf("Expected text message for connect, got binary")
-		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","message":"first message must be JSON connect"}`))
+		wsWrite(websocket.TextMessage, []byte(`{"type":"error","message":"first message must be JSON connect"}`))
 		return
 	}
 
 	var connectMsg ConnectMessage
 	if err := json.Unmarshal(msgData, &connectMsg); err != nil {
 		log.Printf("Error parsing connect message: %v", err)
-		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","message":"invalid JSON"}`))
+		wsWrite(websocket.TextMessage, []byte(`{"type":"error","message":"invalid JSON"}`))
 		return
 	}
 
 	if connectMsg.Type != "connect" {
 		log.Printf("Expected connect message, got type: %s", connectMsg.Type)
-		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","message":"expected connect message"}`))
+		wsWrite(websocket.TextMessage, []byte(`{"type":"error","message":"expected connect message"}`))
 		return
 	}
 
 	if connectMsg.Host == "" || connectMsg.User == "" {
-		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","message":"host and user are required"}`))
+		wsWrite(websocket.TextMessage, []byte(`{"type":"error","message":"host and user are required"}`))
 		return
 	}
 
@@ -110,7 +118,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("SSH dial error: %v", err)
 		errMsg := fmt.Sprintf(`{"type":"error","message":"SSH connection failed: %s"}`, jsonEscape(err.Error()))
-		conn.WriteMessage(websocket.TextMessage, []byte(errMsg))
+		wsWrite(websocket.TextMessage, []byte(errMsg))
 		return
 	}
 	defer client.Close()
@@ -119,7 +127,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("SSH session error: %v", err)
 		errMsg := fmt.Sprintf(`{"type":"error","message":"SSH session failed: %s"}`, jsonEscape(err.Error()))
-		conn.WriteMessage(websocket.TextMessage, []byte(errMsg))
+		wsWrite(websocket.TextMessage, []byte(errMsg))
 		return
 	}
 	defer session.Close()
@@ -161,7 +169,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	log.Printf("SSH session established to %s", addr)
 
 	// Notify client that connection is ready.
-	conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"connected"}`))
+	wsWrite(websocket.TextMessage, []byte(`{"type":"connected"}`))
 
 	// Step 6: Bidirectional pipe with context for cleanup.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -231,7 +239,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if n > 0 {
-				if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				if err := wsWrite(websocket.BinaryMessage, buf[:n]); err != nil {
 					log.Printf("WebSocket write error: %v", err)
 					cancel()
 					return
@@ -260,7 +268,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if n > 0 {
-				if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				if err := wsWrite(websocket.BinaryMessage, buf[:n]); err != nil {
 					log.Printf("WebSocket write error (stderr): %v", err)
 					cancel()
 					return
