@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. Go/no-go decision documented: proceed with @wterm/react or fall back to xterm.js
 **Plans**: 2 plans
 Plans:
-- [ ] 01-01-PLAN.md — Build spike: Go WebSocket SSH proxy + React @wterm/react terminal
+- [x] 01-01-PLAN.md — Build spike: Go WebSocket SSH proxy + React @wterm/react terminal
 - [ ] 01-02-PLAN.md — Human validation checkpoint: vim/htop/tmux/resize + go/no-go decision
 **UI hint**: yes
 
@@ -81,7 +81,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. wterm Spike | 0/2 | Planned | - |
+| 1. wterm Spike | 1/2 | In Progress | - |
 | 2. Connection Management | 0/? | Not started | - |
 | 3. SSH Terminal | 0/? | Not started | - |
 | 4. Multi-Tab & Polish | 0/? | Not started | - |
