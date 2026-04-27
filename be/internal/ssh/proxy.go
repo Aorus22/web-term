@@ -111,6 +111,13 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			User: connectMsg.User,
 			Auth: []ssh.AuthMethod{
 				ssh.Password(connectMsg.Password),
+				ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+					answers := make([]string, len(questions))
+					for i := range answers {
+						answers[i] = connectMsg.Password
+					}
+					return answers, nil
+				}),
 			},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Implement host key verification
 			Timeout:         10 * time.Second,
@@ -162,14 +169,17 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		connectedJSON, _ := json.Marshal(connectedMsg)
 		wsWrite(websocket.TextMessage, connectedJSON)
 
-		_, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		done := make(chan struct{}, 3)
 
 		// Forwarding goroutines
 		go func() {
-			defer func() { done <- struct{}{} }()
 			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
 				msgType, msgData, err := conn.ReadMessage()
 				if err != nil {
 					cancel()
@@ -195,9 +205,13 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		}()
 
 		forward := func(src io.Reader) {
-			defer func() { done <- struct{}{} }()
 			buf := make([]byte, 4096)
 			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
 				n, err := src.Read(buf)
 				if n > 0 {
 					if err := wsWrite(websocket.BinaryMessage, buf[:n]); err != nil {
@@ -215,8 +229,16 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		go forward(stdoutPipe)
 		go forward(stderrPipe)
 
-		<-done
-		cancel()
+		// Wait for context cancellation (any goroutine signals done).
+		<-ctx.Done()
+
+		// Send disconnected message so frontend knows session ended cleanly.
+		disconnectedMsg := ServerMessage{
+			Type:      "disconnected",
+			SessionID: sessionID,
+		}
+		disconnectedJSON, _ := json.Marshal(disconnectedMsg)
+		wsWrite(websocket.TextMessage, disconnectedJSON)
 	}
 }
 
