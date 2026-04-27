@@ -12,18 +12,17 @@ Bisa SSH ke server dari browser dengan pengalaman terminal yang smooth dan relia
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] User bisa menyimpan koneksi SSH (host, port, username) — Validated in Phase 2
+- [x] User bisa connect ke server via SSH langsung dari browser — Validated in Phase 3
+- [x] Terminal emulator yang smooth menggunakan @wterm.dev — Validated in Phase 3
+- [x] Koneksi SSH via WebSocket proxy (browser → Go backend → SSH target) — Validated in Phase 3
+- [x] Data koneksi disimpan server-side di SQLite — Validated in Phase 2
+- [x] UI minimalis dan clean ala Vercel menggunakan shadcn — Validated in Phase 2
+- [x] Frontend dibangun dengan Vite + React + shadcn — Validated in Phase 2
 
 ### Active
 
-- [ ] User bisa menyimpan koneksi SSH (host, port, username)
-- [ ] User bisa connect ke server via SSH langsung dari browser
-- [ ] Terminal emulator yang smooth menggunakan @wterm.dev
 - [ ] Multi-tab — buka beberapa sesi SSH sekaligus
-- [ ] Koneksi SSH via WebSocket proxy (browser → Go backend → SSH target)
-- [ ] Data koneksi disimpan server-side di SQLite
-- [ ] UI minimalis dan clean ala Vercel menggunakan shadcn
-- [ ] Frontend dibangun dengan Vite + React + shadcn
 
 ### Out of Scope
 
@@ -79,4 +78,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-27 after initialization*
+*Last updated: 2026-04-27 after Phase 3 completion*

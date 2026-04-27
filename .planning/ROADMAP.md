@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: wterm Spike** - Validate @wterm/react handles SSH workloads before committing to architecture
 - [x] **Phase 2: Connection Management** - Full vertical slice: Go backend + React frontend for saving, organizing, and managing SSH connections
-- [ ] **Phase 3: SSH Terminal** - Core product: browser-to-SSH terminal with password auth, resize, copy/paste, and reconnection
+- [x] **Phase 3: SSH Terminal** - Core product: browser-to-SSH terminal with password auth, resize, copy/paste, and reconnection
 - [ ] **Phase 4: Multi-Tab & Polish** - Multiple simultaneous sessions, keyboard shortcuts, dark/light theme
 
 ## Phase Details
@@ -63,9 +63,9 @@ Plans:
   5. WebSocket disconnection shows a reconnection prompt to the user
 **Plans**: 3 plans
 Plans:
-- [ ] 03-01-PLAN.md — Backend SSH proxy: keyboard-interactive auth, connection_id protocol, session cleanup
-- [ ] 03-02-PLAN.md — Frontend terminal: useSSHSession hook, TerminalPane component, app-store session state
-- [ ] 03-03-PLAN.md — UI integration: sidebar/quick-connect wiring, tab bar, reconnection UX, save banner
+- [x] 03-01-PLAN.md — Backend SSH proxy: keyboard-interactive auth, connection_id protocol, session cleanup
+- [x] 03-02-PLAN.md — Frontend terminal: useSSHSession hook, TerminalPane component, app-store session state
+- [x] 03-03-PLAN.md — UI integration: sidebar/quick-connect wiring, tab bar, reconnection UX, save banner
 **UI hint**: yes
 
 ### Phase 4: Multi-Tab & Polish
@@ -90,20 +90,20 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
 | 2. Connection Management | 2/2 | Complete | 2026-04-27 |
-| 3. SSH Terminal | 0/3 | Planned | - |
+| 3. SSH Terminal | 3/3 | Complete | 2026-04-27 |
 | 4. Multi-Tab & Polish | 0/? | Not started | - |
 ---
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: milestone
 status: executing
-stopped_at: "Phase 02 Complete"
-last_updated: "2026-04-27T14:15:00Z"
-last_activity: 2026-04-27 -- Phase 02 connection management complete (backend + frontend)
+stopped_at: "Phase 03 Complete"
+last_updated: "2026-04-27T15:30:00Z"
+last_activity: 2026-04-27 -- Phase 03 SSH Terminal complete (3 plans)
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 3
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---

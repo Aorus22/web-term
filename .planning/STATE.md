@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-04-27)
 
 **Core value:** Bisa SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable
-**Current focus:** Phase 03 — SSH Terminal
+**Current focus:** Phase 04 — Multi-Tab & Polish
 
 ## Current Position
 
-Phase: 03 (ssh-terminal) — EXECUTING (plan 2/3 complete)
-Next: Phase 03 Plan 03 — wire terminal into app shell
-Last activity: 2026-04-27 -- Plan 02 complete: frontend terminal infrastructure
+Phase: 03 (ssh-terminal) — COMPLETE (3/3 plans)
+Next: Phase 04 (Multi-Tab & Polish)
+Last activity: 2026-04-27 -- Phase 03 complete: SSH Terminal
 
-Progress: [======----] 67% (Phase 03)
+Progress: [======----] 67% (Milestone v0.2.0)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 5
-- Average duration: 14 min
-- Total execution time: 1.1 hours
+- Total plans completed: 7
+- Average duration: 13 min
+- Total execution time: 1.5 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [======----] 67% (Phase 03)
 |-------|-------|-------|----------|
 | 01-wterm-spike | 2 | 25 min | 12.5 min |
 | 02-connection-mgmt | 2 | 35 min | 17.5 min |
-| 03-ssh-terminal | 2 (of 3) | 28 min | 14 min |
+| 03-ssh-terminal | 3 | 40 min | 13 min |
 
 **Recent Trend:**
 
-- Last 5 plans: 03-02 (3 min), 03-01 (25 min), 02-02 (20 min), 02-01 (15 min), 01-02 (15 min)
+- Last 5 plans: 03-03 (12 min), 03-02 (3 min), 03-01 (25 min), 02-02 (20 min), 02-01 (15 min)
 - Trend: On track
 
 *Updated after each plan completion*
@@ -51,6 +51,8 @@ Recent decisions affecting current work:
 - (02-02) Implemented TanStack Query for server state management and Zustand for UI state.
 - (03-02) useSSHSession hook encapsulates WebSocket lifecycle; password never stored in state (D-07).
 - (03-02) TerminalPane renders 4 states with initialConnect auto-connect pattern.
+- (03-03) Tab bar keeps all sessions alive via visibility toggle (not remount).
+- (03-03) Save banner does NOT include ephemeral password (T-03-08 mitigation).
 
 ### Pending Todos
 
@@ -71,5 +73,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-04-27
-Stopped at: Completed 03-02-PLAN.md, next: 03-03
-Resume file: .planning/phases/03-ssh-terminal/03-CONTEXT.md
+Stopped at: Phase 03 complete, next: Phase 04
+Resume file: .planning/ROADMAP.md
