@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 	"webterm/internal/config"
+	"webterm/internal/db"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
@@ -21,25 +23,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 4096,
 }
 
-// ConnectMessage is the initial JSON message from client with SSH connection params.
-type ConnectMessage struct {
-	Type     string `json:"type"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Rows     int    `json:"rows,omitempty"`
-	Cols     int    `json:"cols,omitempty"`
-}
-
-// ResizeMessage is a JSON control message for terminal resize.
-type ResizeMessage struct {
-	Type string `json:"type"`
-	Cols int    `json:"cols"`
-	Rows int    `json:"rows"`
-}
-
-func HandleWebSocket(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
+func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	upgrader.CheckOrigin = func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
 		if origin == "" {
@@ -86,9 +70,33 @@ func HandleWebSocket(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Security Fix CR-03: SSRF Protection
+		// Generate session ID early for logging and response.
+		sessionID := uuid.New().String()
+
+		// Resolve connection credentials: either from saved connection_id or direct fields.
+		if connectMsg.ConnectionID != "" {
+			// Saved connection flow: fetch from DB and decrypt password.
+			var conn db.Connection
+			if err := database.First(&conn, "id = ?", connectMsg.ConnectionID); err != nil {
+				log.Printf("Connection not found: %s (session %s)", connectMsg.ConnectionID, sessionID)
+				sendWSError(wsWrite, "Connection not found")
+				return
+			}
+			decrypted, err := config.Decrypt(conn.Encrypted, cfg.EncryptionKey)
+			if err != nil {
+				log.Printf("Failed to decrypt password for connection %s (session %s): %v", connectMsg.ConnectionID, sessionID, err)
+				sendWSError(wsWrite, "Failed to decrypt connection credentials")
+				return
+			}
+			connectMsg.Host = conn.Host
+			connectMsg.Port = conn.Port
+			connectMsg.User = conn.Username
+			connectMsg.Password = decrypted
+		}
+
+		// Security Fix CR-03: SSRF Protection (applies to both flows, including DB-fetched hosts)
 		if !cfg.IsHostAllowed(connectMsg.Host) {
-			log.Printf("SSRF Blocked: attempt to connect to unauthorized host %s", connectMsg.Host)
+			log.Printf("SSRF Blocked: attempt to connect to unauthorized host %s (session %s)", connectMsg.Host, sessionID)
 			sendWSError(wsWrite, "Host not authorized by security policy")
 			return
 		}
@@ -146,8 +154,13 @@ func HandleWebSocket(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Notify client that connection is ready.
-		wsWrite(websocket.TextMessage, []byte(`{"type":"connected"}`))
+		// Notify client that connection is ready with session_id.
+		connectedMsg := ServerMessage{
+			Type:      "connected",
+			SessionID: sessionID,
+		}
+		connectedJSON, _ := json.Marshal(connectedMsg)
+		wsWrite(websocket.TextMessage, connectedJSON)
 
 		_, cancel := context.WithCancel(context.Background())
 		defer cancel()
