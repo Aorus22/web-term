@@ -1,209 +1,110 @@
-import { useState, useCallback, useRef } from 'react';
-import { Terminal, useTerminal } from '@wterm/react';
-import '@wterm/react/css';
-import './App.css';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { PanelLeft, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { useAppStore } from '@/stores/app-store'
+import { cn } from '@/lib/utils'
 
-function App() {
-  const { ref, write, focus } = useTerminal();
-  const [connected, setConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+import { QuickConnect } from '@/features/connections/components/QuickConnect'
+import { TagFilter } from '@/features/connections/components/TagFilter'
+import { ConnectionList } from '@/features/connections/components/ConnectionList'
+import { ExportImport } from '@/features/connections/components/ExportImport'
+import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
 
-  // Form state
-  const [host, setHost] = useState('');
-  const [port, setPort] = useState('22');
-  const [user, setUser] = useState('');
-  const [password, setPassword] = useState('');
+const queryClient = new QueryClient()
 
-  const handleConnect = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      setError(null);
-
-      const portNum = parseInt(port, 10) || 22;
-
-      // Create WebSocket to Vite dev proxy (which proxies to Go backend).
-      const wsHost = window.location.hostname;
-      const socket = new WebSocket(`ws://${wsHost}:8080/ws`);
-      wsRef.current = socket;
-
-      socket.binaryType = 'arraybuffer';
-
-      socket.onopen = () => {
-        // Send connect message with SSH params.
-        const connectMsg = JSON.stringify({
-          type: 'connect',
-          host,
-          port: portNum,
-          user,
-          password,
-        });
-        socket.send(connectMsg);
-      };
-
-      socket.onmessage = (event) => {
-        if (typeof event.data === 'string') {
-          // JSON control message from server.
-          try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === 'connected') {
-              setConnected(true);
-              // Focus terminal after connection.
-              setTimeout(() => focus(), 100);
-            } else if (msg.type === 'error') {
-              setError(msg.message || 'Connection error');
-              socket.close();
-            }
-          } catch {
-            // Ignore malformed JSON.
-          }
-        } else {
-          // Binary frame — SSH output data.
-          const data =
-            event.data instanceof ArrayBuffer
-              ? new Uint8Array(event.data)
-              : event.data;
-          write(data);
-        }
-      };
-
-      socket.onclose = () => {
-        setConnected(false);
-        wsRef.current = null;
-      };
-
-      socket.onerror = () => {
-        setError('WebSocket connection failed');
-        setConnected(false);
-        wsRef.current = null;
-      };
-    },
-    [host, port, user, password, write, focus]
-  );
-
-  // Terminal user input → WebSocket binary frame.
-  const handleData = useCallback(
-    (data: string) => {
-      const socket = wsRef.current;
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(new TextEncoder().encode(data));
-      }
-    },
-    []
-  );
-
-  // Terminal resize → WebSocket JSON control message.
-  const handleResize = useCallback(
-    (cols: number, rows: number) => {
-      const socket = wsRef.current;
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'resize', cols, rows }));
-      }
-    },
-    []
-  );
-
-  // Disconnect handler.
-  const handleDisconnect = useCallback(() => {
-    const socket = wsRef.current;
-    if (socket) {
-      socket.close();
-      wsRef.current = null;
-    }
-    setConnected(false);
-  }, []);
-
-  if (connected) {
-    return (
-      <div className="terminal-container">
-        <div className="terminal-header">
-          <span className="terminal-title">
-            {user}@{host}
-          </span>
-          <button className="disconnect-btn" onClick={handleDisconnect}>
-            Disconnect
-          </button>
-        </div>
-        <div className="terminal-wrapper">
-          <Terminal
-            ref={ref}
-            autoResize
-            cursorBlink
-            onData={handleData}
-            onResize={handleResize}
-          />
-        </div>
-      </div>
-    );
-  }
+function AppContent() {
+  const { sidebarOpen, toggleSidebar, setCreatingConnection } = useAppStore()
 
   return (
-    <div className="connect-container">
-      <div className="connect-card">
-        <h1 className="connect-title">WebTerm</h1>
-        <p className="connect-subtitle">SSH from your browser</p>
+    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "flex flex-col border-r bg-muted/30 transition-all duration-300 ease-in-out",
+          sidebarOpen ? "w-[280px]" : "w-0 overflow-hidden border-none"
+        )}
+      >
+        <div className="p-4 flex items-center justify-between">
+          <h2 className="font-semibold text-lg tracking-tight">WebTerm</h2>
+          <Button variant="ghost" size="icon" onClick={() => setCreatingConnection(true)}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="px-4 pb-4">
+          <QuickConnect />
+        </div>
+        
+        <Separator />
+        
+        <div className="py-2">
+          <TagFilter />
+        </div>
+        
+        <Separator />
+        
+        <ScrollArea className="flex-1">
+          <ConnectionList />
+        </ScrollArea>
+        
+        <Separator />
+        
+        <div className="p-4">
+          <ExportImport />
+        </div>
+      </aside>
 
-        {error && <div className="connect-error">{error}</div>}
-
-        <form onSubmit={handleConnect} className="connect-form">
-          <div className="form-group">
-            <label htmlFor="host">Host</label>
-            <input
-              id="host"
-              type="text"
-              placeholder="192.168.1.1"
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="port">Port</label>
-              <input
-                id="port"
-                type="number"
-                placeholder="22"
-                value={port}
-                onChange={(e) => setPort(e.target.value)}
-                min={1}
-                max={65535}
-              />
+      {/* Main Area */}
+      <main className="flex-1 flex flex-col min-w-0 bg-background">
+        {/* Tab Bar / Header */}
+        <header className="h-12 border-b flex items-center px-4 gap-4 bg-muted/10">
+          {!sidebarOpen && (
+            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8">
+              <PanelLeft className="h-4 w-4" />
+            </Button>
+          )}
+          {sidebarOpen && (
+             <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8">
+                <PanelLeft className="h-4 w-4" />
+             </Button>
+          )}
+          
+          <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
+            {/* Tabs will go here in Phase 3 */}
+            <div className="px-3 py-1 bg-background border rounded-t-md text-sm font-medium">
+              Dashboard
             </div>
-            <div className="form-group">
-              <label htmlFor="user">Username</label>
-              <input
-                id="user"
-                type="text"
-                placeholder="root"
-                value={user}
-                onChange={(e) => setUser(e.target.value)}
-                required
-              />
-            </div>
           </div>
+        </header>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+        {/* Content Area */}
+        <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
+          <div className="max-w-md text-center">
+            <h3 className="text-lg font-medium text-foreground mb-2">No active sessions</h3>
+            <p className="text-sm">
+              Select a saved connection from the sidebar or use Quick Connect to start a new SSH session.
+            </p>
           </div>
+        </div>
+      </main>
 
-          <button type="submit" className="connect-btn">
-            Connect
-          </button>
-        </form>
-      </div>
+      {/* Overlays */}
+      <ConnectionForm />
     </div>
-  );
+  )
 }
 
-export default App;
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AppContent />
+      </TooltipProvider>
+    </QueryClientProvider>
+  )
+}
+
+export default App

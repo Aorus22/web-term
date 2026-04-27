@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"webterm/internal/api"
 	"webterm/internal/config"
 	"webterm/internal/db"
 )
@@ -22,14 +23,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	_ = database
 
 	mux := http.NewServeMux()
-	// Routes will be registered here in Task 2
-	// api.SetupRoutes(mux, database, cfg)
+	api.SetupRoutes(mux, database, cfg)
 
 	server := &http.Server{
-		Addr:    "0.0.0.0" + cfg.Port, // Config.Port usually starts with :
+		Addr:    "0.0.0.0" + cfg.Port,
 		Handler: mux,
 	}
 

@@ -13,7 +13,7 @@ WebTerm is a self-hosted web-based SSH client. The roadmap starts with validatin
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: wterm Spike** - Validate @wterm/react handles SSH workloads before committing to architecture
-- [ ] **Phase 2: Connection Management** - Full vertical slice: Go backend + React frontend for saving, organizing, and managing SSH connections
+- [x] **Phase 2: Connection Management** - Full vertical slice: Go backend + React frontend for saving, organizing, and managing SSH connections
 - [ ] **Phase 3: SSH Terminal** - Core product: browser-to-SSH terminal with password auth, resize, copy/paste, and reconnection
 - [ ] **Phase 4: Multi-Tab & Polish** - Multiple simultaneous sessions, keyboard shortcuts, dark/light theme
 
@@ -47,8 +47,8 @@ Plans:
   5. User can export and import connections as JSON for backup
 **Plans**: 2 plans
 Plans:
-- [ ] 02-01-PLAN.md — Go backend: REST API, SQLite, encryption, security hardening
-- [ ] 02-02-PLAN.md — React frontend: shadcn setup, sidebar, connection CRUD UI, quick-connect, export/import
+- [x] 02-01-PLAN.md — Go backend: REST API, SQLite, encryption, security hardening
+- [x] 02-02-PLAN.md — React frontend: shadcn setup, sidebar, connection CRUD UI, quick-connect, export/import
 **UI hint**: yes
 
 ### Phase 3: SSH Terminal
@@ -85,6 +85,21 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
-| 2. Connection Management | 0/2 | Planned | - |
+| 2. Connection Management | 2/2 | Complete | 2026-04-27 |
 | 3. SSH Terminal | 0/? | Not started | - |
 | 4. Multi-Tab & Polish | 0/? | Not started | - |
+---
+gsd_state_version: 1.0
+milestone: v0.2.0
+milestone_name: milestone
+status: executing
+stopped_at: "Phase 02 Complete"
+last_updated: "2026-04-27T14:15:00Z"
+last_activity: 2026-04-27 -- Phase 02 connection management complete (backend + frontend)
+progress:
+  total_phases: 4
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
+  percent: 100
+---
