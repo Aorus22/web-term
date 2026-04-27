@@ -179,7 +179,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 
 	// Goroutine 1: WebSocket → SSH stdin.
 	go func() {
-		defer func() { done <- struct{}{} }()
+		defer func() { log.Printf("[ws-reader] exiting"); done <- struct{}{} }()
 		for {
 			select {
 			case <-ctx.Done():
@@ -202,10 +202,18 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 				var ctrl ResizeMessage
 				if err := json.Unmarshal(msgData, &ctrl); err == nil && ctrl.Type == "resize" {
 					if ctrl.Cols > 0 && ctrl.Rows > 0 {
-						winSize := struct{ Cols, Rows uint32 }{uint32(ctrl.Cols), uint32(ctrl.Rows)}
+						winSize := struct {
+							Cols uint32
+							Rows uint32
+							W    uint32
+							H    uint32
+						}{uint32(ctrl.Cols), uint32(ctrl.Rows), 0, 0}
 						payload := ssh.Marshal(winSize)
-						session.SendRequest("window-change", false, payload)
-						log.Printf("Resize: %dx%d", ctrl.Cols, ctrl.Rows)
+						if _, err := session.SendRequest("window-change", false, payload); err != nil {
+							log.Printf("Resize send error: %v", err)
+						} else {
+							log.Printf("Resize: %dx%d", ctrl.Cols, ctrl.Rows)
+						}
 					}
 				}
 			case websocket.BinaryMessage:
@@ -221,7 +229,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 
 	// Goroutine 2: SSH stdout → WebSocket.
 	go func() {
-		defer func() { done <- struct{}{} }()
+		defer func() { log.Printf("[stdout-reader] exiting"); done <- struct{}{} }()
 		buf := make([]byte, 4096)
 		for {
 			select {
@@ -250,7 +258,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 
 	// Goroutine 3: SSH stderr → WebSocket.
 	go func() {
-		defer func() { done <- struct{}{} }()
+		defer func() { log.Printf("[stderr-reader] exiting"); done <- struct{}{} }()
 		buf := make([]byte, 4096)
 		for {
 			select {
