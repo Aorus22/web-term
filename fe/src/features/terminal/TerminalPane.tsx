@@ -1,23 +1,29 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@wterm/react'
 import '@wterm/react/css'
 import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useSSHSession } from './useSSHSession'
 import { useAppStore } from '@/stores/app-store'
+import { PasswordPrompt } from './PasswordPrompt'
+import { ReconnectOverlay } from './ReconnectOverlay'
+import { SaveConnectionBanner } from './SaveConnectionBanner'
 import type { ConnectOptions } from './types'
 
 interface TerminalPaneProps {
   sessionId: string
-  /** When provided and session is not connected/connecting, auto-connect on mount */
+  /** When provided, auto-connect on mount (saved connection with stored password) */
   initialConnect?: ConnectOptions
 }
 
 export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   const { ref, connect, sendData, sendResize, disconnect } = useSSHSession(sessionId)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
+  const removeSession = useAppStore((s) => s.removeSession)
   const lastOptionsRef = useRef<ConnectOptions | null>(initialConnect ?? null)
+  const [showSaveBanner, setShowSaveBanner] = useState(false)
+  const [passwordProvided, setPasswordProvided] = useState(false)
 
-  // Auto-connect on mount if initialConnect provided and not already connected
+  // Auto-connect on mount if initialConnect is provided (saved connection with password, D-01)
   useEffect(() => {
     if (initialConnect) {
       lastOptionsRef.current = initialConnect
@@ -28,10 +34,38 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Show save banner when quick-connect session disconnects (D-06)
+  useEffect(() => {
+    if (session?.status === 'disconnected' && session.isQuickConnect) {
+      setShowSaveBanner(true)
+    }
+  }, [session?.status, session?.isQuickConnect])
+
   const handleRetry = () => {
     if (lastOptionsRef.current) {
       connect(lastOptionsRef.current)
     }
+  }
+
+  const handlePasswordConnect = (password: string) => {
+    setPasswordProvided(true)
+    const opts: ConnectOptions = {
+      host: session!.host,
+      port: session!.port,
+      username: session!.username,
+      password,
+    }
+    lastOptionsRef.current = opts
+    connect(opts)
+  }
+
+  const handlePasswordCancel = () => {
+    // Remove the session — user cancelled password prompt
+    removeSession(sessionId)
+  }
+
+  const handleReconnectDismiss = () => {
+    // Keep session in disconnected state, just hide the overlay
   }
 
   // No session found — shouldn't happen but handle gracefully
@@ -43,7 +77,19 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
     )
   }
 
-  // Connecting state — spinner
+  // Connecting with no initialConnect and no password provided → show PasswordPrompt (D-02, D-03)
+  if (session.status === 'connecting' && !initialConnect && !passwordProvided) {
+    return (
+      <PasswordPrompt
+        host={session.host}
+        username={session.username}
+        onConnect={handlePasswordConnect}
+        onCancel={handlePasswordCancel}
+      />
+    )
+  }
+
+  // Connecting state — spinner (auto-connect via useEffect for saved connections)
   if (session.status === 'connecting') {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
@@ -68,7 +114,7 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
     )
   }
 
-  // Error state — show error with retry button
+  // Error state — show error with retry button (D-05)
   if (session.status === 'error') {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
@@ -88,21 +134,35 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
     )
   }
 
-  // Disconnected state — show reconnect button
+  // Disconnected state — show frozen terminal + reconnect overlay + save banner (UI-04, D-06)
   if (session.status === 'disconnected') {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-        <div className="text-center space-y-2">
-          <p className="text-sm text-foreground">Disconnected from {session.host}</p>
-          <p className="text-xs text-muted-foreground">The SSH session has ended</p>
+      <div className="h-full w-full relative flex flex-col">
+        {/* Save connection banner for quick-connect sessions (D-06) */}
+        {showSaveBanner && session.isQuickConnect && (
+          <SaveConnectionBanner
+            host={session.host}
+            port={session.port}
+            username={session.username}
+            onDismiss={() => setShowSaveBanner(false)}
+          />
+        )}
+        {/* Frozen terminal content underneath */}
+        <div className="flex-1 relative">
+          <Terminal
+            ref={ref}
+            autoResize
+            cursorBlink={false}
+            onData={() => {}}
+            onResize={sendResize}
+          />
+          {/* Reconnect overlay on top (UI-04) */}
+          <ReconnectOverlay
+            host={session.host}
+            onReconnect={handleRetry}
+            onDismiss={handleReconnectDismiss}
+          />
         </div>
-        <button
-          onClick={handleRetry}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Reconnect
-        </button>
       </div>
     )
   }
