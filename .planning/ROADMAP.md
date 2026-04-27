@@ -61,7 +61,11 @@ Plans:
   3. Terminal auto-resizes when the browser window or pane resizes
   4. Copy/paste works natively through browser text selection
   5. WebSocket disconnection shows a reconnection prompt to the user
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 03-01-PLAN.md — Backend SSH proxy: keyboard-interactive auth, connection_id protocol, session cleanup
+- [ ] 03-02-PLAN.md — Frontend terminal: useSSHSession hook, TerminalPane component, app-store session state
+- [ ] 03-03-PLAN.md — UI integration: sidebar/quick-connect wiring, tab bar, reconnection UX, save banner
 **UI hint**: yes
 
 ### Phase 4: Multi-Tab & Polish
@@ -86,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
 | 2. Connection Management | 2/2 | Complete | 2026-04-27 |
-| 3. SSH Terminal | 0/? | Not started | - |
+| 3. SSH Terminal | 0/3 | Planned | - |
 | 4. Multi-Tab & Polish | 0/? | Not started | - |
 ---
 gsd_state_version: 1.0

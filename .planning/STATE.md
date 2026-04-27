@@ -9,9 +9,9 @@ See: .planning/PROJECT.md (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 03 (ssh-terminal) — CONTEXT GATHERED
-Next: Phase 03 (SSH Terminal) — plan + execute
-Last activity: 2026-04-27 -- Phase 03 context gathered, ready for planning
+Phase: 03 (ssh-terminal) — PLANNED (3 plans, 2 waves)
+Next: Phase 03 (SSH Terminal) — execute plans
+Last activity: 2026-04-27 -- Phase 03 planned: 3 plans in 2 waves
 
 Progress: [----------] 0% (Phase 03)
 
@@ -68,5 +68,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-04-27
-Stopped at: Phase 03 context gathered
+Stopped at: Phase 03 planned, ready to execute
 Resume file: .planning/phases/03-ssh-terminal/03-CONTEXT.md
