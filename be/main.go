@@ -287,7 +287,7 @@ func main() {
 	mux.HandleFunc("/ws", handleWS)
 
 	server := &http.Server{
-		Addr:    "127.0.0.1:8080",
+		Addr:    "0.0.0.0:8080",
 		Handler: mux,
 	}
 
@@ -303,7 +303,7 @@ func main() {
 		server.Shutdown(ctx)
 	}()
 
-	log.Printf("WebTerm SSH proxy starting on 127.0.0.1:8080")
+	log.Printf("WebTerm SSH proxy starting on 0.0.0.0:8080")
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
 	}
