@@ -21,10 +21,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { MoreVertical, Edit2, Trash2, Copy, ExternalLink, Terminal } from 'lucide-react'
 import type { Connection } from '@/lib/api'
+import type { SSHSession } from '@/features/terminal/types'
 
 export const ConnectionList = () => {
   const { data: connections = [], isLoading } = useConnections()
-  const { selectedTags, setEditingConnection } = useAppStore()
+  const { selectedTags, setEditingConnection, sessions, activeSessionId, addSession, setActiveSession } = useAppStore()
   const deleteMutation = useDeleteConnection()
   const createMutation = useCreateConnection()
   
@@ -81,7 +82,27 @@ export const ConnectionList = () => {
           <div
             key={conn.id}
             className="group flex items-center justify-between p-2 rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors border border-transparent hover:border-border"
-            onClick={() => console.log('Connect to:', conn.id)}
+            onClick={() => {
+              // Check if a session already exists for this connection (D-01)
+              const existing = sessions.find((s) => s.connectionId === conn.id)
+              if (existing) {
+                setActiveSession(existing.id)
+                return
+              }
+              // Create new session
+              const sessionId = crypto.randomUUID()
+              const session: SSHSession = {
+                id: sessionId,
+                connectionId: conn.id,
+                host: conn.host,
+                port: conn.port,
+                username: conn.username,
+                label: conn.label,
+                status: 'connecting',
+                isQuickConnect: false,
+              }
+              addSession(session)
+            }}
           >
             <div className="flex flex-col min-w-0 flex-1">
               <div className="flex items-center gap-2">

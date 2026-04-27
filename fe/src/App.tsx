@@ -12,11 +12,13 @@ import { TagFilter } from '@/features/connections/components/TagFilter'
 import { ConnectionList } from '@/features/connections/components/ConnectionList'
 import { ExportImport } from '@/features/connections/components/ExportImport'
 import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
+import { TabBar } from '@/components/TabBar'
+import { TerminalPane } from '@/features/terminal/TerminalPane'
 
 const queryClient = new QueryClient()
 
 function AppContent() {
-  const { sidebarOpen, toggleSidebar, setCreatingConnection } = useAppStore()
+  const { sidebarOpen, toggleSidebar, setCreatingConnection, sessions, activeSessionId } = useAppStore()
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
@@ -73,21 +75,33 @@ function AppContent() {
           )}
           
           <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
-            {/* Tabs will go here in Phase 3 */}
-            <div className="px-3 py-1 bg-background border rounded-t-md text-sm font-medium">
-              Dashboard
-            </div>
+            <TabBar />
           </div>
         </header>
 
-        {/* Content Area */}
-        <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
-          <div className="max-w-md text-center">
-            <h3 className="text-lg font-medium text-foreground mb-2">No active sessions</h3>
-            <p className="text-sm">
-              Select a saved connection from the sidebar or use Quick Connect to start a new SSH session.
-            </p>
-          </div>
+        {/* Content Area — all sessions rendered, only active one visible */}
+        <div className="flex-1 relative">
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              className={cn("absolute inset-0", session.id !== activeSessionId && "hidden")}
+            >
+              <TerminalPane
+                sessionId={session.id}
+                initialConnect={session.connectionId ? { connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
+              />
+            </div>
+          ))}
+          {sessions.length === 0 && (
+            <div className="flex items-center justify-center h-full text-muted-foreground p-8">
+              <div className="max-w-md text-center">
+                <h3 className="text-lg font-medium text-foreground mb-2">No active sessions</h3>
+                <p className="text-sm">
+                  Select a saved connection from the sidebar or use Quick Connect to start a new SSH session.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

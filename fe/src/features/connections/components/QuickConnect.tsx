@@ -10,15 +10,69 @@ import {
 import { useConnections } from '../hooks/useConnections'
 import { Terminal, Plus } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
+import type { SSHSession } from '@/features/terminal/types'
 
 export const QuickConnect = () => {
   const [value, setValue] = React.useState('')
   const { data: connections = [] } = useConnections()
-  const setCreatingConnection = useAppStore((state) => state.setCreatingConnection)
+  const { setCreatingConnection, sessions, addSession, setActiveSession } = useAppStore()
 
   const handleSelect = (selectedValue: string) => {
-    console.log('Connecting to:', selectedValue)
-    // Phase 3 will handle actual SSH connection
+    // Check if this is a saved connection (selected from dropdown)
+    const savedConn = connections.find(
+      (c) => `${c.username}@${c.host}:${c.port}` === selectedValue
+    )
+    if (savedConn) {
+      // Use the same flow as ConnectionList — saved connection with connectionId
+      const existing = sessions.find((s) => s.connectionId === savedConn.id)
+      if (existing) {
+        setActiveSession(existing.id)
+      } else {
+        const sessionId = crypto.randomUUID()
+        const session: SSHSession = {
+          id: sessionId,
+          connectionId: savedConn.id,
+          host: savedConn.host,
+          port: savedConn.port,
+          username: savedConn.username,
+          label: savedConn.label,
+          status: 'connecting',
+          isQuickConnect: false,
+        }
+        addSession(session)
+      }
+      setValue('')
+      return
+    }
+
+    // Quick-connect: parse user@host[:port] (D-03)
+    const atIndex = selectedValue.indexOf('@')
+    if (atIndex < 0) return
+    const username = selectedValue.slice(0, atIndex)
+    const hostPort = selectedValue.slice(atIndex + 1)
+    const colonIndex = hostPort.indexOf(':')
+    const host = colonIndex >= 0 ? hostPort.slice(0, colonIndex) : hostPort
+    const port = colonIndex >= 0 ? parseInt(hostPort.slice(colonIndex + 1), 10) : 22
+
+    // Validate parsed input (T-03-09 mitigation)
+    if (!host.trim() || !username.trim() || host.includes(' ') || username.includes(' ')) {
+      return
+    }
+    if (isNaN(port) || port < 1 || port > 65535) {
+      return
+    }
+
+    const sessionId = crypto.randomUUID()
+    const session: SSHSession = {
+      id: sessionId,
+      host: host.trim(),
+      port,
+      username: username.trim(),
+      label: `${username.trim()}@${host.trim()}`,
+      status: 'connecting',
+      isQuickConnect: true,
+    }
+    addSession(session)
     setValue('')
   }
 
