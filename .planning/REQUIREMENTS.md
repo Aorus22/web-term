@@ -84,31 +84,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TERM-01 | — | Pending |
-| TERM-02 | — | Pending |
-| TERM-03 | — | Pending |
-| TERM-04 | — | Pending |
-| TERM-05 | — | Pending |
-| CONN-01 | — | Pending |
-| CONN-02 | — | Pending |
-| CONN-03 | — | Pending |
-| CONN-04 | — | Pending |
-| CONN-05 | — | Pending |
-| CONN-06 | — | Pending |
-| CONN-07 | — | Pending |
-| TAB-01 | — | Pending |
-| TAB-02 | — | Pending |
-| TAB-03 | — | Pending |
-| TAB-04 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| UI-04 | — | Pending |
+| TERM-01 | Phase 3 | Pending |
+| TERM-02 | Phase 3 | Pending |
+| TERM-03 | Phase 3 | Pending |
+| TERM-04 | Phase 3 | Pending |
+| TERM-05 | Phase 3 | Pending |
+| CONN-01 | Phase 2 | Pending |
+| CONN-02 | Phase 2 | Pending |
+| CONN-03 | Phase 2 | Pending |
+| CONN-04 | Phase 2 | Pending |
+| CONN-05 | Phase 2 | Pending |
+| CONN-06 | Phase 2 | Pending |
+| CONN-07 | Phase 2 | Pending |
+| TAB-01 | Phase 4 | Pending |
+| TAB-02 | Phase 4 | Pending |
+| TAB-03 | Phase 4 | Pending |
+| TAB-04 | Phase 4 | Pending |
+| UI-01 | Phase 2 | Pending |
+| UI-02 | Phase 4 | Pending |
+| UI-03 | Phase 4 | Pending |
+| UI-04 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20 ⚠️
+- Mapped to phases: 20
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-27*
