@@ -12,7 +12,7 @@ WebTerm is a self-hosted web-based SSH client. The roadmap starts with validatin
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: wterm Spike** - Validate @wterm/react handles SSH workloads before committing to architecture
+- [x] **Phase 1: wterm Spike** - Validate @wterm/react handles SSH workloads before committing to architecture
 - [ ] **Phase 2: Connection Management** - Full vertical slice: Go backend + React frontend for saving, organizing, and managing SSH connections
 - [ ] **Phase 3: SSH Terminal** - Core product: browser-to-SSH terminal with password auth, resize, copy/paste, and reconnection
 - [ ] **Phase 4: Multi-Tab & Polish** - Multiple simultaneous sessions, keyboard shortcuts, dark/light theme
@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 Plans:
 - [x] 01-01-PLAN.md — Build spike: Go WebSocket SSH proxy + React @wterm/react terminal
-- [ ] 01-02-PLAN.md — Human validation checkpoint: vim/htop/tmux/resize + go/no-go decision
+- [x] 01-02-PLAN.md — Human validation checkpoint: vim/htop/tmux/resize + go/no-go decision
 **UI hint**: yes
 
 ### Phase 2: Connection Management
@@ -81,7 +81,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. wterm Spike | 1/2 | In Progress | - |
+| 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
 | 2. Connection Management | 0/? | Not started | - |
 | 3. SSH Terminal | 0/? | Not started | - |
 | 4. Multi-Tab & Polish | 0/? | Not started | - |

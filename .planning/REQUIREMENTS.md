@@ -84,11 +84,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TERM-01 | Phase 3 | Pending |
-| TERM-02 | Phase 3 | Pending |
-| TERM-03 | Phase 3 | Pending |
-| TERM-04 | Phase 3 | Pending |
-| TERM-05 | Phase 3 | Pending |
+| TERM-01 | Phase 1 (validated), Phase 3 | Validated |
+| TERM-02 | Phase 1 (validated), Phase 3 | Validated |
+| TERM-03 | Phase 1 (validated), Phase 3 | Validated |
+| TERM-04 | Phase 1 (validated), Phase 3 | Validated |
+| TERM-05 | Phase 1 (validated), Phase 3 | Validated |
 | CONN-01 | Phase 2 | Pending |
 | CONN-02 | Phase 2 | Pending |
 | CONN-03 | Phase 2 | Pending |
@@ -112,4 +112,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-04-27*
-*Last updated: 2026-04-27 after initialization*
+*Last updated: 2026-04-27 after Phase 1 completion*
