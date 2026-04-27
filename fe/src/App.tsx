@@ -23,9 +23,8 @@ function App() {
       const portNum = parseInt(port, 10) || 22;
 
       // Create WebSocket to Vite dev proxy (which proxies to Go backend).
-      const socket = new WebSocket(
-        `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
-      );
+      const wsHost = window.location.hostname;
+      const socket = new WebSocket(`ws://${wsHost}:8080/ws`);
       wsRef.current = socket;
 
       socket.binaryType = 'arraybuffer';
