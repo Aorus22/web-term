@@ -7,7 +7,7 @@ WebTerm v0.3.0 adds SSH key-based authentication and a sidebar UI redesign. Thre
 ## Milestones
 
 - ✅ **v0.2.0 MVP** - Phases 1-4 (shipped 2026-04-28)
-- 🚧 **v0.3.0 SSH Key Auth & UI Redesign** - Phases 5-8 (in progress)
+- ✅ **v0.3.0 SSH Key Auth & UI Redesign** - Phases 5-8 (shipped 2026-04-28)
 
 ## Phases
 
@@ -50,7 +50,7 @@ Plans:
 
 </details>
 
-### 🚧 v0.3.0 SSH Key Auth & UI Redesign (In Progress)
+### ✅ v0.3.0 SSH Key Auth & UI Redesign (Shipped 2026-04-28)
 
 **Milestone Goal:** SSH key-based authentication + sidebar redesigned into 2-page navigation (Hosts & SSH Keys) + port forwarding
 
