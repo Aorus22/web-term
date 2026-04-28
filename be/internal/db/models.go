@@ -50,6 +50,23 @@ func (k *SSHKey) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type PortForward struct {
+	ID           string    `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	Name         string    `json:"name" gorm:"not null"`
+	ConnectionID string    `json:"connection_id" gorm:"not null;type:varchar(36)"`
+	LocalPort    int       `json:"local_port" gorm:"not null"`
+	RemotePort   int       `json:"remote_port" gorm:"not null"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+func (pf *PortForward) BeforeCreate(tx *gorm.DB) (err error) {
+	if pf.ID == "" {
+		pf.ID = uuid.New().String()
+	}
+	return
+}
+
 type StringList []string
 func (sl StringList) Value() (driver.Value, error) {
 	return json.Marshal(sl)

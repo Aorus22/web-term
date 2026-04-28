@@ -8,15 +8,24 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupRoutes(mux *http.ServeMux, db *gorm.DB, cfg *config.Config) {
+func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	h := &ConnectionHandler{
-		DB:  db,
+		DB:  database,
 		Cfg: cfg,
 	}
 
 	kh := &SSHKeyHandler{
-		DB:  db,
+		DB:  database,
 		Cfg: cfg,
+	}
+
+	// Create tunnel manager for port forwarding
+	tunnelMgr := ssh.NewTunnelManager(database, cfg)
+
+	fh := &ForwardHandler{
+		DB:        database,
+		Cfg:       cfg,
+		TunnelMgr: tunnelMgr,
 	}
 
 	// Go 1.22+ method routing
@@ -35,6 +44,13 @@ func SetupRoutes(mux *http.ServeMux, db *gorm.DB, cfg *config.Config) {
 	mux.HandleFunc("PUT /api/keys/{id}", kh.UpdateKey)
 	mux.HandleFunc("DELETE /api/keys/{id}", kh.DeleteKey)
 
+	// Port Forward endpoints
+	mux.HandleFunc("GET /api/forwards", fh.ListForwards)
+	mux.HandleFunc("POST /api/forwards", fh.CreateForward)
+	mux.HandleFunc("DELETE /api/forwards/{id}", fh.DeleteForward)
+	mux.HandleFunc("POST /api/forwards/{id}/start", fh.StartForward)
+	mux.HandleFunc("POST /api/forwards/{id}/stop", fh.StopForward)
+
 	// WebSocket handler
-	mux.HandleFunc("GET /ws", ssh.HandleWebSocket(db, cfg))
+	mux.HandleFunc("GET /ws", ssh.HandleWebSocket(database, cfg))
 }
