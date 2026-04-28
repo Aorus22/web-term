@@ -85,13 +85,13 @@ Plans:
   3. Hosts page displays connections as cards with kebab menu actions (edit, delete, duplicate, connect)
   4. Connection add/edit form includes auth method toggle (password vs SSH key) and key selector dropdown when key is chosen
   5. Quick-connect bar supports initiating connections that use key-based auth
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 06-01: Sidebar tab navigation and SSH Keys page
-- [ ] 06-02: Hosts card page with kebab menus
-- [ ] 06-03: Connection form auth method toggle and key selector
+- [ ] 06-01-PLAN.md — Sidebar navigation + API layer + SSH Keys feature
+- [ ] 06-02-PLAN.md — Hosts card page with kebab menus
+- [ ] 06-03-PLAN.md — Connection form auth method and key selector
 
 ### Phase 7: WebSocket Key Auth Integration
 **Goal**: Users can establish SSH connections using key-based authentication with passphrase support, while existing password connections work unchanged
