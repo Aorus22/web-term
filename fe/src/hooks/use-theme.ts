@@ -1,54 +1,58 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { settingsApi } from '@/lib/api'
 
 export type Theme = 'light' | 'dark' | 'system'
 export type ResolvedTheme = 'light' | 'dark'
 
 export function useTheme() {
+  const queryClient = useQueryClient()
   const [theme, setThemeState] = useState<Theme>(() => {
+    // Fallback to localStorage on first load before API data arrives
     return (localStorage.getItem('webterm-theme') as Theme) || 'system'
   })
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => {
-    if (theme !== 'system') return theme
+    if (theme !== 'system') return theme as ResolvedTheme
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
 
+  // Apply theme to DOM
   useEffect(() => {
     const root = window.document.documentElement
-    
     const applyTheme = (currentTheme: Theme) => {
-      let effectiveTheme: ResolvedTheme = 'light'
-      
-      if (currentTheme === 'system') {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-      } else {
-        effectiveTheme = currentTheme
-      }
-      
-      setResolvedTheme(effectiveTheme)
-      
-      if (effectiveTheme === 'dark') {
-        root.classList.add('dark')
-      } else {
-        root.classList.remove('dark')
-      }
+      const effective: ResolvedTheme = currentTheme === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : currentTheme as ResolvedTheme
+      setResolvedTheme(effective)
+      root.classList.toggle('dark', effective === 'dark')
     }
-
     applyTheme(theme)
-    localStorage.setItem('webterm-theme', theme)
+    localStorage.setItem('webterm-theme', theme) // keep as fallback
 
     if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      const handleChange = () => applyTheme('system')
-      
-      mediaQuery.addEventListener('change', handleChange)
-      return () => mediaQuery.removeEventListener('change', handleChange)
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const handler = () => applyTheme('system')
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
     }
   }, [theme])
 
-  const setTheme = (newTheme: Theme) => {
+  // Sync from settings API data when it loads
+  useEffect(() => {
+    const settings = queryClient.getQueryData<{ settings: Record<string, string> }>(['settings'])
+    if (settings?.settings?.theme_mode && ['light','dark','system'].includes(settings.settings.theme_mode)) {
+      setThemeState(settings.settings.theme_mode as Theme)
+    }
+  }, [queryClient])
+
+  const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme)
-  }
+    // Persist to backend (fire-and-forget, optimistic update)
+    settingsApi.update({ theme_mode: newTheme }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
+    })
+  }, [queryClient])
 
   return { theme, resolvedTheme, setTheme }
 }

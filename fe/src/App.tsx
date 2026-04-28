@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { PanelLeft, Server, Key, ArrowLeftRight } from 'lucide-react'
+import { PanelLeft, Server, Key, ArrowLeftRight, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -8,12 +8,12 @@ import { cn } from '@/lib/utils'
 
 import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
 import { TabBar } from '@/components/TabBar'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { Toaster } from '@/components/ui/sonner'
 import { TerminalPane } from '@/features/terminal/TerminalPane'
 import { HostsPage } from '@/features/hosts/components/HostsPage'
 import { SSHKeysPage } from '@/features/ssh-keys/components/SSHKeysPage'
 import { PortForwardsPage } from '@/features/forwards/components/PortForwardsPage'
+import { SettingsPage } from '@/features/settings/components/SettingsPage'
 import { NewTabView } from '@/components/NewTabView'
 import { useTheme } from '@/hooks/use-theme'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
@@ -108,6 +108,23 @@ function AppContent() {
             <ArrowLeftRight className="h-4 w-4" /> Port Forwards
           </button>
         </nav>
+
+        <div className="flex-1" />
+        <Separator />
+        <div className="p-2">
+          <button 
+            onClick={() => {
+              setSidebarPage('settings')
+              setActiveSession(null)
+            }} 
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
+              sidebarPage === 'settings' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+            )}
+          >
+            <Settings className="h-4 w-4" /> Settings
+          </button>
+        </div>
       </aside>
 
       {/* Main Area */}
@@ -121,7 +138,6 @@ function AppContent() {
           <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
             <TabBar />
           </div>
-          <ThemeToggle />
         </header>
 
         {/* Content Area — all sessions rendered, only active one visible */}
@@ -150,6 +166,9 @@ function AppContent() {
           )}
           {!activeSessionId && sidebarPage === 'forwards' && (
             <PortForwardsPage />
+          )}
+          {!activeSessionId && sidebarPage === 'settings' && (
+            <SettingsPage />
           )}
         </div>
       </main>
