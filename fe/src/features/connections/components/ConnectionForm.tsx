@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/stores/app-store'
 import { useCreateConnection, useUpdateConnection } from '../hooks/useConnections'
+import { useSSHKeys } from '@/features/ssh-keys/hooks/useSSHKeys'
+import { ExternalLink } from 'lucide-react'
 import type { Connection } from '@/lib/api'
 
 export const ConnectionForm = () => {
@@ -19,9 +21,11 @@ export const ConnectionForm = () => {
     creatingConnection, 
     setCreatingConnection, 
     editingConnection, 
-    setEditingConnection 
+    setEditingConnection,
+    setSidebarPage
   } = useAppStore()
 
+  const { data: sshKeys = [] } = useSSHKeys()
   const createMutation = useCreateConnection()
   const updateMutation = useUpdateConnection()
 
@@ -32,6 +36,8 @@ export const ConnectionForm = () => {
     username: 'root',
     password: '',
     tags: [],
+    auth_method: 'password',
+    ssh_key_id: null,
   })
 
   const [tagsInput, setTagsInput] = React.useState('')
@@ -48,6 +54,8 @@ export const ConnectionForm = () => {
         username: editingConnection.username,
         password: '', // Password not loaded for security, handled on backend
         tags: editingConnection.tags || [],
+        auth_method: editingConnection.auth_method || 'password',
+        ssh_key_id: editingConnection.ssh_key_id || null,
       })
       setTagsInput((editingConnection.tags || []).join(', '))
     } else {
@@ -58,6 +66,8 @@ export const ConnectionForm = () => {
         username: 'root',
         password: '',
         tags: [],
+        auth_method: 'password',
+        ssh_key_id: null,
       })
       setTagsInput('')
     }
@@ -176,8 +186,53 @@ export const ConnectionForm = () => {
               placeholder={editingConnection ? 'Leave empty to keep existing' : 'Secure password'}
             />
             <p className="text-[10px] text-muted-foreground">
-              Passwords are encrypted with AES-256-GCM on the server.
+              {formData.ssh_key_id
+                ? 'Password stored as fallback. Key auth will be primary.'
+                : 'Passwords are encrypted with AES-256-GCM on the server.'}
             </p>
+          </div>
+
+          {/* SSH Key Selector — per D-19, D-20: both fields always visible */}
+          <div className="space-y-2">
+            <Label htmlFor="ssh-key">SSH Key (optional)</Label>
+            <div className="flex gap-2">
+              <select
+                id="ssh-key"
+                value={formData.ssh_key_id || ''}
+                onChange={(e) => {
+                  const keyId = e.target.value || null
+                  setFormData({
+                    ...formData,
+                    ssh_key_id: keyId,
+                    auth_method: keyId ? 'key' : 'password',
+                  })
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">None</option>
+                {sshKeys.map((key) => (
+                  <option key={key.id} value={key.id}>
+                    {key.name} ({key.key_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {sshKeys.length === 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                No SSH keys uploaded yet.
+              </p>
+            )}
+            {/* Manage SSH Keys link — per D-22 */}
+            <button
+              type="button"
+              onClick={() => {
+                handleClose()
+                setSidebarPage('keys')
+              }}
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <ExternalLink className="h-3 w-3" /> Manage SSH Keys
+            </button>
           </div>
 
           <div className="space-y-2">

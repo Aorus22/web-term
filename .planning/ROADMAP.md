@@ -54,8 +54,8 @@ Plans:
 
 **Milestone Goal:** SSH key-based authentication + sidebar redesigned into 2-page navigation (Hosts & SSH Keys)
 
-- [ ] **Phase 5: Backend SSH Key Storage** - SSH key model, encrypted storage, CRUD API, connection schema update
-- [ ] **Phase 6: Frontend UI & Navigation** - Sidebar tabs, hosts card page, SSH keys page, connection form auth toggle
+- [x] **Phase 5: Backend SSH Key Storage** - SSH key model, encrypted storage, CRUD API, connection schema update
+- [x] **Phase 6: Frontend UI & Navigation** - Sidebar tabs, hosts card page, SSH keys page, connection form auth toggle
 - [ ] **Phase 7: WebSocket Key Auth Integration** - Key-based SSH auth, passphrase round-trip, backward compatibility
 
 ## Phase Details
@@ -72,8 +72,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — SSH key model, encrypted storage, and CRUD API
-- [ ] 05-02-PLAN.md — Connection schema migration and encryption AAD context
+- [x] 05-01-PLAN.md — SSH key model, encrypted storage, and CRUD API
+- [x] 05-02-PLAN.md — Connection schema migration and encryption AAD context
 
 ### Phase 6: Frontend UI & Navigation
 **Goal**: Users navigate between Hosts and SSH Keys pages, manage keys visually, and configure auth method per connection
@@ -89,9 +89,9 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 06-01-PLAN.md — Sidebar navigation + API layer + SSH Keys feature
-- [ ] 06-02-PLAN.md — Hosts card page with kebab menus
-- [ ] 06-03-PLAN.md — Connection form auth method and key selector
+- [x] 06-01-PLAN.md — Sidebar navigation + API layer + SSH Keys feature
+- [x] 06-02-PLAN.md — Hosts card page with kebab menus
+- [x] 06-03-PLAN.md — Connection form auth method and key selector
 
 ### Phase 7: WebSocket Key Auth Integration
 **Goal**: Users can establish SSH connections using key-based authentication with passphrase support, while existing password connections work unchanged

@@ -8,7 +8,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { useConnections } from '../hooks/useConnections'
-import { Terminal, Plus } from 'lucide-react'
+import { Terminal, Plus, Key } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
 import { generateId } from '@/lib/utils'
 import type { SSHSession } from '@/features/terminal/types'
@@ -107,7 +107,10 @@ export const QuickConnect = () => {
                   className="cursor-pointer"
                 >
                   <Terminal className="mr-2 h-4 w-4" />
-                  <span>{conn.label} ({conn.host})</span>
+                  <span className="flex items-center gap-2">
+                    {conn.ssh_key_id && <Key className="h-3 w-3 text-muted-foreground" />}
+                    {conn.label} ({conn.host})
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>
