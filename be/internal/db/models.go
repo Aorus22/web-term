@@ -17,10 +17,12 @@ type Connection struct {
 	Port      int       `json:"port" gorm:"default:22"`
 	Username  string    `json:"username" gorm:"not null"`
 	Password  string    `json:"password,omitempty" gorm:"-"` // Omitted from GORM default if not handled
-	Encrypted string    `json:"-" gorm:"column:password"`    // Stored in DB
+	Encrypted string     `json:"-" gorm:"column:password"`    // Stored in DB
 	Tags      StringList `json:"tags" gorm:"type:text"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	AuthMethod string    `json:"auth_method" gorm:"default:password;not null"`
+	SSHKeyID   *string   `json:"ssh_key_id,omitempty" gorm:"type:varchar(36)"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 func (c *Connection) BeforeCreate(tx *gorm.DB) (err error) {
