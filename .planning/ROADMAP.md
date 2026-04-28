@@ -122,10 +122,26 @@ Plans:
 - [x] 08-01-PLAN.md — Backend: PortForward model, CRUD API, tunnel manager with SSH dial
 - [x] 08-02-PLAN.md — Frontend: Port Forwards page, form sheet, sidebar integration, port conflict toast
 
+### Phase 9: Settings Page
+**Goal**: Settings page with justify-between layout (label left, value right), dark/light mode switcher, terminal emulator type selection (xterm, xterm-256-color, vanilla), and terminal color theme presets (Monokai, Solarized, Dracula, Nord, etc. — like Termius)
+**Depends on**: Phase 4 (v0.2.0 complete)
+**Success Criteria** (what must be TRUE):
+1. Settings page displays options in justify-between layout — label on the left, control on the right
+2. Dark mode / light mode switcher toggles app theme and persists preference
+3. Terminal emulator type selector offers options like xterm, xterm-256-color, vanilla (like Termius)
+4. Terminal color theme picker shows preset themes (Monokai, Solarized Dark/Light, Dracula, Nord, GitHub, One Dark, etc.) with live preview
+5. Selected terminal theme and emulator type are applied to the terminal component on connection
+**Plans**: 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Backend settings API (key-value model + handlers) and dynamic terminal type in SSH proxy
+- [ ] 09-02-PLAN.md — Frontend settings infrastructure, SettingsPage UI, sidebar integration, ThemeToggle removal
+- [ ] 09-03-PLAN.md — Terminal settings integration (theme, font, cursor, scrollback, terminal type)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 5 → 6 → 7 → 8
+Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -137,3 +153,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | 6. Frontend UI & Navigation | v0.3.0 | 3/3 | Complete | 2026-04-28 |
 | 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 8. Port Forwarding | v0.3.0 | 2/2 | Complete | 2026-04-28 |
+| 9. Settings Page | _next_ | 0/3 | Planned | — |
