@@ -68,6 +68,6 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-04-28
-Stopped at: Roadmap created for v0.3.0
-Resume file: None
+Stopped at: Phase 5 context gathered
+Resume file: `.planning/phases/05-backend-ssh-key-storage/05-CONTEXT.md`
 Next step: `/gsd-plan-phase 5`
