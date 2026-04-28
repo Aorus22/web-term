@@ -67,6 +67,12 @@ func (pf *PortForward) BeforeCreate(tx *gorm.DB) (err error) {
 	return
 }
 
+type Setting struct {
+	Key       string    `json:"key" gorm:"primaryKey;type:varchar(64)"`
+	Value     string    `json:"value" gorm:"not null"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type StringList []string
 func (sl StringList) Value() (driver.Value, error) {
 	return json.Marshal(sl)

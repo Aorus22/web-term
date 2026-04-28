@@ -28,6 +28,11 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 		TunnelMgr: tunnelMgr,
 	}
 
+	sh := &SettingsHandler{
+		DB:  database,
+		Cfg: cfg,
+	}
+
 	// Go 1.22+ method routing
 	mux.HandleFunc("GET /api/connections", h.ListConnections)
 	mux.HandleFunc("GET /api/connections/{id}", h.GetConnection)
@@ -50,6 +55,10 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	mux.HandleFunc("DELETE /api/forwards/{id}", fh.DeleteForward)
 	mux.HandleFunc("POST /api/forwards/{id}/start", fh.StartForward)
 	mux.HandleFunc("POST /api/forwards/{id}/stop", fh.StopForward)
+
+	// Settings endpoints
+	mux.HandleFunc("GET /api/settings", sh.GetSettings)
+	mux.HandleFunc("PUT /api/settings", sh.UpdateSettings)
 
 	// WebSocket handler
 	mux.HandleFunc("GET /ws", ssh.HandleWebSocket(database, cfg))
