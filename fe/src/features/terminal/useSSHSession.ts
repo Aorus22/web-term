@@ -56,7 +56,8 @@ export function useSSHSession(sessionId: string) {
             cols: opts.cols,
             auth_method: opts.auth_method,
             ssh_key_id: opts.ssh_key_id,
-            passphrase: opts.passphrase 
+            passphrase: opts.passphrase,
+            term: opts.term
           }
         : opts
 
@@ -100,6 +101,7 @@ export function useSSHSession(sessionId: string) {
               auth_method: opts.auth_method || 'password',
               ...(opts.ssh_key_id && { ssh_key_id: opts.ssh_key_id }),
               ...(opts.passphrase && { passphrase: opts.passphrase }),
+              ...(opts.term && { term: opts.term }),
               rows,
               cols,
             })
@@ -109,6 +111,7 @@ export function useSSHSession(sessionId: string) {
               port: opts.port ?? 22,
               user: opts.username,
               password: opts.password,
+              ...(opts.term && { term: opts.term }),
               rows,
               cols,
             })

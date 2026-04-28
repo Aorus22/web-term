@@ -32,4 +32,5 @@ export interface ConnectOptions {
   // Initial terminal size
   rows?: number
   cols?: number
+  term?: string  // Terminal type for TERM env var (e.g., "xterm-256color")
 }
