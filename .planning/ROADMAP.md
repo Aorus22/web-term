@@ -81,7 +81,7 @@ Plans:
 **Plans**: 3 plans
 
 **Wave 1** *(no dependencies — parallel execution)*
-- [ ] 04-01-PLAN.md — Theme system (useTheme hook, ThemeToggle) + keyboard shortcuts hook
+- [x] 04-01-PLAN.md — Theme system (useTheme hook, ThemeToggle) + keyboard shortcuts hook
 - [ ] 04-02-PLAN.md — Sidebar cleanup, NewTabView selection grid, ConnectionForm polish
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -99,19 +99,19 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
 | 2. Connection Management | 2/2 | Complete | 2026-04-27 |
 | 3. SSH Terminal | 3/3 | Complete | 2026-04-27 |
-| 4. Multi-Tab & Polish | 0/3 | Planned | - |
+| 4. Multi-Tab & Polish | 1/3 | In Progress | 2024-05-15 |
 ---
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: milestone
 status: executing
-stopped_at: "Phase 03 Complete"
-last_updated: "2026-04-27T15:30:00Z"
-last_activity: 2026-04-27 -- Phase 03 SSH Terminal complete (3 plans)
+stopped_at: "Phase 04 Plan 01 complete"
+last_updated: "2024-05-15T15:30:00Z"
+last_activity: 2024-05-15 -- Phase 04 Plan 01 completed
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_plans: 10
+  completed_plans: 8
+  percent: 80
 ---
