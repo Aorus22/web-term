@@ -115,3 +115,18 @@ export const keysApi = {
       if (r.status === 200) return r.json()
     }),
 }
+
+const SETTINGS_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/settings`
+
+export type SettingsResponse = { settings: Record<string, string> }
+
+export const settingsApi = {
+  list: (): Promise<SettingsResponse> =>
+    fetch(SETTINGS_API_BASE).then(r => r.json()),
+  update: (settings: Record<string, string>): Promise<SettingsResponse> =>
+    fetch(SETTINGS_API_BASE, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings }),
+    }).then(r => r.json()),
+}
