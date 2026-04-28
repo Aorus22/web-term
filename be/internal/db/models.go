@@ -30,8 +30,25 @@ func (c *Connection) BeforeCreate(tx *gorm.DB) (err error) {
 	return
 }
 
-type StringList []string
+type SSHKey struct {
+	ID            string    `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	Name          string    `json:"name" gorm:"not null"`
+	EncryptedKey  string    `json:"-" gorm:"column:encrypted_key;not null"`
+	Fingerprint   string    `json:"fingerprint" gorm:"not null"`
+	KeyType       string    `json:"key_type" gorm:"not null"`
+	HasPassphrase bool      `json:"has_passphrase" gorm:"not null;default:false"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
 
+func (k *SSHKey) BeforeCreate(tx *gorm.DB) error {
+	if k.ID == "" {
+		k.ID = uuid.New().String()
+	}
+	return nil
+}
+
+type StringList []string
 func (sl StringList) Value() (driver.Value, error) {
 	return json.Marshal(sl)
 }
