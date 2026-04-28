@@ -11,12 +11,13 @@ import type { ConnectOptions } from './types'
 
 interface TerminalPaneProps {
   sessionId: string
+  isActive?: boolean
   /** When provided, auto-connect on mount (saved connection with stored password) */
   initialConnect?: ConnectOptions
   theme?: 'light' | 'dark'
 }
 
-export function TerminalPane({ sessionId, initialConnect, theme }: TerminalPaneProps) {
+export function TerminalPane({ sessionId, isActive, initialConnect, theme }: TerminalPaneProps) {
   const { ref, connect, sendData, sendResize, disconnect } = useSSHSession(sessionId)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const removeSession = useAppStore((s) => s.removeSession)
@@ -38,6 +39,18 @@ export function TerminalPane({ sessionId, initialConnect, theme }: TerminalPaneP
       setShowSaveBanner(true)
     }
   }, [session?.status, session?.isQuickConnect])
+
+  // Scroll to bottom when tab becomes active
+  useEffect(() => {
+    if (!isActive) return
+    const handle = ref.current
+    if (!handle?.instance) return
+    const el = handle.instance.element
+    const maxScroll = el.scrollHeight - el.clientHeight
+    if (maxScroll <= 0) return
+    const rh = (handle.instance as any)._rowHeight || 17
+    el.scrollTop = Math.floor(maxScroll / rh) * rh
+  }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRetry = () => {
     if (lastOptionsRef.current) {
@@ -108,6 +121,7 @@ export function TerminalPane({ sessionId, initialConnect, theme }: TerminalPaneP
           theme={theme === 'light' ? 'light' : undefined}
           onData={sendData}
           onResize={sendResize}
+          style={{ height: '100%' }}
         />
       </div>
     )
@@ -155,6 +169,7 @@ export function TerminalPane({ sessionId, initialConnect, theme }: TerminalPaneP
             theme={theme === 'light' ? 'light' : undefined}
             onData={() => {}}
             onResize={sendResize}
+            style={{ height: '100%' }}
           />
           {/* Reconnect overlay on top (UI-04) */}
           <ReconnectOverlay

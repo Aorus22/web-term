@@ -105,10 +105,11 @@ function AppContent() {
           {sessions.map((session) => (
             <div
               key={session.id}
-              className={cn("absolute inset-0", session.id !== activeSessionId && "hidden")}
+              className={cn("absolute inset-0", session.id !== activeSessionId && "invisible pointer-events-none")}
             >
               <TerminalPane
                 sessionId={session.id}
+                isActive={session.id === activeSessionId}
                 initialConnect={session.connectionId ? { connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
                 theme={resolvedTheme}
               />
