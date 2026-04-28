@@ -1,7 +1,7 @@
 ---
 phase: 4
 slug: multi-tab-polish
-status: draft
+status: approved
 shadcn_initialized: true
 preset: base-nova
 created: 2026-04-28
@@ -56,11 +56,11 @@ Exceptions: none
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px (text-sm) | 400 (default) | 1.5 (tailwind default) |
-| Label | 14px (text-sm) | 500 (font-medium) | 1.5 |
+| Label | 14px (text-sm) | 600 (font-semibold) | 1.5 |
 | Heading | 18px (text-lg) | 600 (font-semibold) | 1.2 (tracking-tight) |
 | Small | 12px (text-xs) | 400 (default) | 1.5 |
 
-**Rationale:** These 3 sizes + small are already in use across the codebase (text-sm, text-lg, text-xs in App.tsx, TabBar, ReconnectOverlay, TerminalPane). No new sizes needed.
+**Rationale:** 2 weights (400, 600) across 3 sizes + small. Labels use font-semibold alongside headings for clear visual distinction from body text without introducing a third weight. These sizes are already in use across the codebase (text-sm, text-lg, text-xs in App.tsx, TabBar, ReconnectOverlay, TerminalPane). No new sizes needed.
 
 ---
 
@@ -294,11 +294,11 @@ No third-party registries. No new shadcn components needed beyond what's already
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS (FLAG: inherited `py-1.5` 6px pattern — non-blocking)
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-04-28
