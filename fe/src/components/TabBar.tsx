@@ -41,39 +41,29 @@ export function TabBar() {
           <span className="truncate max-w-[120px]">
             {session.label || `${session.username}@${session.host}`}
           </span>
-          
           <Tooltip open={confirmingClose === session.id} onOpenChange={(open) => !open && setConfirmingClose(null)}>
-            <TooltipTrigger asChild>
-              <span
-                role="button"
-                tabIndex={0}
-                className={cn(
-                  "rounded-sm p-0.5 transition-opacity",
-                  "opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/10",
-                  confirmingClose === session.id && "opacity-100"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (session.status === 'connected') {
-                    setConfirmingClose(session.id)
-                  } else {
-                    removeSession(session.id)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+            <TooltipTrigger
+              render={
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={cn(
+                    "rounded-sm p-0.5 transition-opacity",
+                    "opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/10",
+                    confirmingClose === session.id && "opacity-100"
+                  )}
+                  onClick={(e) => {
                     e.stopPropagation()
                     if (session.status === 'connected') {
                       setConfirmingClose(session.id)
                     } else {
                       removeSession(session.id)
                     }
-                  }
-                }}
-                aria-label={`Close ${session.label}`}
-              >
-                <X className="h-3 w-3" />
-              </span>
+                  }}
+                />
+              }
+            >
+              <X className={cn("h-3.5 w-3.5", confirmingClose === session.id && "text-destructive")} />
             </TooltipTrigger>
             <TooltipContent 
               side="bottom" 

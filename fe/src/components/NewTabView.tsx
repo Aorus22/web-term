@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { Terminal, Plus, Tag as TagIcon } from 'lucide-react'
 import { useConnections } from '@/features/connections/hooks/useConnections'
 import { QuickConnect } from '@/features/connections/components/QuickConnect'

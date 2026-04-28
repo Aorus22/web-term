@@ -26,7 +26,7 @@ import type { SSHSession } from '@/features/terminal/types'
 
 export const ConnectionList = () => {
   const { data: connections = [], isLoading } = useConnections()
-  const { selectedTags, setEditingConnection, sessions, activeSessionId, addSession, setActiveSession } = useAppStore()
+  const { selectedTags, setEditingConnection, sessions, addSession, setActiveSession } = useAppStore()
   const deleteMutation = useDeleteConnection()
   const createMutation = useCreateConnection()
   

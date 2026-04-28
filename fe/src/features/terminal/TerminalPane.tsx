@@ -19,7 +19,7 @@ interface TerminalPaneProps {
 }
 
 export function TerminalPane({ sessionId, isActive, initialConnect, theme }: TerminalPaneProps) {
-  const { ref, connect, sendData, sendResize, disconnect } = useSSHSession(sessionId)
+  const { ref, connect, sendData, sendResize } = useSSHSession(sessionId)
   const { onReady: onTerminalReady } = useTerminalMouse(sendData)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const removeSession = useAppStore((s) => s.removeSession)

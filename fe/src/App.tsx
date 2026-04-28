@@ -68,11 +68,7 @@ function AppContent() {
         
         <Separator />
         
-        <div className="py-2">
-          <TagFilter />
-        </div>
-        
-        <Separator />
+        <TagFilter />
         
         <ScrollArea className="flex-1">
           <ConnectionList />
