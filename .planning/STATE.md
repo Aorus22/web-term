@@ -4,15 +4,17 @@
 
 See: .planning/PROJECT.md (updated 2026-04-28)
 
-**Core value:** Bisa SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable
-**Current focus:** Planning next milestone
+**Core value:** SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable
+**Current focus:** Planning v0.3.0
 
 ## Current Position
 
-Phase: None (milestone v0.2.0 archived)
-Last activity: 2026-04-28 -- v0.2.0 milestone completed and archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-28 — Milestone v0.3.0 started
 
-Progress: [==========] 100% (Milestone v0.2.0 — SHIPPED)
+Progress: [          ] 0% (Milestone v0.3.0 — SSH Key Auth & UI Redesign)
 
 ## Performance Metrics
 
@@ -56,6 +58,6 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-04-28
-Stopped at: v0.2.0 milestone archived
+Stopped at: Defining requirements for v0.3.0
 Resume file: None
-Next step: `/gsd-new-milestone` to plan v2
+Next step: `/gsd-plan-phase [N]` after roadmap approval

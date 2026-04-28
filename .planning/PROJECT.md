@@ -27,7 +27,11 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 
 ### Active
 
-(None — all v1 requirements shipped)
+- [ ] SSH key-based authentication (upload, connect, manage keys)
+- [ ] Sidebar redesign into 2-page navigation (Hosts + SSH Keys)
+- [ ] Hosts page with card-based layout and kebab menus
+- [ ] SSH Keys page with key pool management
+- [ ] Per-connection auth method selection (password vs key)
 
 ### Out of Scope
 
@@ -85,6 +89,17 @@ This document evolves at phase transitions and milestone boundaries.
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
+## Current Milestone: v0.3.0 SSH Key Auth & UI Redesign
+
+**Goal:** Add SSH key-based authentication + redesign sidebar into a 2-page navigation (Hosts & SSH Keys).
+
+**Target features:**
+- Sidebar → 2-page nav: "Hosts" and "SSH Keys" menu items
+- Hosts page: Card-based layout showing all hosts, kebab menu per card (edit/delete/duplicate), click to connect. Add/edit via right-side sheet (existing pattern)
+- SSH Keys page: Key pool management — upload, list, rename, delete keys
+- SSH Key auth: Upload existing private keys, encrypted at rest (AES-256-GCM), passphrase-protected key support (prompt on connect)
+- Per-connection auth: When adding/editing a host, select auth method (password vs key) and which key to use
 
 ---
-*Last updated: 2026-04-28 after v0.2.0 milestone*
+
+*Last updated: 2026-04-28 after v0.3.0 milestone start*
