@@ -13,6 +13,27 @@ import (
 	"webterm/internal/db"
 )
 
+func corsMux(next http.Handler, origins []string) http.Handler {
+	allowed := make(map[string]bool, len(origins))
+	for _, o := range origins {
+		allowed[o] = true
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if allowed[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -27,9 +48,11 @@ func main() {
 	mux := http.NewServeMux()
 	api.SetupRoutes(mux, database, cfg)
 
+	handler := corsMux(mux, cfg.AllowedOrigins)
+
 	server := &http.Server{
 		Addr:    "0.0.0.0" + cfg.Port,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	// Graceful shutdown

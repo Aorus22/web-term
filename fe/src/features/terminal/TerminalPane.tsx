@@ -27,10 +27,7 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   useEffect(() => {
     if (initialConnect) {
       lastOptionsRef.current = initialConnect
-      const currentStatus = session?.status
-      if (!currentStatus || currentStatus === 'disconnected' || currentStatus === 'error') {
-        connect(initialConnect)
-      }
+      connect(initialConnect)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -3,3 +3,7 @@ be/webterm
 
 # OS
 .DS_Store
+
+# Env
+.env
+*.db

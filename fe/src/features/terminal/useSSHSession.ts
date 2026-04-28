@@ -58,21 +58,26 @@ export function useSSHSession(sessionId: string) {
       const isQuickConnect = !opts.connectionId
       const label = opts.connectionId ? (host || 'Connecting...') : `${username}@${host}`
 
-      // Add session to store with connecting status
-      addSession({
-        id: sessionId,
-        connectionId: opts.connectionId,
-        host,
-        port,
-        username,
-        label,
-        status: 'connecting',
-        isQuickConnect,
-      })
+      // Update or add session to store with connecting status
+      const found = useAppStore.getState().sessions.find((s) => s.id === sessionId)
+      if (found) {
+        updateSession(sessionId, { status: 'connecting' })
+      } else {
+        addSession({
+          id: sessionId,
+          connectionId: opts.connectionId,
+          host,
+          port,
+          username,
+          label,
+          status: 'connecting',
+          isQuickConnect,
+        })
+      }
 
       // Create WebSocket connection
-      const wsHost = window.location.hostname
-      const socket = new WebSocket(`ws://${wsHost}:8080/ws`)
+      const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8080`
+      const socket = new WebSocket(`${wsUrl}/ws`)
       wsRef.current = socket
       socket.binaryType = 'arraybuffer'
 

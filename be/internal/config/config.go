@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -18,6 +20,8 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	godotenv.Load()
+
 	cfg := &Config{
 		Port:           getEnv("WEBTERM_PORT", ":8080"),
 		DBPath:         getEnv("WEBTERM_DB_PATH", "data/webterm.db"),

@@ -77,7 +77,7 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		if connectMsg.ConnectionID != "" {
 			// Saved connection flow: fetch from DB and decrypt password.
 			var conn db.Connection
-			if err := database.First(&conn, "id = ?", connectMsg.ConnectionID); err != nil {
+			if err := database.First(&conn, "id = ?", connectMsg.ConnectionID).Error; err != nil {
 				log.Printf("Connection not found: %s (session %s)", connectMsg.ConnectionID, sessionID)
 				sendWSError(wsWrite, "Connection not found")
 				return
