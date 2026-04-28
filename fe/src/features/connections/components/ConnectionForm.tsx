@@ -116,7 +116,7 @@ export const ConnectionForm = () => {
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto py-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="space-y-2">
             <Label htmlFor="label">Display Label</Label>
             <Input
