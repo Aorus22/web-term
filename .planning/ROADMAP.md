@@ -57,7 +57,7 @@ Plans:
 - [x] **Phase 5: Backend SSH Key Storage** - SSH key model, encrypted storage, CRUD API, connection schema update
 - [x] **Phase 6: Frontend UI & Navigation** - Sidebar tabs, hosts card page, SSH keys page, connection form auth toggle
 - [x] **Phase 7: WebSocket Key Auth Integration** - Key-based SSH auth, passphrase round-trip, backward compatibility
-- [ ] **Phase 8: Port Forwarding** - SSH local port forwarding, sheet UI for managing forwards, port conflict detection
+- [x] **Phase 8: Port Forwarding** - SSH local port forwarding, sheet UI for managing forwards, port conflict detection
 
 ## Phase Details
 
@@ -120,7 +120,7 @@ Plans:
 
 Plans:
 - [x] 08-01-PLAN.md — Backend: PortForward model, CRUD API, tunnel manager with SSH dial
-- [ ] 08-02-PLAN.md — Frontend: Port Forwards page, form sheet, sidebar integration, port conflict toast
+- [x] 08-02-PLAN.md — Frontend: Port Forwards page, form sheet, sidebar integration, port conflict toast
 
 ## Progress
 
@@ -136,4 +136,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | 5. Backend SSH Key Storage | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 6. Frontend UI & Navigation | v0.3.0 | 3/3 | Complete | 2026-04-28 |
 | 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
-| 8. Port Forwarding | v0.3.0 | 1/2 | In Progress | - |
+| 8. Port Forwarding | v0.3.0 | 2/2 | Complete | 2026-04-28 |
