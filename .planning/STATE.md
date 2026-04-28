@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-04-28)
 
 **Core value:** SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable
-**Current focus:** Planning v0.3.0
+**Current focus:** Planning v0.3.0 — SSH Key Auth & UI Redesign
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 5 of 7 (Backend SSH Key Storage)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-28 — Milestone v0.3.0 started
+Status: Roadmap approved, ready to plan
+Last activity: 2026-04-28 — Roadmap created for v0.3.0
 
-Progress: [          ] 0% (Milestone v0.3.0 — SSH Key Auth & UI Redesign)
+Progress: [░░░░░░░░░░] 0% (Milestone v0.3.0 — 0/7 plans across 3 phases)
 
 ## Performance Metrics
 
@@ -33,11 +33,21 @@ Progress: [          ] 0% (Milestone v0.3.0 — SSH Key Auth & UI Redesign)
 | 03-ssh-terminal | 3 | 40 min | 13 min |
 | 04-multi-tab-polish | 3 | 50 min | 16.6 min |
 
+**Recent Trend:**
+- Last 5 plans: 13, 13, 14, 17, 19 min
+- Trend: Stable
+
 ## Accumulated Context
 
 ### Decisions
 
-All decisions logged in PROJECT.md Key Decisions table.
+Decisions logged in PROJECT.md Key Decisions table.
+
+Recent decisions for v0.3.0:
+- PEM-only key format (no PPK support)
+- AES-256-GCM with AAD domain separation for key encryption
+- Zustand sidebarPage state for tab navigation (no router)
+- Backward-compatible WebSocket protocol extension (auth_method field)
 
 ### Pending Todos
 
@@ -58,6 +68,6 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-04-28
-Stopped at: Defining requirements for v0.3.0
+Stopped at: Roadmap created for v0.3.0
 Resume file: None
-Next step: `/gsd-plan-phase [N]` after roadmap approval
+Next step: `/gsd-plan-phase 5`
