@@ -1,11 +1,11 @@
 import * as React from 'react'
 import { useConnections, useDeleteConnection, useCreateConnection } from '@/features/connections/hooks/useConnections'
 import { useAppStore } from '@/stores/app-store'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
-  MoreVertical, Edit2, Trash2, Copy, Plus, Server, Circle, ExternalLink 
+  MoreVertical, Edit2, Trash2, Copy, Plus, Server, ExternalLink
 } from 'lucide-react'
 import { 
   DropdownMenu, 
@@ -25,19 +25,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { TagFilter } from '@/features/connections/components/TagFilter'
+import { ExportImport } from '@/features/connections/components/ExportImport'
 import { generateId } from '@/lib/utils'
-import type { Connection } from '@/lib/api'
+import { keysApi, type Connection } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
 
 export const HostsPage = () => {
-  const { data: connections = [], isLoading } = useConnections()
+  const { data: connections = [] } = useConnections()
   const { 
-    setCreatingConnection, 
     setEditingConnection,
     selectedTags,
     sessions, 
-    addSession, 
-    setActiveSession 
+    addSession 
   } = useAppStore()
   
   const deleteMutation = useDeleteConnection()
@@ -51,30 +50,58 @@ export const HostsPage = () => {
     return selectedTags.every((tag) => conn.tags?.includes(tag))
   })
 
-  const handleConnect = (conn: Connection) => {
-    // Check if session already exists for this connection
-    const existing = sessions.find((s) => s.connectionId === conn.id)
-    if (existing) {
-      setActiveSession(existing.id)
-      return
+  const handleConnect = async (conn: Connection) => {
+    if (conn.auth_method === 'key' && conn.ssh_key_id) {
+      try {
+        const key = await keysApi.get(conn.ssh_key_id)
+        const session: SSHSession = {
+          id: generateId(),
+          connectionId: conn.id,
+          host: conn.host,
+          port: conn.port,
+          username: conn.username,
+          label: conn.label,
+          status: key.has_passphrase ? 'needs-passphrase' : 'connecting',
+          isQuickConnect: false,
+          auth_method: 'key',
+          ssh_key_id: conn.ssh_key_id,
+          key_name: key.name,
+          key_type: key.key_type,
+          has_passphrase: key.has_passphrase,
+        }
+        addSession(session)
+      } catch (error) {
+        console.error('Failed to fetch key metadata:', error)
+        const session: SSHSession = {
+          id: generateId(),
+          connectionId: conn.id,
+          host: conn.host,
+          port: conn.port,
+          username: conn.username,
+          label: conn.label,
+          status: 'connecting',
+          isQuickConnect: false,
+          auth_method: 'key',
+          ssh_key_id: conn.ssh_key_id,
+        }
+        addSession(session)
+      }
+    } else {
+      const session: SSHSession = {
+        id: generateId(),
+        connectionId: conn.id,
+        host: conn.host,
+        port: conn.port,
+        username: conn.username,
+        label: conn.label,
+        status: 'connecting',
+        isQuickConnect: false
+      }
+      addSession(session)
     }
-    
-    // Create new session
-    const session: SSHSession = {
-      id: generateId(),
-      connectionId: conn.id,
-      host: conn.host,
-      port: conn.port,
-      username: conn.username,
-      label: conn.label,
-      status: 'connecting',
-      isQuickConnect: false
-    }
-    addSession(session)
   }
 
   const handleDuplicate = (conn: Connection) => {
-    // Remove ID and timestamps for duplication
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, created_at, updated_at, ...rest } = conn
     createMutation.mutate({
@@ -90,132 +117,125 @@ export const HostsPage = () => {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-          <p className="text-sm text-muted-foreground font-medium">Loading connections...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!connections || connections.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <Server className="w-8 h-8 text-muted-foreground/30" />
-        </div>
-        <h3 className="text-xl font-semibold mb-2">No connections yet</h3>
-        <p className="text-muted-foreground mb-6 max-w-sm">
-          Create your first connection to start using WebTerm.
-        </p>
-        <Button onClick={() => setCreatingConnection(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Create Connection
-        </Button>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <div className="flex flex-col border-b bg-muted/5">
-        <div className="flex items-center justify-between px-6 py-4">
-          <h2 className="text-xl font-semibold">Hosts</h2>
-        </div>
-        <div className="px-2">
+    <div className="flex flex-col h-full bg-background">
+      {/* Termius-style Header */}
+      <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
+        <div className="flex items-center gap-4">
+          <h1 className="text-lg font-semibold tracking-tight">Hosts</h1>
+          <div className="h-4 w-[1px] bg-border" />
           <TagFilter />
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          <ExportImport />
+          <Button size="sm" onClick={() => useAppStore.getState().setCreatingConnection(true)} className="h-8 shadow-sm">
+            <Plus className="mr-2 h-4 w-4" /> New Host
+          </Button>
+        </div>
+      </header>
 
-      <div className="flex-1 overflow-auto p-6">
-        {filteredConnections.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center">
-            <p className="text-muted-foreground">No connections match the selected tags.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-24">
-            {filteredConnections.map((conn) => {
-              const isActive = sessions.some(s => s.connectionId === conn.id)
-              
-              return (
-                <Card 
-                  key={conn.id} 
-                  className={`relative cursor-pointer transition-all hover:shadow-md group flex flex-col ${
-                    isActive ? 'border-l-4 border-l-primary shadow-sm' : ''
-                  }`}
-                  onClick={() => handleConnect(conn)}
-                >
-                  <div className="absolute top-2 right-2 flex items-center gap-1">
-                    {isActive && (
-                      <Circle className="h-2 w-2 fill-green-500 text-green-500 mr-1" />
-                    )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger 
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-8 w-8 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/10 transition-all outline-none"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleConnect(conn) }}>
-                          <ExternalLink className="mr-2 h-4 w-4" /> Connect
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingConnection(conn) }}>
-                          <Edit2 className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(conn) }}>
-                          <Copy className="mr-2 h-4 w-4" /> Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          className="text-destructive focus:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeleteId(conn.id)
-                            setDeletingName(conn.label)
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+      <div className="flex-1 overflow-auto p-4">
+        <div className="max-w-[1600px] mx-auto">
+          {filteredConnections.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 text-center border-2 border-dashed rounded-lg bg-muted/10">
+              <Server className="h-10 w-10 text-muted-foreground/20 mb-3" />
+              <p className="text-sm text-muted-foreground">
+                {connections.length === 0 ? "No hosts saved yet." : "No hosts match your filters."}
+              </p>
+              <Button variant="link" size="sm" onClick={() => useAppStore.getState().clearTags()}>
+                Clear all filters
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredConnections.map((conn) => {
+                const connSessions = sessions.filter(s => s.connectionId === conn.id)
+                const sessionCount = connSessions.length
+                const isActive = sessionCount > 0
+                
+                return (
+                  <Card 
+                    key={conn.id} 
+                    className={`group relative cursor-pointer transition-all border-border/40 hover:border-primary/40 hover:shadow-md overflow-hidden py-0 gap-0 ${
+                      isActive ? 'bg-primary/5 border-primary/30' : ''
+                    }`}
+                    onClick={() => handleConnect(conn)}
+                  >
+                    <div className="flex items-center p-3 gap-3">
+                      {/* Left: Icon */}
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center ${
+                        isActive ? 'bg-primary/10' : 'bg-muted/50'
+                      }`}>
+                        <Server className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-muted-foreground/70'}`} />
+                      </div>
 
-                  <CardHeader className="p-4 pb-2">
-                    <CardTitle className="text-base font-bold truncate pr-10">{conn.label}</CardTitle>
-                    <CardDescription className="text-xs truncate">
-                      {conn.username}@{conn.host}:{conn.port}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0 flex-1">
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {conn.tags && conn.tags.length > 0 ? (
-                        conn.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-[10px] px-1 py-0 h-4 leading-none font-normal">
-                            {tag}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground italic">No tags</span>
-                      )}
+                      {/* Middle: Info */}
+                      <div className="flex-1 min-w-0 py-0">
+                        <h3 className="text-sm font-bold truncate leading-tight">
+                          {conn.label || conn.host}
+                        </h3>
+                        <p className="text-[10px] font-mono opacity-50 truncate leading-none mt-0.5">
+                          {conn.username}@{conn.host}
+                        </p>
+                        {conn.tags && conn.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {conn.tags.map((tag) => (
+                              <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal bg-muted/40 border-none leading-none">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex items-center gap-1 pr-2 flex-shrink-0">
+                        {isActive && (
+                          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-sm">
+                            <span className="text-[9px] font-bold text-primary-foreground leading-none">
+                              {sessionCount}
+                            </span>
+                          </div>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger 
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-7 w-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-all outline-none"
+                          >
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleConnect(conn) }}>
+                              <ExternalLink className="mr-2 h-3.5 w-3.5" /> Connect
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingConnection(conn) }}>
+                              <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(conn) }}>
+                              <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-destructive focus:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setDeleteId(conn.id)
+                                setDeletingName(conn.label)
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        )}
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
-
-      <Button
-        className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg z-10"
-        size="icon"
-        onClick={() => setCreatingConnection(true)}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>

@@ -47,7 +47,17 @@ export function useSSHSession(sessionId: string) {
 
       // Store options for retry/reconnect (strip password per D-07 for saved connections)
       lastOptionsRef.current = opts.connectionId
-        ? { connectionId: opts.connectionId, host: opts.host, port: opts.port, username: opts.username, rows: opts.rows, cols: opts.cols }
+        ? { 
+            connectionId: opts.connectionId, 
+            host: opts.host, 
+            port: opts.port, 
+            username: opts.username, 
+            rows: opts.rows, 
+            cols: opts.cols,
+            auth_method: opts.auth_method,
+            ssh_key_id: opts.ssh_key_id,
+            passphrase: opts.passphrase 
+          }
         : opts
 
       const host = opts.host ?? ''
@@ -87,6 +97,9 @@ export function useSSHSession(sessionId: string) {
           ? JSON.stringify({
               type: 'connect',
               connection_id: opts.connectionId,
+              auth_method: opts.auth_method || 'password',
+              ...(opts.ssh_key_id && { ssh_key_id: opts.ssh_key_id }),
+              ...(opts.passphrase && { passphrase: opts.passphrase }),
               rows,
               cols,
             })

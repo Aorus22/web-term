@@ -10,6 +10,9 @@ type ConnectMessage struct {
 	Port         int    `json:"port"`                  // SSH port (quick-connect)
 	User         string `json:"user"`                  // SSH username (quick-connect)
 	Password     string `json:"password"`              // SSH password (quick-connect)
+	AuthMethod   string `json:"auth_method,omitempty"` // "password" or "key"
+	SSHKeyID     string `json:"ssh_key_id,omitempty"`   // SSH key ID for key-based auth
+	Passphrase   string `json:"passphrase,omitempty"`   // Passphrase for encrypted private keys
 	ConnectionID string `json:"connection_id,omitempty"` // Saved connection ID (alternative to host/user/password)
 	Rows         int    `json:"rows,omitempty"`         // Initial terminal rows
 	Cols         int    `json:"cols,omitempty"`         // Initial terminal cols

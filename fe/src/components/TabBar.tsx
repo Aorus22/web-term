@@ -2,7 +2,11 @@ import { X, Circle, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -13,6 +17,7 @@ export function TabBar() {
   const sessions = useAppStore((s) => s.sessions)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
+  const setSidebarPage = useAppStore((s) => s.setSidebarPage)
   const removeSession = useAppStore((s) => s.removeSession)
   const [confirmingClose, setConfirmingClose] = useState<string | null>(null)
 
@@ -41,14 +46,14 @@ export function TabBar() {
           <span className="truncate max-w-[120px]">
             {session.label || `${session.username}@${session.host}`}
           </span>
-          <Tooltip open={confirmingClose === session.id} onOpenChange={(open) => !open && setConfirmingClose(null)}>
-            <TooltipTrigger
+          <Popover open={confirmingClose === session.id} onOpenChange={(open) => !open && setConfirmingClose(null)}>
+            <PopoverTrigger
               render={
                 <span
                   role="button"
                   tabIndex={0}
                   className={cn(
-                    "rounded-sm p-0.5 transition-opacity",
+                    "rounded-sm p-0.5 transition-opacity outline-none",
                     "opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/10",
                     confirmingClose === session.id && "opacity-100"
                   )}
@@ -60,22 +65,22 @@ export function TabBar() {
                       removeSession(session.id)
                     }
                   }}
-                />
+                >
+                  <X className={cn("h-3.5 w-3.5", confirmingClose === session.id && "text-destructive")} />
+                </span>
               }
-            >
-              <X className={cn("h-3.5 w-3.5", confirmingClose === session.id && "text-destructive")} />
-            </TooltipTrigger>
-            <TooltipContent 
+            />
+            <PopoverContent 
               side="bottom" 
-              className="flex flex-col items-center gap-2 p-3 bg-popover text-popover-foreground border shadow-md min-w-[180px]"
+              className="flex flex-col items-center gap-2 p-3 border shadow-md min-w-[180px]"
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="text-sm font-medium">Disconnect from {session.host}?</p>
+              <p className="text-xs font-medium">Disconnect from {session.host}?</p>
               <div className="flex gap-2 w-full">
                 <Button 
-                  size="xs" 
+                  size="sm" 
                   variant="destructive" 
-                  className="flex-1"
+                  className="flex-1 h-7 text-[10px]"
                   onClick={() => {
                     removeSession(session.id)
                     setConfirmingClose(null)
@@ -84,22 +89,25 @@ export function TabBar() {
                   Disconnect
                 </Button>
                 <Button 
-                  size="xs" 
+                  size="sm" 
                   variant="outline" 
-                  className="flex-1"
+                  className="flex-1 h-7 text-[10px]"
                   onClick={() => setConfirmingClose(null)}
                 >
                   Cancel
                 </Button>
               </div>
-            </TooltipContent>
-          </Tooltip>
+            </PopoverContent>
+          </Popover>
         </button>
       ))}
 
       <button
         className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-        onClick={() => setActiveSession(null)}
+        onClick={() => {
+          setActiveSession(null)
+          setSidebarPage('new-tab')
+        }}
         aria-label="New tab"
       >
         <Plus className="h-4 w-4" />

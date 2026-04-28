@@ -73,25 +73,79 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		// Generate session ID early for logging and response.
 		sessionID := uuid.New().String()
 
+		var keySigner ssh.Signer
+
 		// Resolve connection credentials: either from saved connection_id or direct fields.
 		if connectMsg.ConnectionID != "" {
-			// Saved connection flow: fetch from DB and decrypt password.
+			// Saved connection flow: fetch from DB.
 			var conn db.Connection
 			if err := database.First(&conn, "id = ?", connectMsg.ConnectionID).Error; err != nil {
 				log.Printf("Connection not found: %s (session %s)", connectMsg.ConnectionID, sessionID)
 				sendWSError(wsWrite, "Connection not found")
 				return
 			}
-			decrypted, err := config.Decrypt(conn.Encrypted, cfg.EncryptionKey)
-			if err != nil {
-				log.Printf("Failed to decrypt password for connection %s (session %s): %v", connectMsg.ConnectionID, sessionID, err)
-				sendWSError(wsWrite, "Failed to decrypt connection credentials")
+
+			// Determine auth method
+			if connectMsg.AuthMethod == "key" && conn.AuthMethod == "key" && conn.SSHKeyID != nil {
+				// KEY AUTH PATH
+				var key db.SSHKey
+				if err := database.First(&key, "id = ?", *conn.SSHKeyID).Error; err != nil {
+					log.Printf("SSH Key not found: %s (session %s)", *conn.SSHKeyID, sessionID)
+					sendWSError(wsWrite, "SSH key not found")
+					return
+				}
+
+				decryptedKey, err := config.DecryptWithAAD(key.EncryptedKey, cfg.EncryptionKey, []byte(config.SSHKeyAAD))
+				if err != nil {
+					log.Printf("Failed to decrypt SSH key for connection %s (session %s): %v", connectMsg.ConnectionID, sessionID, err)
+					sendWSError(wsWrite, "Failed to decrypt SSH key")
+					return
+				}
+
+				var parsedKey interface{}
+				if connectMsg.Passphrase != "" {
+					parsedKey, err = ssh.ParseRawPrivateKeyWithPassphrase([]byte(decryptedKey), []byte(connectMsg.Passphrase))
+				} else {
+					parsedKey, err = ssh.ParseRawPrivateKey([]byte(decryptedKey))
+				}
+
+				if err != nil {
+					log.Printf("Failed to parse SSH key for connection %s (session %s): %v", connectMsg.ConnectionID, sessionID, err)
+					sendWSError(wsWrite, "Failed to parse SSH key: invalid passphrase or corrupted key")
+					return
+				}
+
+				keySigner, err = ssh.NewSignerFromKey(parsedKey)
+				if err != nil {
+					log.Printf("Failed to create SSH signer for connection %s (session %s): %v", connectMsg.ConnectionID, sessionID, err)
+					sendWSError(wsWrite, "Failed to create SSH signer from key")
+					return
+				}
+
+				connectMsg.Host = conn.Host
+				connectMsg.Port = conn.Port
+				connectMsg.User = conn.Username
+			} else if connectMsg.AuthMethod == "key" || conn.AuthMethod == "key" {
+				// Mismatch or missing key ID
+				if conn.AuthMethod == "key" && conn.SSHKeyID == nil {
+					sendWSError(wsWrite, "Connection configured for key auth but no SSH key assigned")
+				} else {
+					sendWSError(wsWrite, "Authentication method mismatch")
+				}
 				return
+			} else {
+				// EXISTING PASSWORD PATH
+				decrypted, err := config.Decrypt(conn.Encrypted, cfg.EncryptionKey)
+				if err != nil {
+					log.Printf("Failed to decrypt password for connection %s (session %s): %v", connectMsg.ConnectionID, sessionID, err)
+					sendWSError(wsWrite, "Failed to decrypt connection credentials")
+					return
+				}
+				connectMsg.Host = conn.Host
+				connectMsg.Port = conn.Port
+				connectMsg.User = conn.Username
+				connectMsg.Password = decrypted
 			}
-			connectMsg.Host = conn.Host
-			connectMsg.Port = conn.Port
-			connectMsg.User = conn.Username
-			connectMsg.Password = decrypted
 		}
 
 		// Security Fix CR-03: SSRF Protection (applies to both flows, including DB-fetched hosts)
@@ -108,8 +162,17 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		// Step 2: Dial SSH.
 		addr := fmt.Sprintf("%s:%d", connectMsg.Host, connectMsg.Port)
 		sshConfig := &ssh.ClientConfig{
-			User: connectMsg.User,
-			Auth: []ssh.AuthMethod{
+			User:            connectMsg.User,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Implement host key verification
+			Timeout:         10 * time.Second,
+		}
+
+		if keySigner != nil {
+			// Key-based auth
+			sshConfig.Auth = []ssh.AuthMethod{ssh.PublicKeys(keySigner)}
+		} else {
+			// Password-based auth (existing flow)
+			sshConfig.Auth = []ssh.AuthMethod{
 				ssh.Password(connectMsg.Password),
 				ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
 					answers := make([]string, len(questions))
@@ -118,9 +181,7 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 					}
 					return answers, nil
 				}),
-			},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Implement host key verification
-			Timeout:         10 * time.Second,
+			}
 		}
 
 		client, err := ssh.Dial("tcp", addr, sshConfig)

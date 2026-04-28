@@ -1,4 +1,4 @@
-export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error' | 'needs-passphrase'
 
 export interface SSHSession {
   id: string                     // unique session ID (matches backend session_id)
@@ -10,6 +10,11 @@ export interface SSHSession {
   status: SessionStatus
   error?: string                 // error message when status is 'error'
   isQuickConnect: boolean        // true if ephemeral quick-connect session
+  auth_method?: string           // 'password' or 'key'
+  ssh_key_id?: string            // for key-auth connections
+  key_name?: string              // display name for passphrase prompt
+  key_type?: string              // RSA/Ed25519/ECDSA for badge
+  has_passphrase?: boolean       // whether passphrase is needed
 }
 
 export interface ConnectOptions {
@@ -20,6 +25,10 @@ export interface ConnectOptions {
   port?: number
   username?: string
   password?: string
+  // Key authentication fields
+  auth_method?: 'password' | 'key'
+  ssh_key_id?: string
+  passphrase?: string
   // Initial terminal size
   rows?: number
   cols?: number

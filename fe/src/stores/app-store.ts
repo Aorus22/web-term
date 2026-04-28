@@ -5,8 +5,8 @@ import type { SSHSession } from '@/features/terminal/types'
 interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
-  sidebarPage: 'hosts' | 'keys'
-  setSidebarPage: (page: 'hosts' | 'keys') => void
+  sidebarPage: 'hosts' | 'keys' | 'new-tab'
+  setSidebarPage: (page: 'hosts' | 'keys' | 'new-tab') => void
   editingConnection: Connection | null
   setEditingConnection: (c: Connection | null) => void
   creatingConnection: boolean
@@ -26,7 +26,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-  sidebarPage: 'hosts',
+  sidebarPage: 'new-tab',
   setSidebarPage: (page) => set({ sidebarPage: page }),
   editingConnection: null,
   setEditingConnection: (c) => set({ editingConnection: c }),

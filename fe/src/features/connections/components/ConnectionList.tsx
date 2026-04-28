@@ -19,14 +19,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { MoreVertical, Edit2, Trash2, Copy, ExternalLink, Terminal } from 'lucide-react'
+import { MoreVertical, Edit2, Trash2, Copy, ExternalLink, Terminal, Key } from 'lucide-react'
 import { generateId } from '@/lib/utils'
-import type { Connection } from '@/lib/api'
+import { keysApi, type Connection } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
 
 export const ConnectionList = () => {
   const { data: connections = [], isLoading } = useConnections()
-  const { selectedTags, setEditingConnection, sessions, addSession, setActiveSession } = useAppStore()
+  const { selectedTags, setEditingConnection, addSession } = useAppStore()
   const deleteMutation = useDeleteConnection()
   const createMutation = useCreateConnection()
   
@@ -38,6 +38,59 @@ export const ConnectionList = () => {
     return selectedTags.every((tag) => conn.tags?.includes(tag))
   })
 
+  const handleConnect = async (conn: Connection) => {
+    // We allow multiple sessions for the same connection (Regression Fix)
+    
+    if (conn.auth_method === 'key' && conn.ssh_key_id) {
+      try {
+        const key = await keysApi.get(conn.ssh_key_id)
+        const session: SSHSession = {
+          id: generateId(),
+          connectionId: conn.id,
+          host: conn.host,
+          port: conn.port,
+          username: conn.username,
+          label: conn.label,
+          status: key.has_passphrase ? 'needs-passphrase' : 'connecting',
+          isQuickConnect: false,
+          auth_method: 'key',
+          ssh_key_id: conn.ssh_key_id,
+          key_name: key.name,
+          key_type: key.key_type,
+          has_passphrase: key.has_passphrase,
+        }
+        addSession(session)
+      } catch (error) {
+        console.error('Failed to fetch key metadata:', error)
+        const session: SSHSession = {
+          id: generateId(),
+          connectionId: conn.id,
+          host: conn.host,
+          port: conn.port,
+          username: conn.username,
+          label: conn.label,
+          status: 'connecting',
+          isQuickConnect: false,
+          auth_method: 'key',
+          ssh_key_id: conn.ssh_key_id,
+        }
+        addSession(session)
+      }
+    } else {
+      const session: SSHSession = {
+        id: generateId(),
+        connectionId: conn.id,
+        host: conn.host,
+        port: conn.port,
+        username: conn.username,
+        label: conn.label,
+        status: 'connecting',
+        isQuickConnect: false
+      }
+      addSession(session)
+    }
+  }
+
   const handleDelete = async () => {
     if (deleteId) {
       await deleteMutation.mutateAsync(deleteId)
@@ -46,6 +99,7 @@ export const ConnectionList = () => {
   }
 
   const handleDuplicate = (conn: Connection) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, created_at, updated_at, ...rest } = conn
     createMutation.mutate({
       ...rest,
@@ -83,31 +137,14 @@ export const ConnectionList = () => {
           <div
             key={conn.id}
             className="group flex items-center justify-between p-2 rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors border border-transparent hover:border-border"
-            onClick={() => {
-              // Check if a session already exists for this connection (D-01)
-              const existing = sessions.find((s) => s.connectionId === conn.id)
-              if (existing) {
-                setActiveSession(existing.id)
-                return
-              }
-              // Create new session
-              const sessionId = generateId()
-              const session: SSHSession = {
-                id: sessionId,
-                connectionId: conn.id,
-                host: conn.host,
-                port: conn.port,
-                username: conn.username,
-                label: conn.label,
-                status: 'connecting',
-                isQuickConnect: false,
-              }
-              addSession(session)
-            }}
+            onClick={() => handleConnect(conn)}
           >
             <div className="flex flex-col min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{conn.label}</span>
+                <span className="text-sm font-medium truncate">
+                  {conn.label}
+                </span>
+                {conn.ssh_key_id && <Key className="h-3 w-3 text-muted-foreground" />}
                 {conn.tags?.map((tag) => (
                   <Badge key={tag} variant="secondary" className="text-[10px] px-1 py-0 h-4 leading-none bg-muted/50 border-none group-hover:bg-muted">
                     {tag}

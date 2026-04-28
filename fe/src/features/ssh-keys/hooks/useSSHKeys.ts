@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { keysApi } from '@/lib/api'
-import type { SSHKey } from '@/lib/api'
 
 export const useSSHKeys = () => {
   return useQuery({

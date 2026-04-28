@@ -90,3 +90,11 @@ Last session: 2026-04-28T11:52:22.650Z
 Stopped at: Phase 6 context gathered
 Resume file: .planning/phases/06-frontend-ui-navigation/06-CONTEXT.md
 Next step: `/gsd-plan-phase 5`
+
+## Quick Tasks Completed
+
+| Task | Date | Status | Slug |
+|------|------|--------|------|
+| Fix UI Separation | 2026-04-28 | complete ✓ | fix-ui-separation |
+| Sidebar Menu Only | 2026-04-28 | complete ✓ | sidebar-menu-only |
+| Relocate Export/Import | 2026-04-28 | complete ✓ | relocate-export-import |

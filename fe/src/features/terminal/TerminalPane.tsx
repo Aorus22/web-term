@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useSSHSession } from './useSSHSession'
 import { useAppStore } from '@/stores/app-store'
 import { PasswordPrompt } from './PasswordPrompt'
+import { PassphrasePrompt } from './PassphrasePrompt'
 import { ReconnectOverlay } from './ReconnectOverlay'
 import { SaveConnectionBanner } from './SaveConnectionBanner'
 import { useTerminalMouse } from './useTerminalMouse'
@@ -24,6 +25,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const removeSession = useAppStore((s) => s.removeSession)
   const lastOptionsRef = useRef<ConnectOptions | null>(initialConnect ?? null)
+  const passphraseRef = useRef<string | null>(null)
   const [showSaveBanner, setShowSaveBanner] = useState(false)
   const [passwordProvided, setPasswordProvided] = useState(false)
 
@@ -32,6 +34,20 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
     if (initialConnect) {
       lastOptionsRef.current = initialConnect
       connect(initialConnect)
+    } else if (session?.auth_method === 'key' && !session?.has_passphrase && session?.status === 'connecting') {
+      // Auto-connect for key-auth without passphrase
+      const opts: ConnectOptions = {
+        connectionId: session.connectionId,
+        host: session.host,
+        port: session.port,
+        username: session.username,
+        auth_method: 'key',
+        ssh_key_id: session.ssh_key_id,
+        rows: 24,
+        cols: 80,
+      }
+      lastOptionsRef.current = opts
+      connect(opts)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -56,6 +72,13 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
 
   const handleRetry = () => {
     if (lastOptionsRef.current) {
+      // If key-auth and we have cached passphrase, use it (D-09)
+      if (lastOptionsRef.current.auth_method === 'key' && passphraseRef.current) {
+        lastOptionsRef.current = {
+          ...lastOptionsRef.current,
+          passphrase: passphraseRef.current,
+        }
+      }
       connect(lastOptionsRef.current)
     }
   }
@@ -74,6 +97,27 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
 
   const handlePasswordCancel = () => {
     // Remove the session — user cancelled password prompt
+    removeSession(sessionId)
+  }
+
+  const handlePassphraseConnect = (passphrase: string) => {
+    passphraseRef.current = passphrase
+    const opts: ConnectOptions = {
+      connectionId: session!.connectionId,
+      host: session!.host,
+      port: session!.port,
+      username: session!.username,
+      auth_method: 'key',
+      ssh_key_id: session!.ssh_key_id,
+      passphrase,
+      rows: 24,
+      cols: 80,
+    }
+    lastOptionsRef.current = opts
+    connect(opts)
+  }
+
+  const handlePassphraseCancel = () => {
     removeSession(sessionId)
   }
 
@@ -109,6 +153,19 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
         <Loader2 className="h-8 w-8 animate-spin" />
         <p className="text-sm">Connecting to {session.host}...</p>
       </div>
+    )
+  }
+
+  // Key-based auth needing passphrase (D-05, D-06)
+  if (session.status === 'needs-passphrase') {
+    return (
+      <PassphrasePrompt
+        keyName={session.key_name || 'SSH Key'}
+        keyType={session.key_type || 'RSA'}
+        host={session.host}
+        onConnect={handlePassphraseConnect}
+        onCancel={handlePassphraseCancel}
+      />
     )
   }
 

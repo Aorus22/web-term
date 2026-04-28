@@ -12,6 +12,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { TerminalPane } from '@/features/terminal/TerminalPane'
 import { HostsPage } from '@/features/hosts/components/HostsPage'
 import { SSHKeysPage } from '@/features/ssh-keys/components/SSHKeysPage'
+import { NewTabView } from '@/components/NewTabView'
 import { useTheme } from '@/hooks/use-theme'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
@@ -31,7 +32,10 @@ function AppContent() {
   const { resolvedTheme } = useTheme()
 
   useKeyboardShortcuts({
-    onNewTab: () => setActiveSession(null),
+    onNewTab: () => {
+      setActiveSession(null)
+      setSidebarPage('new-tab')
+    },
     onCloseTab: () => {
       if (activeSessionId) removeSession(activeSessionId)
     },
@@ -66,7 +70,10 @@ function AppContent() {
         
         <nav className="flex flex-col gap-1 p-2">
           <button 
-            onClick={() => setSidebarPage('hosts')} 
+            onClick={() => {
+              setSidebarPage('hosts')
+              setActiveSession(null)
+            }} 
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
               sidebarPage === 'hosts' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
@@ -75,7 +82,10 @@ function AppContent() {
             <Server className="h-4 w-4" /> Hosts
           </button>
           <button 
-            onClick={() => setSidebarPage('keys')} 
+            onClick={() => {
+              setSidebarPage('keys')
+              setActiveSession(null)
+            }} 
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
               sidebarPage === 'keys' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
@@ -115,6 +125,9 @@ function AppContent() {
               />
             </div>
           ))}
+          {!activeSessionId && sidebarPage === 'new-tab' && (
+            <NewTabView />
+          )}
           {!activeSessionId && sidebarPage === 'hosts' && (
             <HostsPage />
           )}
@@ -123,6 +136,7 @@ function AppContent() {
           )}
         </div>
       </main>
+
 
       {/* Overlays */}
       <ConnectionForm />

@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Download, Upload } from 'lucide-react'
 import { useExportConnections, useImportConnections } from '../hooks/useConnections'
 
@@ -30,13 +29,12 @@ export const ExportImport = () => {
   }
 
   return (
-    <div className="mt-auto pt-2 pb-4 space-y-2 px-2">
-      <Separator className="mb-2" />
+    <div className="flex items-center gap-2">
       <div className="grid grid-cols-2 gap-2">
         <Button 
           variant="outline" 
           size="sm" 
-          className="h-8 text-xs"
+          className="h-8 text-xs bg-transparent border-muted-foreground/20 hover:bg-accent"
           onClick={exportConnections}
         >
           <Download className="mr-2 h-3 w-3" /> Export
@@ -44,7 +42,7 @@ export const ExportImport = () => {
         <Button 
           variant="outline" 
           size="sm" 
-          className="h-8 text-xs"
+          className="h-8 text-xs bg-transparent border-muted-foreground/20 hover:bg-accent"
           onClick={() => fileInputRef.current?.click()}
           disabled={importMutation.isPending}
         >
