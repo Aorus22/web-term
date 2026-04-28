@@ -119,7 +119,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Backend: PortForward model, CRUD API, tunnel manager with SSH dial
+- [x] 08-01-PLAN.md — Backend: PortForward model, CRUD API, tunnel manager with SSH dial
 - [ ] 08-02-PLAN.md — Frontend: Port Forwards page, form sheet, sidebar integration, port conflict toast
 
 ## Progress
@@ -136,4 +136,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | 5. Backend SSH Key Storage | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 6. Frontend UI & Navigation | v0.3.0 | 3/3 | Complete | 2026-04-28 |
 | 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
-| 8. Port Forwarding | v0.3.0 | 0/2 | Planning complete | - |
+| 8. Port Forwarding | v0.3.0 | 1/2 | In Progress | - |

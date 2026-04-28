@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.3.0
 milestone_name: SSH Key Auth & UI Redesign
-status: planning
-stopped_at: Phase 7 complete, ready to plan Phase 8
-last_updated: "2026-04-28T15:05:00.000Z"
-last_activity: 2026-04-28 — Phase 7 executed, verified, and UAT passed
+status: executing
+stopped_at: Plan 08-01 complete, executing 08-02
+last_updated: "2026-04-28T16:23:00.000Z"
+last_activity: 2026-04-28 — Plan 08-01 executed (port forward backend)
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 2
-  completed_plans: 2
-  percent: 100
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -26,19 +26,19 @@ See: .planning/PROJECT.md (updated 2026-04-28)
 ## Current Position
 
 Phase: 8 of 8 (Port Forwarding)
-Plan: 0 plans ready for execution
-Status: Phase 7 complete, ready to plan Phase 8
-Last activity: 2026-04-28 — Phase 7 executed, verified, and UAT passed
+Plan: 1 of 2 plans complete
+Status: Plan 08-01 complete, executing 08-02
+Last activity: 2026-04-28 — Plan 08-01 executed (port forward backend)
 
-Progress: [▓▓▓▓▓▓░░░░] 75% (Milestone v0.3.0 — 7/10 plans across 4 phases, 3 phases complete)
+Progress: [▓▓▓▓▓▓▓░░░] 80% (Milestone v0.3.0 — 8/10 plans across 4 phases, 3 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 14
+- Total plans completed: 15
 - Average duration: 14 min
-- Total execution time: 3.2 hours
+- Total execution time: 3.3 hours
 
 **By Phase:**
 
@@ -51,6 +51,7 @@ Progress: [▓▓▓▓▓▓░░░░] 75% (Milestone v0.3.0 — 7/10 plans 
 | 05-backend-ssh-key-storage | 2 | 28 min | 14 min |
 | 06-frontend-ui-navigation | 3 | 42 min | 14 min |
 | 07-websocket-key-auth-integration | 2 | 28 min | 14 min |
+| 08-port-forwarding | 1 | 3 min | 3 min |
 
 **Recent Trend:**
 
@@ -71,6 +72,9 @@ Recent decisions for v0.3.0:
 - Backward-compatible WebSocket protocol extension (auth_method field)
 - Passphrase caching in frontend (ref-based, session-scoped, never stored)
 - PassphrasePrompt inline component for encrypted key auth flow
+- Hybrid port forward persistence (rules in SQLite, active tunnels in-memory)
+- Separate SSH connection per forward, decoupled from terminal sessions
+- Port conflict detection via net.Listen bind failure
 
 ### Roadmap Evolution
 
@@ -94,10 +98,10 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-28T15:05:00.000Z
-Stopped at: Phase 7 complete, ready to plan Phase 8
+Last session: 2026-04-28T16:23:00.000Z
+Stopped at: Plan 08-01 complete, executing 08-02
 Resume file: None
-Next step: `/gsd-plan-phase 8`
+Next step: `/gsd-execute-phase 08` (continue with plan 08-02)
 
 ## Quick Tasks Completed
 
