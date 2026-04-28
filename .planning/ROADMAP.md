@@ -101,11 +101,11 @@ Plans:
   1. User can connect to a server using SSH key authentication (key selected in connection settings)
   2. User is prompted for passphrase when connecting with an encrypted key — passphrase is sent securely over WebSocket and never stored
   3. Existing password-based connections continue to work without any changes
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 07-01: WebSocket key-based SSH auth and passphrase round-trip
-- [ ] 07-02: Reconnection handling and backward compatibility verification
+- [ ] 07-01-PLAN.md — Backend key auth: extend ConnectMessage + implement ssh.Signer auth in proxy
+- [ ] 07-02-PLAN.md — Frontend key auth: PassphrasePrompt, HostsPage flow, passphrase caching & reconnect
 
 ## Progress
 
@@ -118,6 +118,6 @@ Phases execute in numeric order: 5 → 6 → 7
 | 2. Connection Management | v0.2.0 | 2/2 | Complete | 2026-04-27 |
 | 3. SSH Terminal | v0.2.0 | 3/3 | Complete | 2026-04-28 |
 | 4. Multi-tab & Polish | v0.2.0 | 3/3 | Complete | 2026-04-28 |
-| 5. Backend SSH Key Storage | v0.3.0 | 0/2 | Not started | - |
-| 6. Frontend UI & Navigation | v0.3.0 | 0/3 | Not started | - |
+| 5. Backend SSH Key Storage | v0.3.0 | 2/2 | Complete | 2026-04-28 |
+| 6. Frontend UI & Navigation | v0.3.0 | 3/3 | Complete | 2026-04-28 |
 | 7. WebSocket Key Auth Integration | v0.3.0 | 0/2 | Not started | - |
