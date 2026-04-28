@@ -65,15 +65,15 @@ Plans:
 **Depends on**: Phase 4 (v0.2.0 complete)
 **Requirements**: KEYS-01, KEYS-02, KEYS-03, KEYS-04, KEYS-05
 **Success Criteria** (what must be TRUE):
-  1. User can upload a PEM private key via API and it is stored encrypted (AES-256-GCM with domain separation) in the database
-  2. User can list all keys with metadata (name, key type, fingerprint, passphrase status) via API — decrypted key material never exposed
-  3. User can rename and delete keys via API, with a warning response when deleting a key referenced by connections
-  4. Connection schema supports `auth_method` and `ssh_key_id` fields with safe migration (defaults to password, no data loss)
-**Plans**: TBD
+1. User can upload a PEM private key via API and it is stored encrypted (AES-256-GCM with domain separation) in the database
+2. User can list all keys with metadata (name, key type, fingerprint, passphrase status) via API — decrypted key material never exposed
+3. User can rename and delete keys via API, with a warning response when deleting a key referenced by connections
+4. Connection schema supports `auth_method` and `ssh_key_id` fields with safe migration (defaults to password, no data loss)
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: SSH key model, encrypted storage, and CRUD API
-- [ ] 05-02: Connection schema migration and encryption AAD context
+- [ ] 05-01-PLAN.md — SSH key model, encrypted storage, and CRUD API
+- [ ] 05-02-PLAN.md — Connection schema migration and encryption AAD context
 
 ### Phase 6: Frontend UI & Navigation
 **Goal**: Users navigate between Hosts and SSH Keys pages, manage keys visually, and configure auth method per connection
