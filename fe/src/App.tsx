@@ -11,13 +11,44 @@ import { TagFilter } from '@/features/connections/components/TagFilter'
 import { ConnectionList } from '@/features/connections/components/ConnectionList'
 import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
 import { TabBar } from '@/components/TabBar'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { TerminalPane } from '@/features/terminal/TerminalPane'
 import { NewTabView } from '@/components/NewTabView'
+import { useTheme } from '@/hooks/use-theme'
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
 const queryClient = new QueryClient()
 
 function AppContent() {
-  const { sidebarOpen, toggleSidebar, setCreatingConnection, sessions, activeSessionId } = useAppStore()
+  const { 
+    sidebarOpen, 
+    toggleSidebar, 
+    setCreatingConnection, 
+    sessions, 
+    activeSessionId,
+    setActiveSession,
+    removeSession
+  } = useAppStore()
+  const { resolvedTheme } = useTheme()
+
+  useKeyboardShortcuts({
+    onNewTab: () => setActiveSession(null),
+    onCloseTab: () => {
+      if (activeSessionId) removeSession(activeSessionId)
+    },
+    onNextTab: () => {
+      if (sessions.length <= 1) return
+      const idx = sessions.findIndex(s => s.id === activeSessionId)
+      const next = sessions[(idx + 1) % sessions.length]
+      setActiveSession(next.id)
+    },
+    onPrevTab: () => {
+      if (sessions.length <= 1) return
+      const idx = sessions.findIndex(s => s.id === activeSessionId)
+      const prev = sessions[(idx - 1 + sessions.length) % sessions.length]
+      setActiveSession(prev.id)
+    },
+  })
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
@@ -66,6 +97,7 @@ function AppContent() {
           <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
             <TabBar />
           </div>
+          <ThemeToggle />
         </header>
 
         {/* Content Area — all sessions rendered, only active one visible */}
@@ -78,10 +110,11 @@ function AppContent() {
               <TerminalPane
                 sessionId={session.id}
                 initialConnect={session.connectionId ? { connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
+                theme={resolvedTheme}
               />
             </div>
           ))}
-          {sessions.length === 0 && (
+          {!activeSessionId && (
             <NewTabView />
           )}
         </div>

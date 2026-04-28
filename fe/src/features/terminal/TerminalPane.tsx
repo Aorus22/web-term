@@ -13,9 +13,10 @@ interface TerminalPaneProps {
   sessionId: string
   /** When provided, auto-connect on mount (saved connection with stored password) */
   initialConnect?: ConnectOptions
+  theme?: 'light' | 'dark'
 }
 
-export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
+export function TerminalPane({ sessionId, initialConnect, theme }: TerminalPaneProps) {
   const { ref, connect, sendData, sendResize, disconnect } = useSSHSession(sessionId)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const removeSession = useAppStore((s) => s.removeSession)
@@ -104,6 +105,7 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
           ref={ref}
           autoResize
           cursorBlink
+          theme={theme === 'light' ? 'light' : undefined}
           onData={sendData}
           onResize={sendResize}
         />
@@ -150,6 +152,7 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
             ref={ref}
             autoResize
             cursorBlink={false}
+            theme={theme === 'light' ? 'light' : undefined}
             onData={() => {}}
             onResize={sendResize}
           />
