@@ -210,7 +210,11 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			ssh.TTY_OP_ISPEED: 14400,
 			ssh.TTY_OP_OSPEED: 14400,
 		}
-		if err := session.RequestPty("xterm-256color", connectMsg.Rows, connectMsg.Cols, modes); err != nil {
+		termType := connectMsg.Term
+		if termType == "" {
+			termType = "xterm-256color"
+		}
+		if err := session.RequestPty(termType, connectMsg.Rows, connectMsg.Cols, modes); err != nil {
 			return
 		}
 

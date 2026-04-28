@@ -16,6 +16,7 @@ type ConnectMessage struct {
 	ConnectionID string `json:"connection_id,omitempty"` // Saved connection ID (alternative to host/user/password)
 	Rows         int    `json:"rows,omitempty"`         // Initial terminal rows
 	Cols         int    `json:"cols,omitempty"`         // Initial terminal cols
+	Term         string `json:"term,omitempty"`         // Terminal type for TERM env var (e.g., "xterm-256color")
 }
 
 // ResizeMessage is a JSON control message for terminal resize.
