@@ -19,17 +19,10 @@ import type { SSHSession } from '@/features/terminal/types'
 
 export const NewTabView = () => {
   const { data: connections = [] } = useConnections()
-  const { setCreatingConnection, sessions, addSession, setActiveSession } = useAppStore()
+  const { setCreatingConnection, addSession } = useAppStore()
 
   const handleConnect = (conn: Connection) => {
-    // Check if session already exists for this connection
-    const existing = sessions.find((s) => s.connectionId === conn.id)
-    if (existing) {
-      setActiveSession(existing.id)
-      return
-    }
-
-    // Create new SSH session
+    // Create new SSH session (allow multiple connections to same host)
     const sessionId = generateId()
     const session: SSHSession = {
       id: sessionId,

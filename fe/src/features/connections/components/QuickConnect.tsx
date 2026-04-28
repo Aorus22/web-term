@@ -16,7 +16,7 @@ import type { SSHSession } from '@/features/terminal/types'
 export const QuickConnect = () => {
   const [value, setValue] = React.useState('')
   const { data: connections = [] } = useConnections()
-  const { setCreatingConnection, sessions, addSession, setActiveSession } = useAppStore()
+  const { setCreatingConnection, addSession } = useAppStore()
 
   const handleSelect = (selectedValue: string) => {
     // Check if this is a saved connection (selected from dropdown)
@@ -24,24 +24,19 @@ export const QuickConnect = () => {
       (c) => `${c.username}@${c.host}:${c.port}` === selectedValue
     )
     if (savedConn) {
-      // Use the same flow as ConnectionList — saved connection with connectionId
-      const existing = sessions.find((s) => s.connectionId === savedConn.id)
-      if (existing) {
-        setActiveSession(existing.id)
-      } else {
-        const sessionId = generateId()
-        const session: SSHSession = {
-          id: sessionId,
-          connectionId: savedConn.id,
-          host: savedConn.host,
-          port: savedConn.port,
-          username: savedConn.username,
-          label: savedConn.label,
-          status: 'connecting',
-          isQuickConnect: false,
-        }
-        addSession(session)
+      // Create new session (allow multiple connections to same host)
+      const sessionId = generateId()
+      const session: SSHSession = {
+        id: sessionId,
+        connectionId: savedConn.id,
+        host: savedConn.host,
+        port: savedConn.port,
+        username: savedConn.username,
+        label: savedConn.label,
+        status: 'connecting',
+        isQuickConnect: false,
       }
+      addSession(session)
       setValue('')
       return
     }
