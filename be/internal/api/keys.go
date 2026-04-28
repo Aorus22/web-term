@@ -163,10 +163,31 @@ func (h *SSHKeyHandler) UpdateKey(w http.ResponseWriter, r *http.Request) {
 
 func (h *SSHKeyHandler) DeleteKey(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+
+	// Check if key is referenced by any connections
+	var count int64
+	if err := h.DB.Model(&db.Connection{}).Where("ssh_key_id = ?", id).Count(&count).Error; err != nil {
+		sendError(w, "Failed to check key references", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete the key
 	if err := h.DB.Delete(&db.SSHKey{}, "id = ?", id).Error; err != nil {
 		sendError(w, "Failed to delete key", http.StatusInternalServerError)
 		return
 	}
+
+	// Return warning if key was referenced
+	if count > 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"warning":              "Key was referenced by connections",
+			"affected_connections": count,
+		})
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
