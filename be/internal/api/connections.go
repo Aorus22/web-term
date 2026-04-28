@@ -70,6 +70,33 @@ func (h *ConnectionHandler) CreateConnection(w http.ResponseWriter, r *http.Requ
 		conn.Port = 22
 	}
 
+	// Validate auth_method
+	if conn.AuthMethod == "" {
+		conn.AuthMethod = "password" // backward compatibility
+	}
+	if conn.AuthMethod != "password" && conn.AuthMethod != "key" {
+		sendError(w, "auth_method must be 'password' or 'key'", http.StatusBadRequest)
+		return
+	}
+
+	// Validate ssh_key_id when auth_method is key
+	if conn.AuthMethod == "key" {
+		if conn.SSHKeyID == nil || *conn.SSHKeyID == "" {
+			sendError(w, "ssh_key_id is required when auth_method is 'key'", http.StatusBadRequest)
+			return
+		}
+		// Verify key exists
+		var key db.SSHKey
+		if err := h.DB.First(&key, "id = ?", *conn.SSHKeyID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				sendError(w, "SSH key not found", http.StatusBadRequest)
+			} else {
+				sendError(w, "Failed to validate SSH key", http.StatusInternalServerError)
+			}
+			return
+		}
+	}
+
 	if conn.Password != "" {
 		encrypted, err := config.Encrypt(conn.Password, h.Cfg.EncryptionKey)
 		if err != nil {
@@ -107,6 +134,29 @@ func (h *ConnectionHandler) UpdateConnection(w http.ResponseWriter, r *http.Requ
 	existing.Host = update.Host
 	existing.Username = update.Username
 	existing.Tags = update.Tags
+	existing.AuthMethod = update.AuthMethod
+	if update.SSHKeyID != nil {
+		existing.SSHKeyID = update.SSHKeyID
+	}
+
+	// Validate auth configuration
+	if existing.AuthMethod == "key" && (existing.SSHKeyID == nil || *existing.SSHKeyID == "") {
+		sendError(w, "ssh_key_id is required when auth_method is 'key'", http.StatusBadRequest)
+		return
+	}
+
+	// Verify key exists if switching to key auth
+	if existing.AuthMethod == "key" && existing.SSHKeyID != nil {
+		var key db.SSHKey
+		if err := h.DB.First(&key, "id = ?", *existing.SSHKeyID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				sendError(w, "SSH key not found", http.StatusBadRequest)
+			} else {
+				sendError(w, "Failed to validate SSH key", http.StatusInternalServerError)
+			}
+			return
+		}
+	}
 
 	if update.Port > 0 && update.Port <= 65535 {
 		existing.Port = update.Port
