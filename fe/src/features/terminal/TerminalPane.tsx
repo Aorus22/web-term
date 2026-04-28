@@ -4,6 +4,8 @@ import '@wterm/react/css'
 import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useSSHSession } from './useSSHSession'
 import { useAppStore } from '@/stores/app-store'
+import { useSettings } from '@/features/settings/hooks/useSettings'
+import { cn } from '@/lib/utils'
 import { PasswordPrompt } from './PasswordPrompt'
 import { PassphrasePrompt } from './PassphrasePrompt'
 import { ReconnectOverlay } from './ReconnectOverlay'
@@ -23,17 +25,38 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
   const { ref, connect, sendData, sendResize } = useSSHSession(sessionId)
   const { onReady: onTerminalReady } = useTerminalMouse(sendData)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
+  const { data: settings } = useSettings()
   const removeSession = useAppStore((s) => s.removeSession)
   const lastOptionsRef = useRef<ConnectOptions | null>(initialConnect ?? null)
   const passphraseRef = useRef<string | null>(null)
   const [showSaveBanner, setShowSaveBanner] = useState(false)
   const [passwordProvided, setPasswordProvided] = useState(false)
 
+  // Derive Terminal props from settings
+  const terminalTheme = settings?.terminal_color_theme || undefined  // undefined = default dark
+  const cursorBlinkSetting = settings?.cursor_blink !== 'false'  // default true
+  const cursorStyleClass = settings?.cursor_style === 'underline' ? 'cursor-underline'
+    : settings?.cursor_style === 'bar' ? 'cursor-bar'
+    : undefined  // block is default (no extra class needed)
+  const fontFamily = settings?.font_family || 'Geist Mono'
+  const fontSize = settings?.font_size || '14'
+
+  const terminalClassName = cn(
+    cursorStyleClass,
+    'has-scrollback'
+  )
+
+  const terminalStyle = {
+    height: '100%',
+    fontFamily: `'${fontFamily}', monospace`,
+    fontSize: `${fontSize}px`,
+  }
+
   // Auto-connect on mount if initialConnect is provided (saved connection with password, D-01)
   useEffect(() => {
     if (initialConnect) {
       lastOptionsRef.current = initialConnect
-      connect(initialConnect)
+      connect({ ...initialConnect, term: settings?.terminal_type })
     } else if (session?.auth_method === 'key' && !session?.has_passphrase && session?.status === 'connecting') {
       // Auto-connect for key-auth without passphrase
       const opts: ConnectOptions = {
@@ -45,6 +68,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
         ssh_key_id: session.ssh_key_id,
         rows: 24,
         cols: 80,
+        term: settings?.terminal_type,
       }
       lastOptionsRef.current = opts
       connect(opts)
@@ -79,7 +103,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
           passphrase: passphraseRef.current,
         }
       }
-      connect(lastOptionsRef.current)
+      connect({ ...lastOptionsRef.current, term: settings?.terminal_type })
     }
   }
 
@@ -90,6 +114,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
       port: session!.port,
       username: session!.username,
       password,
+      term: settings?.terminal_type,
     }
     lastOptionsRef.current = opts
     connect(opts)
@@ -112,6 +137,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
       passphrase,
       rows: 24,
       cols: 80,
+      term: settings?.terminal_type,
     }
     lastOptionsRef.current = opts
     connect(opts)
@@ -176,12 +202,13 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
         <Terminal
           ref={ref}
           autoResize
-          cursorBlink
-          theme={theme === 'light' ? 'light' : undefined}
+          cursorBlink={cursorBlinkSetting}
+          theme={terminalTheme}
+          className={terminalClassName}
           onData={sendData}
           onResize={sendResize}
           onReady={onTerminalReady}
-          style={{ height: '100%' }}
+          style={terminalStyle}
         />
       </div>
     )
@@ -226,10 +253,11 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
             ref={ref}
             autoResize
             cursorBlink={false}
-            theme={theme === 'light' ? 'light' : undefined}
+            theme={terminalTheme}
+            className={terminalClassName}
             onData={() => {}}
             onResize={sendResize}
-            style={{ height: '100%' }}
+            style={terminalStyle}
           />
           {/* Reconnect overlay on top (UI-04) */}
           <ReconnectOverlay
