@@ -7,13 +7,12 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 
-import { QuickConnect } from '@/features/connections/components/QuickConnect'
 import { TagFilter } from '@/features/connections/components/TagFilter'
 import { ConnectionList } from '@/features/connections/components/ConnectionList'
-import { ExportImport } from '@/features/connections/components/ExportImport'
 import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
 import { TabBar } from '@/components/TabBar'
 import { TerminalPane } from '@/features/terminal/TerminalPane'
+import { NewTabView } from '@/components/NewTabView'
 
 const queryClient = new QueryClient()
 
@@ -36,10 +35,6 @@ function AppContent() {
           </Button>
         </div>
         
-        <div className="px-4 pb-4">
-          <QuickConnect />
-        </div>
-        
         <Separator />
         
         <div className="py-2">
@@ -51,12 +46,6 @@ function AppContent() {
         <ScrollArea className="flex-1">
           <ConnectionList />
         </ScrollArea>
-        
-        <Separator />
-        
-        <div className="p-4">
-          <ExportImport />
-        </div>
       </aside>
 
       {/* Main Area */}
@@ -93,14 +82,7 @@ function AppContent() {
             </div>
           ))}
           {sessions.length === 0 && (
-            <div className="flex items-center justify-center h-full text-muted-foreground p-8">
-              <div className="max-w-md text-center">
-                <h3 className="text-lg font-medium text-foreground mb-2">No active sessions</h3>
-                <p className="text-sm">
-                  Select a saved connection from the sidebar or use Quick Connect to start a new SSH session.
-                </p>
-              </div>
-            </div>
+            <NewTabView />
           )}
         </div>
       </main>
