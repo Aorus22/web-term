@@ -22,7 +22,7 @@ func Init(dbPath string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := db.AutoMigrate(&Connection{}); err != nil {
+	if err := db.AutoMigrate(&Connection{}, &SSHKey{}); err != nil {
 		return nil, err
 	}
 
