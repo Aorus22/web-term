@@ -7,6 +7,7 @@ import { useAppStore } from '@/stores/app-store'
 import { PasswordPrompt } from './PasswordPrompt'
 import { ReconnectOverlay } from './ReconnectOverlay'
 import { SaveConnectionBanner } from './SaveConnectionBanner'
+import { useTerminalMouse } from './useTerminalMouse'
 import type { ConnectOptions } from './types'
 
 interface TerminalPaneProps {
@@ -19,6 +20,7 @@ interface TerminalPaneProps {
 
 export function TerminalPane({ sessionId, isActive, initialConnect, theme }: TerminalPaneProps) {
   const { ref, connect, sendData, sendResize, disconnect } = useSSHSession(sessionId)
+  const { onReady: onTerminalReady } = useTerminalMouse(sendData)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const removeSession = useAppStore((s) => s.removeSession)
   const lastOptionsRef = useRef<ConnectOptions | null>(initialConnect ?? null)
@@ -121,6 +123,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
           theme={theme === 'light' ? 'light' : undefined}
           onData={sendData}
           onResize={sendResize}
+          onReady={onTerminalReady}
           style={{ height: '100%' }}
         />
       </div>
