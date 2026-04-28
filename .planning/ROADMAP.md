@@ -1,117 +1,41 @@
 # Roadmap: WebTerm
 
-## Overview
+## Milestones
 
-WebTerm is a self-hosted web-based SSH client. The roadmap starts with validating the terminal library (@wterm/react, v0.2.0 — days old), then builds a complete connection management layer (backend + frontend together as a vertical slice), delivers the core SSH terminal experience (the product's entire reason to exist), and finishes with multi-tab sessions and polish.
+- ✅ **v0.2.0 MVP** — Phases 1-4 (shipped 2026-04-28)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+<details>
+<summary>✅ v0.2.0 MVP (Phases 1-4) — SHIPPED 2026-04-28</summary>
 
-Decimal phases appear between their surrounding integers in numeric order.
+- [x] Phase 1: wterm Spike (2/2 plans) — completed 2026-04-27
+- [x] Phase 2: Connection Management (2/2 plans) — completed 2026-04-27
+- [x] Phase 3: SSH Terminal (3/3 plans) — completed 2026-04-27
+- [x] Phase 4: Multi-Tab & Polish (3/3 plans) — completed 2026-04-28
 
-- [x] **Phase 1: wterm Spike** - Validate @wterm/react handles SSH workloads before committing to architecture
-- [x] **Phase 2: Connection Management** - Full vertical slice: Go backend + React frontend for saving, organizing, and managing SSH connections
-- [x] **Phase 3: SSH Terminal** - Core product: browser-to-SSH terminal with password auth, resize, copy/paste, and reconnection
-- [ ] **Phase 4: Multi-Tab & Polish** - Multiple simultaneous sessions, keyboard shortcuts, dark/light theme
-
-## Phase Details
-
-### Phase 1: wterm Spike
-**Goal**: Validate that @wterm/react can handle SSH terminal workloads (vim, htop, tmux, resize) before committing to the architecture — if it fails, fall back to xterm.js
-**Depends on**: Nothing (first phase)
-**Requirements**: (validation gate — no production requirements; validates approach for TERM-01 through TERM-05)
-**Success Criteria** (what must be TRUE):
-  1. @wterm/react renders a terminal in a React app connected to a Go WebSocket server
-  2. vim, htop, and curses apps display correctly without rendering artifacts
-  3. Terminal resize propagates to the remote PTY and redraws correctly
-  4. Go backend successfully proxies bidirectional I/O between WebSocket and SSH
-  5. Go/no-go decision documented: proceed with @wterm/react or fall back to xterm.js
-**Plans**: 2 plans
-Plans:
-- [x] 01-01-PLAN.md — Build spike: Go WebSocket SSH proxy + React @wterm/react terminal
-- [x] 01-02-PLAN.md — Human validation checkpoint: vim/htop/tmux/resize + go/no-go decision
-**UI hint**: yes
-
-### Phase 2: Connection Management
-**Goal**: Users can save, organize, and manage SSH connections through a clean Vercel-inspired web interface
-**Depends on**: Phase 1 (terminal library decision finalized)
-**Requirements**: CONN-01, CONN-02, CONN-03, CONN-04, CONN-05, CONN-06, CONN-07, UI-01
-**Success Criteria** (what must be TRUE):
-  1. User can create a new SSH connection (host, port, username, label) and it persists across page reloads
-  2. Saved connections appear in a sidebar list, organized by tags/labels
-  3. User can edit and delete existing connections with confirmation on destructive actions
-  4. User can type user@host:port in a quick-connect bar to connect without saving
-  5. User can export and import connections as JSON for backup
-**Plans**: 2 plans
-Plans:
-- [x] 02-01-PLAN.md — Go backend: REST API, SQLite, encryption, security hardening
-- [x] 02-02-PLAN.md — React frontend: shadcn setup, sidebar, connection CRUD UI, quick-connect, export/import
-**UI hint**: yes
-
-### Phase 3: SSH Terminal
-**Goal**: Users can SSH to any server from the browser with a smooth, reliable terminal experience — this is the product's core value
-**Depends on**: Phase 2 (connection data and UI shell available)
-**Requirements**: TERM-01, TERM-02, TERM-03, TERM-04, TERM-05, UI-04
-**Success Criteria** (what must be TRUE):
-  1. User can connect to a remote server and get an interactive shell that handles vim, htop, tmux
-  2. Password authentication works, including keyboard-interactive SSH prompts
-  3. Terminal auto-resizes when the browser window or pane resizes
-  4. Copy/paste works natively through browser text selection
-  5. WebSocket disconnection shows a reconnection prompt to the user
-**Plans**: 3 plans
-Plans:
-- [x] 03-01-PLAN.md — Backend SSH proxy: keyboard-interactive auth, connection_id protocol, session cleanup
-- [x] 03-02-PLAN.md — Frontend terminal: useSSHSession hook, TerminalPane component, app-store session state
-- [x] 03-03-PLAN.md — UI integration: sidebar/quick-connect wiring, tab bar, reconnection UX, save banner
-**UI hint**: yes
-
-### Phase 4: Multi-Tab & Polish
-**Goal**: Users can work with multiple SSH sessions simultaneously with a polished, keyboard-driven workflow
-**Depends on**: Phase 3 (single SSH session works end-to-end)
-**Requirements**: TAB-01, TAB-02, TAB-03, TAB-04, UI-02, UI-03
-**Success Criteria** (what must be TRUE):
-  1. User can open multiple independent SSH sessions as tabs in a single browser window
-  2. Closing a tab cleanly disconnects the SSH session without zombie processes
-  3. Each tab shows its connection status (connected, connecting, disconnected)
-  4. Keyboard shortcuts work: Ctrl+T (new tab), Ctrl+W (close tab), Ctrl+Tab (switch tab)
-  5. Dark/light theme toggle changes both UI and terminal appearance
-**Plans**: 3 plans
-
-**Wave 1** *(no dependencies — parallel execution)*
-- [x] 04-01-PLAN.md — Theme system (useTheme hook, ThemeToggle) + keyboard shortcuts hook
-- [ ] 04-02-PLAN.md — Sidebar cleanup, NewTabView selection grid, ConnectionForm polish
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 04-03-PLAN.md — TabBar enhancement (status dots, + button, close confirmation) + full integration
-
-**UI hint**: yes
+</details>
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. wterm Spike | v0.2.0 | 2/2 | Complete | 2026-04-27 |
+| 2. Connection Management | v0.2.0 | 2/2 | Complete | 2026-04-27 |
+| 3. SSH Terminal | v0.2.0 | 3/3 | Complete | 2026-04-27 |
+| 4. Multi-Tab & Polish | v0.2.0 | 3/3 | Complete | 2026-04-28 |
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
-| 2. Connection Management | 2/2 | Complete | 2026-04-27 |
-| 3. SSH Terminal | 3/3 | Complete | 2026-04-27 |
-| 4. Multi-Tab & Polish | 1/3 | In Progress | 2024-05-15 |
 ---
 gsd_state_version: 1.0
 milestone: v0.2.0
-milestone_name: milestone
-status: executing
-stopped_at: "Phase 04 Plan 01 complete"
-last_updated: "2024-05-15T15:30:00Z"
-last_activity: 2024-05-15 -- Phase 04 Plan 01 completed
+milestone_name: MVP
+status: complete
+last_updated: "2026-04-28T05:00:00Z"
+last_activity: 2026-04-28 -- v0.2.0 milestone archived
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 10
+  percent: 100
 ---
