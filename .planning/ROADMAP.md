@@ -78,7 +78,15 @@ Plans:
   3. Each tab shows its connection status (connected, connecting, disconnected)
   4. Keyboard shortcuts work: Ctrl+T (new tab), Ctrl+W (close tab), Ctrl+Tab (switch tab)
   5. Dark/light theme toggle changes both UI and terminal appearance
-**Plans**: TBD
+**Plans**: 3 plans
+
+**Wave 1** *(no dependencies — parallel execution)*
+- [ ] 04-01-PLAN.md — Theme system (useTheme hook, ThemeToggle) + keyboard shortcuts hook
+- [ ] 04-02-PLAN.md — Sidebar cleanup, NewTabView selection grid, ConnectionForm polish
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 04-03-PLAN.md — TabBar enhancement (status dots, + button, close confirmation) + full integration
+
 **UI hint**: yes
 
 ## Progress
@@ -91,7 +99,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. wterm Spike | 2/2 | Complete | 2026-04-27 |
 | 2. Connection Management | 2/2 | Complete | 2026-04-27 |
 | 3. SSH Terminal | 3/3 | Complete | 2026-04-27 |
-| 4. Multi-Tab & Polish | 0/? | Not started | - |
+| 4. Multi-Tab & Polish | 0/3 | Planned | - |
 ---
 gsd_state_version: 1.0
 milestone: v0.2.0
