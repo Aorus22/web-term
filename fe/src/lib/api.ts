@@ -1,5 +1,6 @@
 const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/connections`
 const KEYS_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/keys`
+const FORWARDS_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/forwards`
 
 export interface SSHKey {
   id: string
@@ -52,6 +53,45 @@ export const connectionsApi = {
         headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify({connections: data}) 
     }).then(r => r.json()),
+}
+
+export interface PortForward {
+  id: string
+  name: string
+  connection_id: string
+  local_port: number
+  remote_port: number
+  active: boolean
+  error: string
+  created_at: string
+  updated_at: string
+}
+
+export const forwardsApi = {
+  list: (): Promise<PortForward[]> => fetch(FORWARDS_API_BASE).then(r => r.json()),
+  create: (data: Omit<PortForward, 'id' | 'active' | 'error' | 'created_at' | 'updated_at'>): Promise<PortForward> =>
+    fetch(FORWARDS_API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
+    }),
+  delete: (id: string): Promise<void> =>
+    fetch(`${FORWARDS_API_BASE}/${id}`, { method: 'DELETE' }).then(r => {
+      if (!r.ok) throw new Error('Delete failed')
+    }),
+  start: (id: string): Promise<PortForward> =>
+    fetch(`${FORWARDS_API_BASE}/${id}/start`, { method: 'POST' }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
+    }),
+  stop: (id: string): Promise<PortForward> =>
+    fetch(`${FORWARDS_API_BASE}/${id}/stop`, { method: 'POST' }).then(r => {
+      if (!r.ok) throw new Error('Failed to stop forward')
+      return r.json()
+    }),
 }
 
 export const keysApi = {

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { PanelLeft, Server, Key } from 'lucide-react'
+import { PanelLeft, Server, Key, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -9,9 +9,11 @@ import { cn } from '@/lib/utils'
 import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
 import { TabBar } from '@/components/TabBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { Toaster } from '@/components/ui/sonner'
 import { TerminalPane } from '@/features/terminal/TerminalPane'
 import { HostsPage } from '@/features/hosts/components/HostsPage'
 import { SSHKeysPage } from '@/features/ssh-keys/components/SSHKeysPage'
+import { PortForwardsPage } from '@/features/forwards/components/PortForwardsPage'
 import { NewTabView } from '@/components/NewTabView'
 import { useTheme } from '@/hooks/use-theme'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
@@ -93,6 +95,18 @@ function AppContent() {
           >
             <Key className="h-4 w-4" /> SSH Keys
           </button>
+          <button 
+            onClick={() => {
+              setSidebarPage('forwards')
+              setActiveSession(null)
+            }} 
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
+              sidebarPage === 'forwards' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+            )}
+          >
+            <ArrowLeftRight className="h-4 w-4" /> Port Forwards
+          </button>
         </nav>
       </aside>
 
@@ -134,12 +148,16 @@ function AppContent() {
           {!activeSessionId && sidebarPage === 'keys' && (
             <SSHKeysPage />
           )}
+          {!activeSessionId && sidebarPage === 'forwards' && (
+            <PortForwardsPage />
+          )}
         </div>
       </main>
 
 
       {/* Overlays */}
       <ConnectionForm />
+      <Toaster />
     </div>
   )
 }

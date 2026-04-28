@@ -5,8 +5,8 @@ import type { SSHSession } from '@/features/terminal/types'
 interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
-  sidebarPage: 'hosts' | 'keys' | 'new-tab'
-  setSidebarPage: (page: 'hosts' | 'keys' | 'new-tab') => void
+  sidebarPage: 'hosts' | 'keys' | 'forwards' | 'new-tab'
+  setSidebarPage: (page: 'hosts' | 'keys' | 'forwards' | 'new-tab') => void
   editingConnection: Connection | null
   setEditingConnection: (c: Connection | null) => void
   creatingConnection: boolean
