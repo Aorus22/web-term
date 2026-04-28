@@ -9,9 +9,9 @@ See: .planning/PROJECT.md (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 03 (ssh-terminal) — COMPLETE (3/3 plans)
-Next: Phase 04 (Multi-Tab & Polish)
-Last activity: 2026-04-27 -- Phase 03 complete: SSH Terminal
+Phase: 04 (multi-tab-polish) — UI-SPEC approved
+Next: Phase 04 discuss/plan
+Last activity: 2026-04-28 -- Phase 04 UI design contract approved
 
 Progress: [======----] 67% (Milestone v0.2.0)
 
@@ -72,6 +72,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-27
-Stopped at: Phase 03 complete, next: Phase 04
-Resume file: .planning/ROADMAP.md
+Last session: 2026-04-28
+Stopped at: Phase 04 UI-SPEC approved
+Resume file: .planning/phases/04-multi-tab-polish/04-UI-SPEC.md
