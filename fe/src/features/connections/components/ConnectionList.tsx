@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { MoreVertical, Edit2, Trash2, Copy, ExternalLink, Terminal } from 'lucide-react'
+import { generateId } from '@/lib/utils'
 import type { Connection } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
 
@@ -90,7 +91,7 @@ export const ConnectionList = () => {
                 return
               }
               // Create new session
-              const sessionId = crypto.randomUUID()
+              const sessionId = generateId()
               const session: SSHSession = {
                 id: sessionId,
                 connectionId: conn.id,

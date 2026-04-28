@@ -10,6 +10,7 @@ import {
 import { useConnections } from '../hooks/useConnections'
 import { Terminal, Plus } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
+import { generateId } from '@/lib/utils'
 import type { SSHSession } from '@/features/terminal/types'
 
 export const QuickConnect = () => {
@@ -28,7 +29,7 @@ export const QuickConnect = () => {
       if (existing) {
         setActiveSession(existing.id)
       } else {
-        const sessionId = crypto.randomUUID()
+        const sessionId = generateId()
         const session: SSHSession = {
           id: sessionId,
           connectionId: savedConn.id,
@@ -62,7 +63,7 @@ export const QuickConnect = () => {
       return
     }
 
-    const sessionId = crypto.randomUUID()
+    const sessionId = generateId()
     const session: SSHSession = {
       id: sessionId,
       host: host.trim(),
