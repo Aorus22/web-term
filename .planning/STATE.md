@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.3.0
 milestone_name: SSH Key Auth & UI Redesign
 status: planning
-stopped_at: Phase 6 context gathered
-last_updated: "2026-04-28T11:52:22.695Z"
-last_activity: 2026-04-28 — Phase 5 executed and verified
+stopped_at: Phase 7 complete, ready to plan Phase 8
+last_updated: "2026-04-28T15:05:00.000Z"
+last_activity: 2026-04-28 — Phase 7 executed, verified, and UAT passed
 progress:
-  total_phases: 3
-  completed_phases: 1
+  total_phases: 4
+  completed_phases: 3
   total_plans: 2
   completed_plans: 2
   percent: 100
@@ -21,24 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-28)
 
 **Core value:** SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable
-**Current focus:** Planning v0.3.0 — SSH Key Auth & UI Redesign
+**Current focus:** Planning v0.3.0 — Port Forwarding (Phase 8)
 
 ## Current Position
 
-Phase: 6 of 7 (Frontend SSH Key UI)
+Phase: 8 of 8 (Port Forwarding)
 Plan: 0 plans ready for execution
-Status: Phase 5 complete, ready to plan Phase 6
-Last activity: 2026-04-28 — Phase 5 executed and verified
+Status: Phase 7 complete, ready to plan Phase 8
+Last activity: 2026-04-28 — Phase 7 executed, verified, and UAT passed
 
-Progress: [▓▓▓▓▓░░░░░] 50% (Milestone v0.3.0 — 2/7 plans across 3 phases)
+Progress: [▓▓▓▓▓▓░░░░] 75% (Milestone v0.3.0 — 7/10 plans across 4 phases, 3 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 12
+- Total plans completed: 14
 - Average duration: 14 min
-- Total execution time: 2.8 hours
+- Total execution time: 3.2 hours
 
 **By Phase:**
 
@@ -49,6 +49,8 @@ Progress: [▓▓▓▓▓░░░░░] 50% (Milestone v0.3.0 — 2/7 plans a
 | 03-ssh-terminal | 3 | 40 min | 13 min |
 | 04-multi-tab-polish | 3 | 50 min | 16.6 min |
 | 05-backend-ssh-key-storage | 2 | 28 min | 14 min |
+| 06-frontend-ui-navigation | 3 | 42 min | 14 min |
+| 07-websocket-key-auth-integration | 2 | 28 min | 14 min |
 
 **Recent Trend:**
 
@@ -67,6 +69,12 @@ Recent decisions for v0.3.0:
 - AES-256-GCM with AAD domain separation for key encryption
 - Zustand sidebarPage state for tab navigation (no router)
 - Backward-compatible WebSocket protocol extension (auth_method field)
+- Passphrase caching in frontend (ref-based, session-scoped, never stored)
+- PassphrasePrompt inline component for encrypted key auth flow
+
+### Roadmap Evolution
+
+- Phase 8 added: Port Forwarding — SSH local port forwarding with sheet UI and port conflict detection
 
 ### Pending Todos
 
@@ -86,10 +94,10 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-28T11:52:22.650Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-frontend-ui-navigation/06-CONTEXT.md
-Next step: `/gsd-plan-phase 5`
+Last session: 2026-04-28T15:05:00.000Z
+Stopped at: Phase 7 complete, ready to plan Phase 8
+Resume file: None
+Next step: `/gsd-plan-phase 8`
 
 ## Quick Tasks Completed
 

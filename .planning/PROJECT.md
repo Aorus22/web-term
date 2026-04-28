@@ -24,14 +24,17 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 - ✓ Keyboard shortcuts (Ctrl+T/W/Tab) — v0.2.0
 - ✓ Reconnection handling on WebSocket disconnect — v0.2.0
 - ✓ Clean UI using shadcn — v0.2.0
+- ✓ SSH key-based authentication (upload, connect, manage keys) — v0.3.0
+- ✓ Sidebar redesign into 2-page navigation (Hosts + SSH Keys) — v0.3.0
+- ✓ Hosts page with card-based layout and kebab menus — v0.3.0
+- ✓ SSH Keys page with key pool management — v0.3.0
+- ✓ Per-connection auth method selection (password vs key) — v0.3.0
 
 ### Active
 
-- [ ] SSH key-based authentication (upload, connect, manage keys)
-- [ ] Sidebar redesign into 2-page navigation (Hosts + SSH Keys)
-- [ ] Hosts page with card-based layout and kebab menus
-- [ ] SSH Keys page with key pool management
-- [ ] Per-connection auth method selection (password vs key)
+- [ ] SSH local port forwarding (bind remote port to localhost)
+- [ ] Port forwarding sheet UI with connection selector
+- [ ] Port conflict detection with toast error
 
 ### Out of Scope
 
@@ -58,7 +61,7 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 - **Terminal Library:** @wterm/react — validated, working well
 - **Storage:** SQLite — no external DB dependency
 - **No Auth:** v1 without authentication system
-- **SSH Auth:** Password-based only for v1
+- **SSH Auth:** Password and SSH key-based auth supported
 
 ## Key Decisions
 
@@ -72,6 +75,7 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 | Theme in localStorage | Persist preference without backend | ✓ Good |
 | QuickConnect in NewTabView | Simplify sidebar, reduce clutter | ✓ Good — cleaner architecture |
 | TabBar status dots | Visual session status at a glance | ✓ Good |
+| Passphrase caching via ref | Session-scoped, never stored, auto-cleared on disconnect | ✓ Good — secure UX without repeated prompts |
 
 ## Evolution
 
@@ -102,4 +106,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-28 after v0.3.0 milestone start*
+*Last updated: 2026-04-28 after Phase 7 complete*

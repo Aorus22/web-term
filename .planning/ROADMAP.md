@@ -7,7 +7,7 @@ WebTerm v0.3.0 adds SSH key-based authentication and a sidebar UI redesign. Thre
 ## Milestones
 
 - ✅ **v0.2.0 MVP** - Phases 1-4 (shipped 2026-04-28)
-- 🚧 **v0.3.0 SSH Key Auth & UI Redesign** - Phases 5-7 (in progress)
+- 🚧 **v0.3.0 SSH Key Auth & UI Redesign** - Phases 5-8 (in progress)
 
 ## Phases
 
@@ -52,11 +52,12 @@ Plans:
 
 ### 🚧 v0.3.0 SSH Key Auth & UI Redesign (In Progress)
 
-**Milestone Goal:** SSH key-based authentication + sidebar redesigned into 2-page navigation (Hosts & SSH Keys)
+**Milestone Goal:** SSH key-based authentication + sidebar redesigned into 2-page navigation (Hosts & SSH Keys) + port forwarding
 
 - [x] **Phase 5: Backend SSH Key Storage** - SSH key model, encrypted storage, CRUD API, connection schema update
 - [x] **Phase 6: Frontend UI & Navigation** - Sidebar tabs, hosts card page, SSH keys page, connection form auth toggle
-- [ ] **Phase 7: WebSocket Key Auth Integration** - Key-based SSH auth, passphrase round-trip, backward compatibility
+- [x] **Phase 7: WebSocket Key Auth Integration** - Key-based SSH auth, passphrase round-trip, backward compatibility
+- [ ] **Phase 8: Port Forwarding** - SSH local port forwarding, sheet UI for managing forwards, port conflict detection
 
 ## Phase Details
 
@@ -104,13 +105,26 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Backend key auth: extend ConnectMessage + implement ssh.Signer auth in proxy
-- [ ] 07-02-PLAN.md — Frontend key auth: PassphrasePrompt, HostsPage flow, passphrase caching & reconnect
+- [x] 07-01-PLAN.md — Backend key auth: extend ConnectMessage + implement ssh.Signer auth in proxy
+- [x] 07-02-PLAN.md — Frontend key auth: PassphrasePrompt, HostsPage flow, passphrase caching & reconnect
+
+### Phase 8: Port Forwarding
+**Goal**: Users can create SSH local port forwarding tunnels that bind a remote host port to a local port, managed via sheet UI with port conflict detection
+**Depends on**: Phase 7
+**Success Criteria** (what must be TRUE):
+  1. User can create a port forwarding rule by selecting an SSH connection, specifying a remote target host:port, and a local bind port via a sheet UI
+  2. Active port forwards are listed and can be stopped/removed from the UI
+  3. When saving a port forward with a local port already in use, the user sees a toast error and the forward is not created
+  4. The Go proxy establishes SSH local port forwarding tunnels and exposes them on the specified localhost ports
+**Plans:** (not yet planned)
+
+Plans:
+- [ ] (not yet planned)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 5 → 6 → 7
+Phases execute in numeric order: 5 → 6 → 7 → 8
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -120,4 +134,5 @@ Phases execute in numeric order: 5 → 6 → 7
 | 4. Multi-tab & Polish | v0.2.0 | 3/3 | Complete | 2026-04-28 |
 | 5. Backend SSH Key Storage | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 6. Frontend UI & Navigation | v0.3.0 | 3/3 | Complete | 2026-04-28 |
-| 7. WebSocket Key Auth Integration | v0.3.0 | 0/2 | Not started | - |
+| 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
+| 8. Port Forwarding | v0.3.0 | 0/? | Not started | - |
