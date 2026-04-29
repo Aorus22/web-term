@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -228,15 +229,6 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// If a working directory is specified (e.g., duplicate tab), cd into it after shell starts.
-		// Security (T-10-01): reject paths containing single quotes or newlines to prevent injection.
-		if connectMsg.Cwd != "" {
-			if !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
-				cdCmd := fmt.Sprintf(" cd '%s'\n", connectMsg.Cwd)
-				stdinPipe.Write([]byte(cdCmd))
-			}
-		}
-
 		// Notify client that connection is ready with session_id.
 		connectedMsg := ServerMessage{
 			Type:      "connected",
@@ -248,9 +240,59 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Cwd tracking state for get-cwd requests.
-		var cwdPending bool
-		var cwdBuffer bytes.Buffer
+		// Capture the shell PID before starting forwarding goroutines.
+		// If cwd is specified, cd into it first. Then echo the PID marker.
+		// All output is collected and forwarded to the client in one batch.
+		const pidMarker = "__WTERM_PID__"
+		{
+			var initCmd string
+			if connectMsg.Cwd != "" && !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
+				initCmd = fmt.Sprintf(" cd '%s' && echo %s$$\n", connectMsg.Cwd, pidMarker)
+			} else {
+				initCmd = fmt.Sprintf(" echo %s$$\n", pidMarker, )
+			}
+			stdinPipe.Write([]byte(initCmd))
+		}
+
+		var shellPid int
+		{
+			pidBuf := make([]byte, 8192)
+			var collected []byte
+			readDeadline := time.After(5 * time.Second)
+		pidLoop:
+			for {
+				select {
+				case <-readDeadline:
+					break pidLoop
+				default:
+				}
+				n, err := stdoutPipe.Read(pidBuf)
+				if n > 0 {
+					collected = append(collected, pidBuf[:n]...)
+					if bytes.Contains(collected, []byte(pidMarker)) {
+						break
+					}
+				}
+				if err != nil {
+					break
+				}
+			}
+			// Forward everything collected (MOTD, prompt, PID echo) to client.
+			if len(collected) > 0 {
+				wsWrite(websocket.BinaryMessage, collected)
+			}
+			// Parse the PID from the marker line.
+			for _, line := range strings.Split(string(collected), "\n") {
+				trimmed := strings.TrimSpace(line)
+				if idx := strings.Index(trimmed, pidMarker); idx >= 0 {
+					pidStr := strings.TrimSpace(trimmed[idx+len(pidMarker):])
+					shellPid, _ = strconv.Atoi(pidStr)
+				}
+			}
+		}
+		if shellPid > 0 {
+			log.Printf("Session %s: captured shell PID %d", sessionID, shellPid)
+		}
 
 		// Forwarding goroutines
 		go func() {
@@ -278,12 +320,24 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 							session.SendRequest("window-change", false, ssh.Marshal(winSize))
 						}
 					} else if err == nil && ctrl.Type == "get-cwd" {
-						// Inject pwd command with unique marker into the running shell.
-						cwdPending = true
-						cwdBuffer.Reset()
-						marker := "__WTERM_CWD_END__"
-						cmd := fmt.Sprintf(" pwd && echo %s\n", marker)
-						stdinPipe.Write([]byte(cmd))
+						go func(pid int) {
+							path := ""
+							if pid > 0 {
+								s, err := client.NewSession()
+								if err == nil {
+									defer s.Close()
+									out, err := s.Output(fmt.Sprintf("readlink /proc/%d/cwd 2>/dev/null", pid))
+									if err == nil {
+										path = strings.TrimSpace(string(out))
+									}
+								}
+							}
+							if path == "" {
+								path = "/"
+							}
+							cwdResp, _ := json.Marshal(CwdResponseMessage{Type: "cwd", Path: path})
+							wsWrite(websocket.TextMessage, cwdResp)
+						}(shellPid)
 					}
 				} else if msgType == websocket.BinaryMessage {
 					stdinPipe.Write(msgData)
@@ -313,58 +367,7 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			}
 		}
 
-		go func() {
-			buf := make([]byte, 4096)
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-				n, err := stdoutPipe.Read(buf)
-				if n > 0 {
-					data := buf[:n]
-					if cwdPending {
-						cwdBuffer.Write(data)
-						if bytes.Contains(cwdBuffer.Bytes(), []byte("__WTERM_CWD_END__")) {
-							cwdPending = false
-							content := cwdBuffer.String()
-							lines := strings.Split(content, "\n")
-							var path string
-							for _, line := range lines {
-								trimmed := strings.TrimSpace(line)
-								if strings.Contains(trimmed, "__WTERM_CWD_END__") {
-									beforeMarker := strings.Split(trimmed, "__WTERM_CWD_END__")[0]
-									if beforeMarker != "" {
-										path = beforeMarker
-									}
-									break
-								} else if trimmed != "" {
-									path = trimmed
-								}
-							}
-							cwdResp, _ := json.Marshal(CwdResponseMessage{
-								Type: "cwd",
-								Path: path,
-							})
-							wsWrite(websocket.TextMessage, cwdResp)
-							wsWrite(websocket.BinaryMessage, cwdBuffer.Bytes())
-							cwdBuffer.Reset()
-							continue
-						}
-						continue
-					}
-					if err := wsWrite(websocket.BinaryMessage, data); err != nil {
-						cancel()
-						return
-					}
-				}
-				if err != nil {
-					cancel()
-					return
-				}
-			}
-		}()
+		go forward(stdoutPipe)
 		go forward(stderrPipe)
 
 		// Wait for context cancellation (any goroutine signals done).
