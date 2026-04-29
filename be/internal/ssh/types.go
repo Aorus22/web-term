@@ -14,6 +14,7 @@ type ConnectMessage struct {
 	SSHKeyID     string `json:"ssh_key_id,omitempty"`   // SSH key ID for key-based auth
 	Passphrase   string `json:"passphrase,omitempty"`   // Passphrase for encrypted private keys
 	ConnectionID string `json:"connection_id,omitempty"` // Saved connection ID (alternative to host/user/password)
+	Cwd          string `json:"cwd,omitempty"`          // Initial working directory for new session (duplicate tab)
 	Rows         int    `json:"rows,omitempty"`         // Initial terminal rows
 	Cols         int    `json:"cols,omitempty"`         // Initial terminal cols
 	Term         string `json:"term,omitempty"`         // Terminal type for TERM env var (e.g., "xterm-256color")
@@ -28,7 +29,13 @@ type ResizeMessage struct {
 
 // ServerMessage is a structured response sent from the backend to the client.
 type ServerMessage struct {
-	Type      string `json:"type"`                  // "connected", "error", "disconnected"
-	SessionID string `json:"session_id,omitempty"`  // unique per WebSocket connection
-	Message   string `json:"message,omitempty"`      // error/info message
+	Type      string `json:"type"`                 // "connected", "error", "disconnected"
+	SessionID string `json:"session_id,omitempty"` // unique per WebSocket connection
+	Message   string `json:"message,omitempty"`    // error/info message
+}
+
+// CwdResponseMessage is sent in response to a "get-cwd" WebSocket message.
+type CwdResponseMessage struct {
+	Type string `json:"type"` // "cwd"
+	Path string `json:"path"` // the current working directory path
 }
