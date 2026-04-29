@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
 
 const MONO_FONTS = [
   'Geist Mono',
@@ -90,15 +91,13 @@ export function FontDialog({ open, onOpenChange, currentFont, currentSize, onSav
             <div className="flex items-center justify-between">
               <Label htmlFor="font-size">Font Size ({size}px)</Label>
             </div>
-            <input
+            <Slider
               id="font-size"
-              type="range"
-              min="10"
-              max="24"
-              step="1"
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-              className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+              min={10}
+              max={24}
+              step={1}
+              value={Number(size)}
+              onValueChange={(val) => setSize(String(val))}
             />
           </div>
 
