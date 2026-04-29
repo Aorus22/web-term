@@ -277,9 +277,17 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 					break
 				}
 			}
-			// Forward everything collected (MOTD, prompt, PID echo) to client.
-			if len(collected) > 0 {
-				wsWrite(websocket.BinaryMessage, collected)
+			// Forward collected data to client, but filter out PID marker lines
+			// so the init command is invisible to the user.
+			var filtered []byte
+			for _, line := range bytes.Split(collected, []byte("\n")) {
+				if !bytes.Contains(line, []byte(pidMarker)) {
+					filtered = append(filtered, line...)
+					filtered = append(filtered, '\n')
+				}
+			}
+			if len(filtered) > 0 {
+				wsWrite(websocket.BinaryMessage, filtered)
 			}
 			// Parse the PID from the marker line.
 			for _, line := range strings.Split(string(collected), "\n") {
@@ -323,14 +331,22 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 						go func(pid int) {
 							path := ""
 							if pid > 0 {
-								s, err := client.NewSession()
-								if err == nil {
+								s, sessErr := client.NewSession()
+								if sessErr != nil {
+									log.Printf("get-cwd: NewSession failed: %v (pid=%d)", sessErr, pid)
+								} else {
 									defer s.Close()
-									out, err := s.Output(fmt.Sprintf("readlink /proc/%d/cwd 2>/dev/null", pid))
-									if err == nil {
+									cmd := fmt.Sprintf("readlink /proc/%d/cwd 2>/dev/null", pid)
+									out, outErr := s.Output(cmd)
+									if outErr != nil {
+										log.Printf("get-cwd: readlink failed: %v (pid=%d)", outErr, pid)
+									} else {
 										path = strings.TrimSpace(string(out))
+										log.Printf("get-cwd: pid=%d path=%q", pid, path)
 									}
 								}
+							} else {
+								log.Printf("get-cwd: shellPid is 0, cannot resolve cwd")
 							}
 							if path == "" {
 								path = "/"
