@@ -3,6 +3,13 @@ import { useTerminal } from '@wterm/react'
 import { useAppStore } from '@/stores/app-store'
 import type { ConnectOptions } from './types'
 
+// Global map for WebSocket references so TabBar can access them for get-cwd
+const wsMap = new Map<string, WebSocket>()
+
+export function getSessionWebSocket(sessionId: string): WebSocket | undefined {
+  return wsMap.get(sessionId)
+}
+
 /**
  * Hook that encapsulates the full WebSocket lifecycle for a single SSH session.
  *
@@ -29,8 +36,9 @@ export function useSSHSession(sessionId: string) {
         ws.close()
         wsRef.current = null
       }
+      wsMap.delete(sessionId)
     }
-  }, [])
+  }, [sessionId])
 
   const connect = useCallback(
     (opts: ConnectOptions) => {
@@ -52,6 +60,7 @@ export function useSSHSession(sessionId: string) {
             host: opts.host, 
             port: opts.port, 
             username: opts.username, 
+            cwd: opts.cwd,
             rows: opts.rows, 
             cols: opts.cols,
             auth_method: opts.auth_method,
@@ -90,6 +99,7 @@ export function useSSHSession(sessionId: string) {
       const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8080`
       const socket = new WebSocket(`${wsUrl}/ws`)
       wsRef.current = socket
+      wsMap.set(sessionId, socket)
       socket.binaryType = 'arraybuffer'
 
       socket.onopen = () => {
@@ -101,6 +111,7 @@ export function useSSHSession(sessionId: string) {
               auth_method: opts.auth_method || 'password',
               ...(opts.ssh_key_id && { ssh_key_id: opts.ssh_key_id }),
               ...(opts.passphrase && { passphrase: opts.passphrase }),
+              ...(opts.cwd && { cwd: opts.cwd }),
               ...(opts.term && { term: opts.term }),
               rows,
               cols,
@@ -111,6 +122,7 @@ export function useSSHSession(sessionId: string) {
               port: opts.port ?? 22,
               user: opts.username,
               password: opts.password,
+              ...(opts.cwd && { cwd: opts.cwd }),
               ...(opts.term && { term: opts.term }),
               rows,
               cols,
@@ -156,6 +168,7 @@ export function useSSHSession(sessionId: string) {
 
       socket.onclose = () => {
         wsRef.current = null
+        wsMap.delete(sessionId)
         // Only update if not already in error or disconnected state
         const session = useAppStore.getState().sessions.find((s) => s.id === sessionId)
         if (session && session.status !== 'error' && session.status !== 'disconnected') {
@@ -194,8 +207,43 @@ export function useSSHSession(sessionId: string) {
       socket.close()
       wsRef.current = null
     }
+    wsMap.delete(sessionId)
     updateSession(sessionId, { status: 'disconnected' })
   }, [sessionId, updateSession])
+
+  const getCwd = useCallback((): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const socket = wsRef.current
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        reject(new Error('Not connected'))
+        return
+      }
+
+      const timeout = setTimeout(() => {
+        socket.removeEventListener('message', handler)
+        reject(new Error('get-cwd timeout'))
+      }, 5000)
+
+      const handler = (event: MessageEvent) => {
+        if (typeof event.data === 'string') {
+          try {
+            const msg = JSON.parse(event.data)
+            if (msg.type === 'cwd') {
+              clearTimeout(timeout)
+              socket.removeEventListener('message', handler)
+              resolve(msg.path || '')
+              return
+            }
+          } catch {
+            // Not JSON, ignore
+          }
+        }
+      }
+
+      socket.addEventListener('message', handler)
+      socket.send(JSON.stringify({ type: 'get-cwd' }))
+    })
+  }, [])
 
   return {
     ref,
@@ -205,5 +253,6 @@ export function useSSHSession(sessionId: string) {
     disconnect,
     write,
     focus,
+    getCwd,
   }
 }

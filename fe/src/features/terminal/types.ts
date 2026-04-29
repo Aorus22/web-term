@@ -29,6 +29,8 @@ export interface ConnectOptions {
   auth_method?: 'password' | 'key'
   ssh_key_id?: string
   passphrase?: string
+  // Initial working directory (for duplicate tab feature)
+  cwd?: string
   // Initial terminal size
   rows?: number
   cols?: number
