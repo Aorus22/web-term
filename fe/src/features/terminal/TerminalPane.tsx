@@ -56,7 +56,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
   useEffect(() => {
     if (initialConnect) {
       lastOptionsRef.current = initialConnect
-      connect({ ...initialConnect, term: settings?.terminal_type })
+      connect({ ...initialConnect, ...(session?.cwd && { cwd: session.cwd }), term: settings?.terminal_type })
     } else if (session?.auth_method === 'key' && !session?.has_passphrase && session?.status === 'connecting') {
       // Auto-connect for key-auth without passphrase
       const opts: ConnectOptions = {
@@ -68,6 +68,23 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
         ssh_key_id: session.ssh_key_id,
         rows: 24,
         cols: 80,
+        ...(session.cwd && { cwd: session.cwd }),
+        term: settings?.terminal_type,
+      }
+      lastOptionsRef.current = opts
+      connect(opts)
+    } else if (session?.cwd && session?.status === 'connecting') {
+      // Auto-connect for duplicated sessions (has cwd but no initialConnect)
+      const opts: ConnectOptions = {
+        connectionId: session.connectionId,
+        host: session.host,
+        port: session.port,
+        username: session.username,
+        auth_method: session.auth_method as 'password' | 'key',
+        ssh_key_id: session.ssh_key_id,
+        rows: 24,
+        cols: 80,
+        cwd: session.cwd,
         term: settings?.terminal_type,
       }
       lastOptionsRef.current = opts

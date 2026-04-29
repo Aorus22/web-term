@@ -1,4 +1,4 @@
-import { X, Circle, Plus } from 'lucide-react'
+import { X, Circle, Plus, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
@@ -8,6 +8,7 @@ import {
   PopoverTrigger 
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
+import { getSessionWebSocket } from '@/features/terminal/useSSHSession'
 
 /**
  * Horizontal tab bar showing active SSH sessions.
@@ -19,7 +20,43 @@ export function TabBar() {
   const setActiveSession = useAppStore((s) => s.setActiveSession)
   const setSidebarPage = useAppStore((s) => s.setSidebarPage)
   const removeSession = useAppStore((s) => s.removeSession)
+  const duplicateSession = useAppStore((s) => s.duplicateSession)
   const [confirmingClose, setConfirmingClose] = useState<string | null>(null)
+  const [plusPopoverOpen, setPlusPopoverOpen] = useState(false)
+
+  const handleDuplicate = async () => {
+    if (!activeSessionId) return
+    const source = sessions.find((s) => s.id === activeSessionId)
+    if (!source || source.status !== 'connected') return
+
+    const ws = getSessionWebSocket(activeSessionId)
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+
+    try {
+      const cwd = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('timeout')), 5000)
+        const handler = (event: MessageEvent) => {
+          if (typeof event.data === 'string') {
+            try {
+              const msg = JSON.parse(event.data)
+              if (msg.type === 'cwd') {
+                clearTimeout(timeout)
+                ws.removeEventListener('message', handler)
+                resolve(msg.path || '')
+              }
+            } catch {}
+          }
+        }
+        ws.addEventListener('message', handler)
+        ws.send(JSON.stringify({ type: 'get-cwd' }))
+      })
+
+      duplicateSession(activeSessionId, cwd)
+    } catch {
+      // Fallback: duplicate without cwd (starts in home directory)
+      duplicateSession(activeSessionId, '')
+    }
+  }
 
   return (
     <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar">
@@ -102,16 +139,46 @@ export function TabBar() {
         </button>
       ))}
 
-      <button
-        className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-        onClick={() => {
-          setActiveSession(null)
-          setSidebarPage('new-tab')
-        }}
-        aria-label="New tab"
-      >
-        <Plus className="h-4 w-4" />
-      </button>
+      <Popover open={plusPopoverOpen} onOpenChange={setPlusPopoverOpen}>
+        <PopoverTrigger
+          className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+          aria-label="New tab"
+        >
+          <Plus className="h-4 w-4" />
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="w-52 p-1"
+        >
+          <button
+            className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+            onClick={() => {
+              setPlusPopoverOpen(false)
+              handleDuplicate()
+            }}
+          >
+            <Copy className="h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col items-start">
+              <span className="font-medium">Duplicate</span>
+              <span className="text-xs text-muted-foreground">Same connection &amp; directory</span>
+            </div>
+          </button>
+          <button
+            className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+            onClick={() => {
+              setPlusPopoverOpen(false)
+              setActiveSession(null)
+              setSidebarPage('new-tab')
+            }}
+          >
+            <Plus className="h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col items-start">
+              <span className="font-medium">New Connection</span>
+              <span className="text-xs text-muted-foreground">Connect to a server</span>
+            </div>
+          </button>
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

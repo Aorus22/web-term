@@ -15,6 +15,7 @@ export interface SSHSession {
   key_name?: string              // display name for passphrase prompt
   key_type?: string              // RSA/Ed25519/ECDSA for badge
   has_passphrase?: boolean       // whether passphrase is needed
+  cwd?: string                   // initial working directory for duplicate tab auto-connect
 }
 
 export interface ConnectOptions {

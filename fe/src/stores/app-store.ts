@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Connection } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
+import { generateId } from '@/lib/utils'
 
 interface AppState {
   sidebarOpen: boolean
@@ -21,6 +22,7 @@ interface AppState {
   removeSession: (id: string) => void
   updateSession: (id: string, updates: Partial<SSHSession>) => void
   setActiveSession: (id: string | null) => void
+  duplicateSession: (sessionId: string, cwd: string) => string | null
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -56,4 +58,22 @@ export const useAppStore = create<AppState>((set) => ({
     sessions: state.sessions.map((s) => s.id === id ? { ...s, ...updates } : s),
   })),
   setActiveSession: (id) => set({ activeSessionId: id }),
+  duplicateSession: (sessionId, cwd) => {
+    const state = useAppStore.getState()
+    const source = state.sessions.find((s) => s.id === sessionId)
+    if (!source) return null
+    const newId = generateId()
+    const newSession: SSHSession = {
+      ...source,
+      id: newId,
+      status: 'connecting',
+      error: undefined,
+      cwd: cwd || undefined,
+    }
+    set((state) => ({
+      sessions: [...state.sessions, newSession],
+      activeSessionId: newId,
+    }))
+    return newId
+  },
 }))
