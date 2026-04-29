@@ -138,6 +138,20 @@ Plans:
 - [x] 09-02-PLAN.md — Frontend settings infrastructure, SettingsPage UI, sidebar integration, ThemeToggle removal
 - [x] 09-03-PLAN.md — Terminal settings integration (theme, font, cursor, scrollback, terminal type)
 
+### Phase 10: Tab Plus Button Popover
+**Goal**: Add a plus button popover on the tab bar with two options — "Duplicate" (opens same connection at same working directory) and "New Connection" (opens a new connection tab like current new tab behavior)
+**Depends on**: Phase 4 (multi-tab sessions)
+**Success Criteria** (what must be TRUE):
+1. A plus (+) button is visible on the tab bar; clicking it opens a popover with "Duplicate" and "New Connection" options
+2. "Duplicate" creates a new tab connected to the same host AND navigates to the same working directory as the active tab
+3. "New Connection" opens a new connection tab with behavior identical to the current new tab flow
+4. Popover closes after selecting an option or clicking outside
+**Plans:** 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Backend cwd support: ConnectMessage.Cwd field, get-cwd WebSocket handler with stdout interception
+- [ ] 10-02-PLAN.md — Frontend plus button popover with Duplicate (same connection + directory) and New Connection options
+
 ## Progress
 
 **Execution Order:**
@@ -154,3 +168,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 | 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 8. Port Forwarding | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 9. Settings Page | v0.3.0 | 3/3 | Complete | 2026-04-28 |
+| 10. Tab Plus Button Popover | — | 0/2 | Planned | — |
