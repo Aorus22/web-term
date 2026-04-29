@@ -252,19 +252,40 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		{
 			s, err := client.NewSession()
 			if err == nil {
-				out, err := s.Output(`PID=$$; PPID=$(ps -o ppid= -p $PID | tr -d ' '); ps -eo pid,ppid --no-headers | awk -v ppid="$PPID" -v me="$PID" '$2 == ppid+0 && $1 != me+0 { print $1 }'`)
+				out, err := s.Output("echo $$; ps -eo pid,ppid --no-headers")
 				s.Close()
 				if err == nil {
-					for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-						if pid, e := strconv.Atoi(strings.TrimSpace(line)); e == nil && pid > 0 {
-							shellPid = pid
+					lines := strings.Split(string(out), "\n")
+					if len(lines) > 0 {
+						execPid, _ := strconv.Atoi(strings.TrimSpace(lines[0]))
+						type proc struct{ pid, ppid int }
+						var procs []proc
+						for _, line := range lines[1:] {
+							fields := strings.Fields(line)
+							if len(fields) >= 2 {
+								p, _ := strconv.Atoi(fields[0])
+								pp, _ := strconv.Atoi(fields[1])
+								procs = append(procs, proc{p, pp})
+							}
+						}
+						var execPpid int
+						for _, pr := range procs {
+							if pr.pid == execPid {
+								execPpid = pr.ppid
+								break
+							}
+						}
+						for _, pr := range procs {
+							if pr.ppid == execPpid && pr.pid != execPid {
+								shellPid = pr.pid
+							}
 						}
 					}
 				}
 				if shellPid > 0 {
 					log.Printf("Session %s: shell PID %d", sessionID, shellPid)
 				} else {
-					log.Printf("Session %s: could not find shell PID (output=%q err=%v)", sessionID, strings.TrimSpace(string(out)), err)
+					log.Printf("Session %s: could not find shell PID (err=%v)", sessionID, err)
 				}
 			}
 		}
