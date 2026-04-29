@@ -149,7 +149,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — Backend cwd support: ConnectMessage.Cwd field, get-cwd WebSocket handler with stdout interception
+- [x] 10-01-PLAN.md — Backend cwd support: ConnectMessage.Cwd field, get-cwd WebSocket handler with stdout interception
 - [ ] 10-02-PLAN.md — Frontend plus button popover with Duplicate (same connection + directory) and New Connection options
 
 ## Progress
@@ -168,4 +168,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 | 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 8. Port Forwarding | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 9. Settings Page | v0.3.0 | 3/3 | Complete | 2026-04-28 |
-| 10. Tab Plus Button Popover | — | 0/2 | Planned | — |
+| 10. Tab Plus Button Popover | — | 1/2 | In Progress | — |

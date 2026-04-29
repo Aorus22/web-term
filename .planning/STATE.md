@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.3.0
 milestone_name: SSH Key Auth & UI Redesign
-status: complete
-stopped_at: Phase 9 complete
-last_updated: "2026-04-28T18:00:00.000Z"
-last_activity: 2026-04-28 — Phase 9 (Settings Page) execution completed
+status: executing
+stopped_at: Phase 10 plan 10-01
+last_updated: "2026-04-29T00:00:00.000Z"
+last_activity: 2026-04-29 — Phase 10 (Tab Plus Button Popover) plan 10-01 completed
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_plans: 21
+  completed_plans: 20
+  percent: 95
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-28)
 
 ## Current Position
 
-Phase: 9 (Settings Page)
-Plan: 09-03
-Status: Phase 9 complete, all plans executed and verified
-Last activity: 2026-04-28 — Phase 9 execution finished
+Phase: 10 (Tab Plus Button Popover)
+Plan: 10-01
+Status: Wave 1 complete, wave 2 pending
+Last activity: 2026-04-29 — Plan 10-01 completed
 
-Progress: [▓▓▓▓▓▓▓▓▓▓] 100% (Milestone v0.3.0 — 19/19 plans across 5 phases, 5 phases complete)
+Progress: [▓▓▓▓▓▓▓▓▓░] 95% (Milestone v0.3.0 — 20/21 plans across 6 phases, 5 phases complete)
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ Recent decisions for v0.3.0:
 
 - Phase 8 added: Port Forwarding — SSH local port forwarding with sheet UI and port conflict detection
 - Phase 9 added: Settings Page — dark/light mode switcher, terminal type, and color theme presets
+- Phase 10 added: Tab Plus Button Popover — plus button popover with duplicate (same connection + directory) and new connection options
 
 ### Pending Todos
 
