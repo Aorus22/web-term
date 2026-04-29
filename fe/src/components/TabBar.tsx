@@ -139,46 +139,59 @@ export function TabBar() {
         </button>
       ))}
 
-      <Popover open={plusPopoverOpen} onOpenChange={setPlusPopoverOpen}>
-        <PopoverTrigger
+      {activeSessionId ? (
+        <Popover open={plusPopoverOpen} onOpenChange={setPlusPopoverOpen}>
+          <PopoverTrigger
+            className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+            aria-label="New tab"
+          >
+            <Plus className="h-4 w-4" />
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-52 p-1"
+          >
+            <button
+              className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
+              onClick={() => {
+                setPlusPopoverOpen(false)
+                handleDuplicate()
+              }}
+            >
+              <Copy className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="flex flex-col items-start">
+                <span className="font-medium">Duplicate</span>
+                <span className="text-xs text-muted-foreground">Same connection &amp; directory</span>
+              </div>
+            </button>
+            <button
+              className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
+              onClick={() => {
+                setPlusPopoverOpen(false)
+                setActiveSession(null)
+                setSidebarPage('new-tab')
+              }}
+            >
+              <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="flex flex-col items-start">
+                <span className="font-medium">New Connection</span>
+                <span className="text-xs text-muted-foreground">Connect to a server</span>
+              </div>
+            </button>
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <button
           className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
           aria-label="New tab"
+          onClick={() => {
+            setActiveSession(null)
+            setSidebarPage('new-tab')
+          }}
         >
           <Plus className="h-4 w-4" />
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="w-52 p-1"
-        >
-          <button
-            className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
-            onClick={() => {
-              setPlusPopoverOpen(false)
-              handleDuplicate()
-            }}
-          >
-            <Copy className="h-4 w-4 text-muted-foreground" />
-            <div className="flex flex-col items-start">
-              <span className="font-medium">Duplicate</span>
-              <span className="text-xs text-muted-foreground">Same connection &amp; directory</span>
-            </div>
-          </button>
-          <button
-            className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
-            onClick={() => {
-              setPlusPopoverOpen(false)
-              setActiveSession(null)
-              setSidebarPage('new-tab')
-            }}
-          >
-            <Plus className="h-4 w-4 text-muted-foreground" />
-            <div className="flex flex-col items-start">
-              <span className="font-medium">New Connection</span>
-              <span className="text-xs text-muted-foreground">Connect to a server</span>
-            </div>
-          </button>
-        </PopoverContent>
-      </Popover>
+        </button>
+      )}
     </div>
   )
 }

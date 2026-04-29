@@ -224,14 +224,15 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		stdoutPipe, _ := session.StdoutPipe()
 		stderrPipe, _ := session.StderrPipe()
 
-		if err := session.Shell(); err != nil {
-			return
-		}
-
-		// If a working directory is specified (e.g., duplicate tab), cd into it after shell starts.
-		if connectMsg.Cwd != "" {
-			if !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
-				stdinPipe.Write([]byte(fmt.Sprintf(" cd '%s'\n", connectMsg.Cwd)))
+		// Start the shell. If cwd is specified, start directly in that directory
+		// instead of injecting a cd command (which would be visible due to PTY echo).
+		if connectMsg.Cwd != "" && !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
+			if err := session.Start(fmt.Sprintf("cd '%s' && exec -l $SHELL", connectMsg.Cwd)); err != nil {
+				return
+			}
+		} else {
+			if err := session.Shell(); err != nil {
+				return
 			}
 		}
 
