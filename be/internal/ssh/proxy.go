@@ -1,7 +1,6 @@
 package ssh
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -229,6 +228,13 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		// If a working directory is specified (e.g., duplicate tab), cd into it after shell starts.
+		if connectMsg.Cwd != "" {
+			if !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
+				stdinPipe.Write([]byte(fmt.Sprintf(" cd '%s'\n", connectMsg.Cwd)))
+			}
+		}
+
 		// Notify client that connection is ready with session_id.
 		connectedMsg := ServerMessage{
 			Type:      "connected",
@@ -240,66 +246,27 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Capture the shell PID before starting forwarding goroutines.
-		// If cwd is specified, cd into it first. Then echo the PID marker.
-		// All output is collected and forwarded to the client in one batch.
-		const pidMarker = "__WTERM_PID__"
-		{
-			var initCmd string
-			if connectMsg.Cwd != "" && !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
-				initCmd = fmt.Sprintf(" cd '%s' && echo %s$$\n", connectMsg.Cwd, pidMarker)
-			} else {
-				initCmd = fmt.Sprintf(" echo %s$$\n", pidMarker, )
-			}
-			stdinPipe.Write([]byte(initCmd))
-		}
-
+		// Find the interactive shell's PID via a separate exec session.
+		// The exec session and interactive shell are siblings (same sshd parent).
 		var shellPid int
 		{
-			pidBuf := make([]byte, 8192)
-			var collected []byte
-			readDeadline := time.After(5 * time.Second)
-		pidLoop:
-			for {
-				select {
-				case <-readDeadline:
-					break pidLoop
-				default:
-				}
-				n, err := stdoutPipe.Read(pidBuf)
-				if n > 0 {
-					collected = append(collected, pidBuf[:n]...)
-					if bytes.Contains(collected, []byte(pidMarker)) {
-						break
+			s, err := client.NewSession()
+			if err == nil {
+				out, err := s.Output(`PID=$$; PPID=$(ps -o ppid= -p $PID | tr -d ' '); ps -eo pid,ppid --no-headers | awk -v ppid="$PPID" -v me="$PID" '$2 == ppid+0 && $1 != me+0 { print $1 }'`)
+				s.Close()
+				if err == nil {
+					for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+						if pid, e := strconv.Atoi(strings.TrimSpace(line)); e == nil && pid > 0 {
+							shellPid = pid
+						}
 					}
 				}
-				if err != nil {
-					break
+				if shellPid > 0 {
+					log.Printf("Session %s: shell PID %d", sessionID, shellPid)
+				} else {
+					log.Printf("Session %s: could not find shell PID (output=%q err=%v)", sessionID, strings.TrimSpace(string(out)), err)
 				}
 			}
-			// Forward collected data to client, but filter out PID marker lines
-			// so the init command is invisible to the user.
-			var filtered []byte
-			for _, line := range bytes.Split(collected, []byte("\n")) {
-				if !bytes.Contains(line, []byte(pidMarker)) {
-					filtered = append(filtered, line...)
-					filtered = append(filtered, '\n')
-				}
-			}
-			if len(filtered) > 0 {
-				wsWrite(websocket.BinaryMessage, filtered)
-			}
-			// Parse the PID from the marker line.
-			for _, line := range strings.Split(string(collected), "\n") {
-				trimmed := strings.TrimSpace(line)
-				if idx := strings.Index(trimmed, pidMarker); idx >= 0 {
-					pidStr := strings.TrimSpace(trimmed[idx+len(pidMarker):])
-					shellPid, _ = strconv.Atoi(pidStr)
-				}
-			}
-		}
-		if shellPid > 0 {
-			log.Printf("Session %s: captured shell PID %d", sessionID, shellPid)
 		}
 
 		// Forwarding goroutines
