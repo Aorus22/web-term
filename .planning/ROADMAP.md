@@ -134,9 +134,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Backend settings API (key-value model + handlers) and dynamic terminal type in SSH proxy
-- [ ] 09-02-PLAN.md — Frontend settings infrastructure, SettingsPage UI, sidebar integration, ThemeToggle removal
-- [ ] 09-03-PLAN.md — Terminal settings integration (theme, font, cursor, scrollback, terminal type)
+- [x] 09-01-PLAN.md — Backend settings API (key-value model + handlers) and dynamic terminal type in SSH proxy
+- [x] 09-02-PLAN.md — Frontend settings infrastructure, SettingsPage UI, sidebar integration, ThemeToggle removal
+- [x] 09-03-PLAN.md — Terminal settings integration (theme, font, cursor, scrollback, terminal type)
 
 ## Progress
 
@@ -153,4 +153,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 | 6. Frontend UI & Navigation | v0.3.0 | 3/3 | Complete | 2026-04-28 |
 | 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 8. Port Forwarding | v0.3.0 | 2/2 | Complete | 2026-04-28 |
-| 9. Settings Page | _next_ | 0/3 | Planned | — |
+| 9. Settings Page | v0.3.0 | 3/3 | Complete | 2026-04-28 |

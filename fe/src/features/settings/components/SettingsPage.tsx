@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Monitor, Moon, Sun, Type, MousePointer2, History, Terminal } from 'lucide-react'
-import { useSettings, useUpdateSettings, AppSettings } from '../hooks/useSettings'
+import { Monitor, Moon, Sun, Type, MousePointer2, History, Terminal, Check } from 'lucide-react'
+import { useSettings, useUpdateSettings } from '../hooks/useSettings'
+import type { AppSettings } from '../hooks/useSettings'
 import { terminalThemes } from '../data/terminal-themes'
-import { useTheme, Theme } from '@/hooks/use-theme'
+import { useTheme } from '@/hooks/use-theme'
+import type { Theme } from '@/hooks/use-theme'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -90,12 +92,12 @@ export function SettingsPage() {
                     className={cn(
                       "group relative flex flex-col gap-2 p-2 rounded-lg border-2 transition-all text-left",
                       settings.terminal_color_theme === theme.name
-                        ? "border-primary bg-primary/5"
+                        ? "border-primary/20 bg-accent/40"
                         : "border-transparent bg-muted/30 hover:bg-muted/50"
                     )}
                   >
                     <div 
-                      className="h-16 w-full rounded-md border flex flex-col p-2 gap-1 overflow-hidden"
+                      className="h-16 w-full rounded-md border border-muted flex flex-col p-2 gap-1 overflow-hidden"
                       style={{ backgroundColor: theme.colors.background }}
                     >
                       <div className="flex gap-1">
@@ -107,9 +109,11 @@ export function SettingsPage() {
                         <div className="w-3/4 h-1 rounded-sm" style={{ backgroundColor: theme.colors.foreground }} />
                       </div>
                     </div>
-                    <span className="text-xs font-medium truncate px-1">{theme.label}</span>
+                    <span className="text-xs font-medium truncate px-1 text-muted-foreground group-hover:text-foreground">
+                      {theme.label}
+                    </span>
                     {settings.terminal_color_theme === theme.name && (
-                      <div className="absolute top-1 right-1 h-3 w-3 bg-primary rounded-full border-2 border-background" />
+                      <Check className="absolute top-2 right-2 h-3.5 w-3.5 text-primary/50" />
                     )}
                   </button>
                 ))}

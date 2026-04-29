@@ -66,15 +66,15 @@ export function FontDialog({ open, onOpenChange, currentFont, currentSize, onSav
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle>Terminal Font</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-6 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="font-family">Font Family</Label>
+            <Label htmlFor="font-family" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Font Family</Label>
             <Select value={font} onValueChange={setFont}>
-              <SelectTrigger id="font-family">
+              <SelectTrigger id="font-family" className="w-full">
                 <SelectValue placeholder="Select font" />
               </SelectTrigger>
               <SelectContent>
@@ -102,11 +102,11 @@ export function FontDialog({ open, onOpenChange, currentFont, currentSize, onSav
             />
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 min-w-0">
             <Label>Preview</Label>
             <div 
-              className="mt-2 p-4 rounded bg-muted border font-mono whitespace-pre overflow-hidden h-32"
-              style={{ fontFamily: font, fontSize: `${size}px` }}
+              className="mt-2 p-4 rounded bg-muted border font-mono whitespace-pre overflow-x-auto w-full h-32"
+              style={{ fontFamily: font, fontSize: `${size}px`, lineHeight: '1.2' }}
             >
               $ ls -la /home/user{'\n'}
               drwxr-xr-x  5 user staff 160 Apr 28 10:30 .{'\n'}
