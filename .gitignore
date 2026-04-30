@@ -1,9 +1,14 @@
 # Go binary
 be/webterm
 be/webterm-backend
+be/webterm-backend.exe
+
+# Frontend build
+fe/dist/
 
 # Electron
 desktop/node_modules
+desktop/dist/
 
 # Tauri
 desktop-tauri/
@@ -11,6 +16,7 @@ run-tauri.sh
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Env
 .env

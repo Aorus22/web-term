@@ -1,19 +1,69 @@
 {
-  "name": "desktop",
+  "name": "webterm-desktop",
   "version": "1.0.0",
-  "description": "",
+  "description": "WebTerm Desktop Application",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
     "build:be": "cd ../be && go build -o webterm-backend ./cmd/server/main.go",
-    "build:fe": "cd ../fe && npm run build"
+    "build:fe": "cd ../fe && npm run build",
+    "build": "electron-builder --win --mac --linux",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "build": {
+    "appId": "com.webterm.desktop",
+    "productName": "WebTerm",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      ".env"
+    ],
+    "extraResources": [
+      {
+        "from": "../fe/dist",
+        "to": "fe/dist",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../be/webterm-backend",
+        "to": "be/webterm-backend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../be/webterm-backend.exe",
+        "to": "be/webterm-backend.exe",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": null
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
   "devDependencies": {
-    "electron": "^41.3.0"
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1"
   }
 }

@@ -12,12 +12,17 @@ Menu.setApplicationMenu(null);
 function startBackend() {
     const isDev = process.env.NODE_ENV === 'development';
     
-    // Path to the backend binary
-    // In dev, we assume it's built in be/
-    // In production, it would be bundled with the app
-    let backendPath = path.join(__dirname, '..', 'be', 'webterm-backend');
-    if (process.platform === 'win32') {
-        backendPath += '.exe';
+    let backendPath;
+    if (app.isPackaged) {
+        backendPath = path.join(process.resourcesPath, 'be', 'webterm-backend');
+        if (process.platform === 'win32') {
+            backendPath += '.exe';
+        }
+    } else {
+        backendPath = path.join(__dirname, '..', 'be', 'webterm-backend');
+        if (process.platform === 'win32') {
+            backendPath += '.exe';
+        }
     }
 
     // Ensure the data directory exists in userData
@@ -71,6 +76,8 @@ function createWindow() {
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173');
         mainWindow.webContents.openDevTools();
+    } else if (app.isPackaged) {
+        mainWindow.loadFile(path.join(process.resourcesPath, 'fe', 'dist', 'index.html'));
     } else {
         mainWindow.loadFile(path.join(__dirname, '..', 'fe', 'dist', 'index.html'));
     }
