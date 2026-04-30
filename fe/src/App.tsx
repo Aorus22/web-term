@@ -31,6 +31,8 @@ function AppContent() {
     setSidebarPage
   } = useAppStore()
 
+  const isElectron = !!window.electron
+
   useKeyboardShortcuts({
     onNewTab: () => {
       setActiveSession(null)
@@ -54,7 +56,10 @@ function AppContent() {
   })
 
   return (
-    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
+    <div className={cn(
+      "flex h-screen w-full bg-background text-foreground overflow-hidden",
+      isElectron && "rounded-xl border shadow-2xl"
+    )}>
       {/* Sidebar */}
       <aside
         className={cn(

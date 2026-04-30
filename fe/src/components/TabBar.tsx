@@ -1,4 +1,4 @@
-import { X, Circle, Plus, Copy } from 'lucide-react'
+import { X, Circle, Plus, Copy, Minus, Square, X as CloseIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,7 @@ export function TabBar() {
   const duplicateSession = useAppStore((s) => s.duplicateSession)
   const [confirmingClose, setConfirmingClose] = useState<string | null>(null)
   const [plusPopoverOpen, setPlusPopoverOpen] = useState(false)
+  const isElectron = !!window.electron
 
   const handleDuplicate = async () => {
     if (!activeSessionId) return
@@ -59,139 +60,182 @@ export function TabBar() {
   }
 
   return (
-    <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar">
-      {sessions.map((session) => (
-        <button
-          key={session.id}
-          className={cn(
-            "group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium whitespace-nowrap transition-colors border border-b-0",
-            session.id === activeSessionId
-              ? "bg-background border-border text-foreground"
-              : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          )}
-          onClick={() => setActiveSession(session.id)}
-        >
-          <Circle
+    <div className="relative flex items-center w-full justify-between bg-muted/10 border-b select-none">
+      <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar flex-1 px-1 pt-1 z-10">
+        {sessions.map((session) => (
+          <button
+            key={session.id}
             className={cn(
-              "h-1.5 w-1.5 shrink-0",
-              session.status === 'connected' && "fill-green-500 text-green-500",
-              session.status === 'connecting' && "fill-yellow-500 text-yellow-500 animate-pulse",
-              session.status === 'disconnected' && "fill-none text-muted-foreground",
-              session.status === 'error' && "fill-destructive text-destructive"
+              "group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium whitespace-nowrap transition-colors border border-b-0",
+              session.id === activeSessionId
+                ? "bg-background border-border text-foreground"
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
-          />
-          <span className="truncate max-w-[120px]">
-            {session.label || `${session.username}@${session.host}`}
-          </span>
-          <Popover open={confirmingClose === session.id} onOpenChange={(open) => !open && setConfirmingClose(null)}>
-            <PopoverTrigger
-              render={
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={cn(
-                    "rounded-sm p-0.5 transition-opacity outline-none",
-                    "opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/10",
-                    confirmingClose === session.id && "opacity-100"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (session.status === 'connected') {
-                      setConfirmingClose(session.id)
-                    } else {
-                      removeSession(session.id)
-                    }
-                  }}
-                >
-                  <X className={cn("h-3.5 w-3.5", confirmingClose === session.id && "text-destructive")} />
-                </span>
-              }
+            onClick={() => setActiveSession(session.id)}
+          >
+            <Circle
+              className={cn(
+                "h-1.5 w-1.5 shrink-0",
+                session.status === 'connected' && "fill-green-500 text-green-500",
+                session.status === 'connecting' && "fill-yellow-500 text-yellow-500 animate-pulse",
+                session.status === 'disconnected' && "fill-none text-muted-foreground",
+                session.status === 'error' && "fill-destructive text-destructive"
+              )}
             />
-            <PopoverContent 
-              side="bottom" 
-              className="flex flex-col items-center gap-2 p-3 border shadow-md min-w-[180px]"
-              onClick={(e) => e.stopPropagation()}
+            <span className="truncate max-w-[120px]">
+              {session.label || `${session.username}@${session.host}`}
+            </span>
+            <Popover open={confirmingClose === session.id} onOpenChange={(open) => !open && setConfirmingClose(null)}>
+              <PopoverTrigger
+                render={
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      "rounded-sm p-0.5 transition-opacity outline-none",
+                      "opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/10",
+                      confirmingClose === session.id && "opacity-100"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (session.status === 'connected') {
+                        setConfirmingClose(session.id)
+                      } else {
+                        removeSession(session.id)
+                      }
+                    }}
+                  >
+                    <X className={cn("h-3.5 w-3.5", confirmingClose === session.id && "text-destructive")} />
+                  </span>
+                }
+              />
+              <PopoverContent 
+                side="bottom" 
+                className="flex flex-col items-center gap-2 p-3 border shadow-md min-w-[180px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="text-xs font-medium">Disconnect from {session.host}?</p>
+                <div className="flex gap-2 w-full">
+                  <Button 
+                    size="sm" 
+                    variant="destructive" 
+                    className="flex-1 h-7 text-[10px]"
+                    onClick={() => {
+                      removeSession(session.id)
+                      setConfirmingClose(null)
+                    }}
+                  >
+                    Disconnect
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="flex-1 h-7 text-[10px]"
+                    onClick={() => setConfirmingClose(null)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </button>
+        ))}
+
+        {activeSessionId ? (
+          <Popover open={plusPopoverOpen} onOpenChange={setPlusPopoverOpen}>
+            <PopoverTrigger
+              className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+              aria-label="New tab"
             >
-              <p className="text-xs font-medium">Disconnect from {session.host}?</p>
-              <div className="flex gap-2 w-full">
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  className="flex-1 h-7 text-[10px]"
-                  onClick={() => {
-                    removeSession(session.id)
-                    setConfirmingClose(null)
-                  }}
-                >
-                  Disconnect
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="flex-1 h-7 text-[10px]"
-                  onClick={() => setConfirmingClose(null)}
-                >
-                  Cancel
-                </Button>
-              </div>
+              <Plus className="h-4 w-4" />
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              className="w-52 p-1"
+            >
+              <button
+                className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
+                onClick={() => {
+                  setPlusPopoverOpen(false)
+                  handleDuplicate()
+                }}
+              >
+                <Copy className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">Duplicate</span>
+                  <span className="text-xs text-muted-foreground">Same connection &amp; directory</span>
+                </div>
+              </button>
+              <button
+                className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
+                onClick={() => {
+                  setPlusPopoverOpen(false)
+                  setActiveSession(null)
+                  setSidebarPage('new-tab')
+                }}
+              >
+                <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">New Connection</span>
+                  <span className="text-xs text-muted-foreground">Connect to a server</span>
+                </div>
+              </button>
             </PopoverContent>
           </Popover>
-        </button>
-      ))}
-
-      {activeSessionId ? (
-        <Popover open={plusPopoverOpen} onOpenChange={setPlusPopoverOpen}>
-          <PopoverTrigger
+        ) : (
+          <button
             className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
             aria-label="New tab"
+            onClick={() => {
+              setActiveSession(null)
+              setSidebarPage('new-tab')
+            }}
           >
             <Plus className="h-4 w-4" />
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className="w-52 p-1"
+          </button>
+        )}
+      </div>
+
+      {/* Electron Window Controls */}
+      {isElectron && (
+        <div className="flex items-center h-full z-10">
+          <button 
+            onClick={() => window.electron?.minimize()}
+            className="flex items-center justify-center h-8 w-10 hover:bg-muted transition-colors"
+            title="Minimize"
           >
-            <button
-              className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
-              onClick={() => {
-                setPlusPopoverOpen(false)
-                handleDuplicate()
-              }}
-            >
-              <Copy className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="flex flex-col items-start">
-                <span className="font-medium">Duplicate</span>
-                <span className="text-xs text-muted-foreground">Same connection &amp; directory</span>
-              </div>
-            </button>
-            <button
-              className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
-              onClick={() => {
-                setPlusPopoverOpen(false)
-                setActiveSession(null)
-                setSidebarPage('new-tab')
-              }}
-            >
-              <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="flex flex-col items-start">
-                <span className="font-medium">New Connection</span>
-                <span className="text-xs text-muted-foreground">Connect to a server</span>
-              </div>
-            </button>
-          </PopoverContent>
-        </Popover>
-      ) : (
-        <button
-          className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-          aria-label="New tab"
-          onClick={() => {
-            setActiveSession(null)
-            setSidebarPage('new-tab')
-          }}
-        >
-          <Plus className="h-4 w-4" />
-        </button>
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <button 
+            onClick={() => window.electron?.maximize()}
+            className="flex items-center justify-center h-8 w-10 hover:bg-muted transition-colors"
+            title="Maximize"
+          >
+            <Square className="h-3 w-3" />
+          </button>
+          <button 
+            onClick={() => window.electron?.close()}
+            className="flex items-center justify-center h-8 w-10 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            title="Close"
+          >
+            <CloseIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
+
+      {/* Draggable region for frameless window */}
+      {isElectron && (
+        <div 
+          className="absolute inset-0 z-0" 
+          style={{ height: '36px', WebkitAppRegion: 'drag' } as any}
+        />
+      )}
+      {/* Make actual content clickable again */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .z-10 {
+          -webkit-app-region: no-drag;
+        }
+      `}} />
     </div>
   )
 }

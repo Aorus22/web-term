@@ -1,10 +1,13 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 
 let mainWindow;
 let backendProcess;
+
+// Remove the default menu (File, Edit, etc.)
+Menu.setApplicationMenu(null);
 
 function startBackend() {
     const isDev = process.env.NODE_ENV === 'development';
@@ -50,13 +53,15 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
+        frame: false, // Frameless window
+        transparent: true, // Support rounded corners
+        titleBarStyle: 'hidden',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        title: "WebTerm Desktop",
-        backgroundColor: '#000000'
+        title: "WebTerm Desktop"
     });
 
     // In dev, we might want to load from Vite dev server
@@ -74,6 +79,23 @@ function createWindow() {
         mainWindow = null;
     });
 }
+
+// IPC Handlers for Window Controls
+ipcMain.on('window-minimize', () => {
+    mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+    if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+    } else {
+        mainWindow.maximize();
+    }
+});
+
+ipcMain.on('window-close', () => {
+    mainWindow.close();
+});
 
 app.on('ready', () => {
     startBackend();
