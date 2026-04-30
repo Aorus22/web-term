@@ -16,6 +16,7 @@ import { PortForwardsPage } from '@/features/forwards/components/PortForwardsPag
 import { SettingsPage } from '@/features/settings/components/SettingsPage'
 import { NewTabView } from '@/components/NewTabView'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
+import { CustomCursor } from '@/components/CustomCursor'
 
 const queryClient = new QueryClient()
 
@@ -131,20 +132,28 @@ function AppContent() {
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col min-w-0 bg-background">
+      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
         {/* Tab Bar / Header */}
-        <header className="h-12 border-b flex items-center px-4 gap-4 bg-muted/10">
-          <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8">
-            <PanelLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <TabBar />
+        <header 
+          className={cn(
+            "h-12 border-b flex items-center px-4 gap-4 bg-muted/10 shrink-0",
+            isElectron && "drag-region"
+          )}
+          style={isElectron ? { WebkitAppRegion: 'drag' } as any : {}}
+        >
+          <div className="no-drag contents" style={{ WebkitAppRegion: 'no-drag' } as any}>
+            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8 shrink-0">
+              <PanelLeft className="h-4 w-4" />
+            </Button>
+            
+            <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <TabBar />
+            </div>
           </div>
         </header>
 
         {/* Content Area — all sessions rendered, only active one visible */}
-        <div className="flex-1 relative flex flex-col min-h-0">
+        <div className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
           {sessions.map((session) => (
             <div
               key={session.id}
@@ -179,6 +188,7 @@ function AppContent() {
       {/* Overlays */}
       <ConnectionForm />
       <Toaster />
+      <CustomCursor />
     </div>
   )
 }
