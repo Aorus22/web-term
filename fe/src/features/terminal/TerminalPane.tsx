@@ -32,8 +32,10 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
   const [showSaveBanner, setShowSaveBanner] = useState(false)
   const [passwordProvided, setPasswordProvided] = useState(false)
 
+  const hasConnectedRef = useRef(false)
+
   // Derive Terminal props from settings
-  const terminalTheme = settings?.terminal_color_theme || undefined  // undefined = default dark
+  const terminalTheme = settings?.terminal_color_theme || 'default'
   const cursorBlinkSetting = settings?.cursor_blink !== 'false'  // default true
   const cursorStyleClass = settings?.cursor_style === 'underline' ? 'cursor-underline'
     : settings?.cursor_style === 'bar' ? 'cursor-bar'
@@ -42,6 +44,8 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
   const fontSize = settings?.font_size || '14'
 
   const terminalClassName = cn(
+    'wterm',
+    `theme-${terminalTheme}`,
     cursorStyleClass,
     'has-scrollback'
   )
@@ -52,13 +56,27 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
     fontSize: `${fontSize}px`,
   }
 
-  // Auto-connect on mount if initialConnect is provided (saved connection with password, D-01)
+  // Auto-connect on mount (or as soon as settings are available)
   useEffect(() => {
+    if (hasConnectedRef.current || !settings) return
+
+    const rows = 24
+    const cols = 80
+    const term = settings?.terminal_type || 'screen-256color'
+
     if (initialConnect) {
-      lastOptionsRef.current = initialConnect
-      connect({ ...initialConnect, ...(session?.cwd && { cwd: session.cwd }), term: settings?.terminal_type })
+      hasConnectedRef.current = true
+      const opts = { 
+        ...initialConnect, 
+        ...(session?.cwd && { cwd: session.cwd }), 
+        term,
+        rows,
+        cols
+      }
+      lastOptionsRef.current = opts
+      connect(opts)
     } else if (session?.auth_method === 'key' && !session?.has_passphrase && session?.status === 'connecting') {
-      // Auto-connect for key-auth without passphrase
+      hasConnectedRef.current = true
       const opts: ConnectOptions = {
         connectionId: session.connectionId,
         host: session.host,
@@ -66,15 +84,15 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
         username: session.username,
         auth_method: 'key',
         ssh_key_id: session.ssh_key_id,
-        rows: 24,
-        cols: 80,
+        rows,
+        cols,
         ...(session.cwd && { cwd: session.cwd }),
-        term: settings?.terminal_type,
+        term,
       }
       lastOptionsRef.current = opts
       connect(opts)
     } else if (session?.cwd && session?.status === 'connecting') {
-      // Auto-connect for duplicated sessions (has cwd but no initialConnect)
+      hasConnectedRef.current = true
       const opts: ConnectOptions = {
         connectionId: session.connectionId,
         host: session.host,
@@ -82,15 +100,15 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
         username: session.username,
         auth_method: session.auth_method as 'password' | 'key',
         ssh_key_id: session.ssh_key_id,
-        rows: 24,
-        cols: 80,
+        rows,
+        cols,
         cwd: session.cwd,
-        term: settings?.terminal_type,
+        term,
       }
       lastOptionsRef.current = opts
       connect(opts)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settings, initialConnect, session?.status, connect]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show save banner when quick-connect session disconnects (D-06)
   useEffect(() => {
@@ -120,7 +138,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
           passphrase: passphraseRef.current,
         }
       }
-      connect({ ...lastOptionsRef.current, term: settings?.terminal_type })
+      connect({ ...lastOptionsRef.current, term: settings?.terminal_type || 'screen-256color' })
     }
   }
 
@@ -131,7 +149,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
       port: session!.port,
       username: session!.username,
       password,
-      term: settings?.terminal_type,
+      term: settings?.terminal_type || 'screen-256color',
     }
     lastOptionsRef.current = opts
     connect(opts)
@@ -154,7 +172,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect, theme }: Ter
       passphrase,
       rows: 24,
       cols: 80,
-      term: settings?.terminal_type,
+      term: settings?.terminal_type || 'screen-256color',
     }
     lastOptionsRef.current = opts
     connect(opts)

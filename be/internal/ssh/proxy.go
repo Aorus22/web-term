@@ -214,7 +214,7 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		}
 		termType := connectMsg.Term
 		if termType == "" {
-			termType = "xterm-256color"
+			termType = "screen-256color"
 		}
 		if err := session.RequestPty(termType, connectMsg.Rows, connectMsg.Cols, modes); err != nil {
 			return

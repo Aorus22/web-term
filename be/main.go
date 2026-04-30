@@ -35,6 +35,7 @@ type ConnectMessage struct {
 	Password string `json:"password"`
 	Rows     int    `json:"rows,omitempty"`
 	Cols     int    `json:"cols,omitempty"`
+	Term     string `json:"term,omitempty"`
 }
 
 // ResizeMessage is a JSON control message for terminal resize.
@@ -138,7 +139,11 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 		ssh.TTY_OP_ISPEED: 14400,
 		ssh.TTY_OP_OSPEED: 14400,
 	}
-	if err := session.RequestPty("xterm-256color", connectMsg.Rows, connectMsg.Cols, modes); err != nil {
+	termType := connectMsg.Term
+	if termType == "" {
+		termType = "xterm-256color"
+	}
+	if err := session.RequestPty(termType, connectMsg.Rows, connectMsg.Cols, modes); err != nil {
 		log.Printf("PTY request error: %v", err)
 		return
 	}

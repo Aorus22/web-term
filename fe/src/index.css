@@ -136,8 +136,68 @@
 
   /* Terminal Theme Overrides */
 
+  .wterm {
+    --term-fg: #d4d4d4;
+    --term-bg: #1e1e1e;
+    --theme-bg-actual: #1e1e1e; /* Default dark */
+    --term-cursor: #aeafad;
+    --term-color-0: #1e1e1e;
+    --term-color-1: #f44747;
+    --term-color-2: #6a9955;
+    --term-color-3: #d7ba7d;
+    --term-color-4: #569cd6;
+    --term-color-5: #c586c0;
+    --term-color-6: #4ec9b0;
+    --term-color-7: #d4d4d4;
+    --term-color-8: #808080;
+    --term-color-9: #f44747;
+    --term-color-10: #6a9955;
+    --term-color-11: #d7ba7d;
+    --term-color-12: #569cd6;
+    --term-color-13: #c586c0;
+    --term-color-14: #4ec9b0;
+    --term-color-15: #ffffff;
+    --term-font-family: 'Menlo', 'Consolas', monospace;
+    --term-font-size: 14px;
+    
+    /* FORCE the background to our theme color, ignoring terminal-driven overrides */
+    background: var(--theme-bg-actual) !important;
+    color: var(--term-fg);
+  }
+
+  /* BCE Fix: Force rows to be transparent so they don't leak background colors in tmux */
+  .wterm .term-row {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Default Theme (matches terminal-themes.ts) */
+  .wterm.theme-default {
+    --theme-bg-actual: #1e1e1e;
+    --term-fg: #d4d4d4;
+    --term-bg: #1e1e1e;
+    --term-cursor: #aeafad;
+    --term-color-0: #1e1e1e;
+    --term-color-1: #f44747;
+    --term-color-2: #6a9955;
+    --term-color-3: #d7ba7d;
+    --term-color-4: #569cd6;
+    --term-color-5: #c586c0;
+    --term-color-6: #4ec9b0;
+    --term-color-7: #d4d4d4;
+    --term-color-8: #808080;
+    --term-color-9: #f44747;
+    --term-color-10: #6a9955;
+    --term-color-11: #d7ba7d;
+    --term-color-12: #569cd6;
+    --term-color-13: #c586c0;
+    --term-color-14: #4ec9b0;
+    --term-color-15: #ffffff;
+  }
+
   /* Solarized Light */
   .wterm.theme-solarized-light {
+  --theme-bg-actual: #fdf6e3;
   --term-fg: #657b83;
   --term-bg: #fdf6e3;
   --term-cursor: #586e75;
@@ -161,6 +221,7 @@
 
   /* Dracula */
   .wterm.theme-dracula {
+  --theme-bg-actual: #282a36;
   --term-fg: #f8f8f2;
   --term-bg: #282a36;
   --term-cursor: #f8f8f2;
@@ -184,6 +245,7 @@
 
   /* Nord */
   .wterm.theme-nord {
+  --theme-bg-actual: #2e3440;
   --term-fg: #d8dee9;
   --term-bg: #2e3440;
   --term-cursor: #d8dee9;
@@ -207,6 +269,7 @@
 
   /* One Dark */
   .wterm.theme-one-dark {
+  --theme-bg-actual: #282c34;
   --term-fg: #abb2bf;
   --term-bg: #282c34;
   --term-cursor: #528bff;
@@ -230,6 +293,7 @@
 
   /* GitHub Dark */
   .wterm.theme-github-dark {
+  --theme-bg-actual: #0d1117;
   --term-fg: #c9d1d9;
   --term-bg: #0d1117;
   --term-cursor: #58a6ff;
@@ -253,6 +317,7 @@
 
   /* GitHub Light */
   .wterm.theme-github-light {
+  --theme-bg-actual: #ffffff;
   --term-fg: #24292f;
   --term-bg: #ffffff;
   --term-cursor: #0969da;
@@ -276,6 +341,7 @@
 
   /* Tokyo Night */
   .wterm.theme-tokyo-night {
+  --theme-bg-actual: #1a1b26;
   --term-fg: #a9b1d6;
   --term-bg: #1a1b26;
   --term-cursor: #c0caf5;
@@ -299,6 +365,7 @@
 
   /* Catppuccin Mocha */
   .wterm.theme-catppuccin {
+  --theme-bg-actual: #1e1e2e;
   --term-fg: #cdd6f4;
   --term-bg: #1e1e2e;
   --term-cursor: #f5e0dc;
@@ -322,6 +389,7 @@
 
   /* Gruvbox Dark */
   .wterm.theme-gruvbox-dark {
+  --theme-bg-actual: #282828;
   --term-fg: #ebdbb2;
   --term-bg: #282828;
   --term-cursor: #ebdbb2;
