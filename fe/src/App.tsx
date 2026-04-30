@@ -16,7 +16,6 @@ import { PortForwardsPage } from '@/features/forwards/components/PortForwardsPag
 import { SettingsPage } from '@/features/settings/components/SettingsPage'
 import { NewTabView } from '@/components/NewTabView'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
-import { CustomCursor } from '@/components/CustomCursor'
 
 const queryClient = new QueryClient()
 
@@ -141,14 +140,20 @@ function AppContent() {
           )}
           style={isElectron ? { WebkitAppRegion: 'drag' } as any : {}}
         >
-          <div className="no-drag contents" style={{ WebkitAppRegion: 'no-drag' } as any}>
-            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8 shrink-0">
-              <PanelLeft className="h-4 w-4" />
-            </Button>
-            
-            <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
-              <TabBar />
-            </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar} 
+            className="h-8 w-8 shrink-0 relative z-20"
+            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+          >
+            <PanelLeft className="h-4 w-4" />
+          </Button>
+          
+          <div 
+            className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar relative z-20"
+          >
+            <TabBar />
           </div>
         </header>
 
@@ -188,7 +193,6 @@ function AppContent() {
       {/* Overlays */}
       <ConnectionForm />
       <Toaster />
-      <CustomCursor />
     </div>
   )
 }

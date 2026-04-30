@@ -60,7 +60,7 @@ export function TabBar() {
   }
 
   return (
-    <div className="flex items-center w-full justify-between select-none" style={{ WebkitAppRegion: 'no-drag' } as any}>
+    <div className="flex items-center w-full justify-between select-none">
       <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar flex-1 px-1 pt-1">
         {sessions.map((session) => (
           <button
@@ -71,6 +71,7 @@ export function TabBar() {
                 ? "bg-background border-border text-foreground"
                 : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
+            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
             onClick={() => setActiveSession(session.id)}
           >
             <Circle
@@ -145,6 +146,7 @@ export function TabBar() {
           <Popover open={plusPopoverOpen} onOpenChange={setPlusPopoverOpen}>
             <PopoverTrigger
               className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+              style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
               aria-label="New tab"
             >
               <Plus className="h-4 w-4" />
@@ -185,6 +187,7 @@ export function TabBar() {
         ) : (
           <button
             className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
             aria-label="New tab"
             onClick={() => {
               setActiveSession(null)
@@ -202,6 +205,7 @@ export function TabBar() {
           <button 
             onClick={() => window.electron?.minimize()}
             className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
+            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title="Minimize"
           >
             <Minus className="h-4 w-4 stroke-[1.5]" />
@@ -209,6 +213,7 @@ export function TabBar() {
           <button 
             onClick={() => window.electron?.maximize()}
             className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
+            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title="Maximize"
           >
             <Square className="h-3.5 w-3.5 stroke-[1.5]" />
@@ -216,6 +221,7 @@ export function TabBar() {
           <button 
             onClick={() => window.electron?.close()}
             className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 ease-in-out"
+            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title="Close"
           >
             <CloseIcon className="h-4 w-4 stroke-[1.5]" />
