@@ -1,5 +1,9 @@
 # Go binary
 be/webterm
+be/webterm-backend
+
+# Electron
+desktop/node_modules
 
 # OS
 .DS_Store
