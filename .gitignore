@@ -5,6 +5,10 @@ be/webterm-backend
 # Electron
 desktop/node_modules
 
+# Tauri
+desktop-tauri/
+run-tauri.sh
+
 # OS
 .DS_Store
 
