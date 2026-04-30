@@ -60,8 +60,8 @@ export function TabBar() {
   }
 
   return (
-    <div className="relative flex items-center w-full justify-between bg-muted/10 border-b select-none">
-      <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar flex-1 px-1 pt-1 z-10">
+    <div className="flex items-center w-full justify-between select-none" style={{ WebkitAppRegion: 'no-drag' } as any}>
+      <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar flex-1 px-1 pt-1">
         {sessions.map((session) => (
           <button
             key={session.id}
@@ -198,44 +198,30 @@ export function TabBar() {
 
       {/* Electron Window Controls */}
       {isElectron && (
-        <div className="flex items-center h-full z-10">
+        <div className="flex items-center h-full">
           <button 
             onClick={() => window.electron?.minimize()}
-            className="flex items-center justify-center h-8 w-10 hover:bg-muted transition-colors"
+            className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
             title="Minimize"
           >
-            <Minus className="h-3.5 w-3.5" />
+            <Minus className="h-4 w-4 stroke-[1.5]" />
           </button>
           <button 
             onClick={() => window.electron?.maximize()}
-            className="flex items-center justify-center h-8 w-10 hover:bg-muted transition-colors"
+            className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
             title="Maximize"
           >
-            <Square className="h-3 w-3" />
+            <Square className="h-3.5 w-3.5 stroke-[1.5]" />
           </button>
           <button 
             onClick={() => window.electron?.close()}
-            className="flex items-center justify-center h-8 w-10 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 ease-in-out"
             title="Close"
           >
-            <CloseIcon className="h-3.5 w-3.5" />
+            <CloseIcon className="h-4 w-4 stroke-[1.5]" />
           </button>
         </div>
       )}
-
-      {/* Draggable region for frameless window */}
-      {isElectron && (
-        <div 
-          className="absolute inset-0 z-0" 
-          style={{ height: '36px', WebkitAppRegion: 'drag' } as any}
-        />
-      )}
-      {/* Make actual content clickable again */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        .z-10 {
-          -webkit-app-region: no-drag;
-        }
-      `}} />
     </div>
   )
 }

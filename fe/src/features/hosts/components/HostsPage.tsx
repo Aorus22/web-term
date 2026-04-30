@@ -134,7 +134,7 @@ export const HostsPage = () => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-6">
         <div className="max-w-[1600px] mx-auto">
           {filteredConnections.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 text-center border-2 border-dashed rounded-lg bg-muted/10">
@@ -142,9 +142,15 @@ export const HostsPage = () => {
               <p className="text-sm text-muted-foreground">
                 {connections.length === 0 ? "No hosts saved yet." : "No hosts match your filters."}
               </p>
-              <Button variant="link" size="sm" onClick={() => useAppStore.getState().clearTags()}>
-                Clear all filters
-              </Button>
+              {connections.length === 0 ? (
+                <Button variant="link" size="sm" onClick={() => useAppStore.getState().setCreatingConnection(true)}>
+                  Create your first host
+                </Button>
+              ) : (
+                <Button variant="link" size="sm" onClick={() => useAppStore.getState().clearTags()}>
+                  Clear all filters
+                </Button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
