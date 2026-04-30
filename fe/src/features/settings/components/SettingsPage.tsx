@@ -4,7 +4,6 @@ import { useSettings, useUpdateSettings } from '../hooks/useSettings'
 import type { AppSettings } from '../hooks/useSettings'
 import { terminalThemes } from '../data/terminal-themes'
 import { useTheme } from '@/hooks/use-theme'
-import type { Theme } from '@/hooks/use-theme'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -133,7 +132,7 @@ export function SettingsPage() {
               </div>
               <Select 
                 value={settings.terminal_type} 
-                onValueChange={(v) => handleUpdate('terminal_type', v)}
+                onValueChange={(v) => handleUpdate('terminal_type', v ?? '')}
               >
                 <SelectTrigger className="w-[180px] h-8 text-xs">
                   <SelectValue />
@@ -171,7 +170,7 @@ export function SettingsPage() {
               </div>
               <Select 
                 value={settings.cursor_style} 
-                onValueChange={(v) => handleUpdate('cursor_style', v)}
+                onValueChange={(v) => handleUpdate('cursor_style', v ?? 'block')}
               >
                 <SelectTrigger className="w-[120px] h-8 text-xs">
                   <SelectValue />
@@ -205,7 +204,7 @@ export function SettingsPage() {
               </div>
               <Select 
                 value={settings.scrollback} 
-                onValueChange={(v) => handleUpdate('scrollback', v)}
+                onValueChange={(v) => handleUpdate('scrollback', v ?? '1000')}
               >
                 <SelectTrigger className="w-[140px] h-8 text-xs">
                   <SelectValue />

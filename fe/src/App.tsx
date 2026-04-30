@@ -15,7 +15,6 @@ import { SSHKeysPage } from '@/features/ssh-keys/components/SSHKeysPage'
 import { PortForwardsPage } from '@/features/forwards/components/PortForwardsPage'
 import { SettingsPage } from '@/features/settings/components/SettingsPage'
 import { NewTabView } from '@/components/NewTabView'
-import { useTheme } from '@/hooks/use-theme'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
 const queryClient = new QueryClient()
@@ -31,7 +30,6 @@ function AppContent() {
     sidebarPage,
     setSidebarPage
   } = useAppStore()
-  const { resolvedTheme } = useTheme()
 
   useKeyboardShortcuts({
     onNewTab: () => {
@@ -151,7 +149,6 @@ function AppContent() {
                 sessionId={session.id}
                 isActive={session.id === activeSessionId}
                 initialConnect={session.connectionId ? { connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
-                theme={resolvedTheme}
               />
             </div>
           ))}

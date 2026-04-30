@@ -18,10 +18,9 @@ interface TerminalPaneProps {
   isActive?: boolean
   /** When provided, auto-connect on mount (saved connection with stored password) */
   initialConnect?: ConnectOptions
-  theme?: 'light' | 'dark'
 }
 
-export function TerminalPane({ sessionId, isActive, initialConnect, theme }: TerminalPaneProps) {
+export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPaneProps) {
   const { ref, connect, sendData, sendResize } = useSSHSession(sessionId)
   const { onReady: onTerminalReady } = useTerminalMouse(sendData)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))

@@ -74,7 +74,7 @@ export function FontDialog({ open, onOpenChange, currentFont, currentSize, onSav
         <div className="grid gap-6 py-4">
           <div className="grid gap-2">
             <Label htmlFor="font-family" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Font Family</Label>
-            <Select value={font} onValueChange={setFont}>
+            <Select value={font} onValueChange={(v) => setFont(v ?? '')}>
               <SelectTrigger id="font-family" className="w-full">
                 <SelectValue placeholder="Select font" />
               </SelectTrigger>

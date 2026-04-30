@@ -1,18 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { settingsApi } from '@/lib/api'
 
-export const DEFAULT_SETTINGS = {
-  theme_mode: 'system' as const,
+export interface AppSettings {
+  theme_mode: 'light' | 'dark' | 'system'
+  terminal_color_theme: string
+  terminal_type: string
+  font_family: string
+  font_size: string
+  cursor_style: 'block' | 'underline' | 'bar'
+  cursor_blink: string
+  scrollback: string
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  theme_mode: 'system',
   terminal_color_theme: 'default',
   terminal_type: 'xterm-256color',
   font_family: 'Geist Mono',
   font_size: '14',
-  cursor_style: 'block' as const,
+  cursor_style: 'block',
   cursor_blink: 'true',
   scrollback: '1000',
 }
-
-export type AppSettings = typeof DEFAULT_SETTINGS
 
 export function useSettings() {
   return useQuery({
