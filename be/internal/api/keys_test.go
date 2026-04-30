@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/pem"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"webterm/internal/config"
 	"webterm/internal/db"
 
+	"github.com/glebarez/sqlite"
 	"golang.org/x/crypto/ssh"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -42,12 +42,12 @@ func TestSSHKeyHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to generate key: %v", err)
 	}
-	
+
 	privBytes, err := ssh.MarshalPrivateKey(priv, "")
 	if err != nil {
 		t.Fatalf("failed to marshal private key: %v", err)
 	}
-	
+
 	privPEM := pem.EncodeToMemory(privBytes)
 	privBase64 := base64.StdEncoding.EncodeToString(privPEM)
 
@@ -73,7 +73,7 @@ func TestSSHKeyHandlers(t *testing.T) {
 		if created.KeyType != "Ed25519" {
 			t.Errorf("expected key type 'Ed25519', got %v", created.KeyType)
 		}
-		
+
 		// Verify fingerprint
 		sshPub, _ := ssh.NewPublicKey(pub)
 		expectedFingerprint := ssh.FingerprintLegacyMD5(sshPub)
