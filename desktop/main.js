@@ -56,20 +56,24 @@ function startBackend() {
 
 function createWindow() {
     const isWin = process.platform === 'win32';
+    const isMac = process.platform === 'darwin';
 
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         minWidth: 800,
         minHeight: 600,
-        frame: false, // Frameless for all platforms as requested
+        frame: false, // Frameless for all platforms
         transparent: false,
-        titleBarStyle: 'hidden',
+        // titleBarStyle is ONLY for macOS and Windows. 
+        // Applying it on Linux can cause some window managers to force decorations.
+        ...( (isWin || isMac) ? { titleBarStyle: 'hidden' } : {} ),
         titleBarOverlay: isWin ? {
             color: '#00000000', 
             symbolColor: '#94a3b8',
             height: 48 
-        } : false, // Only use native overlay on Windows
+        } : false,
+        autoHideMenuBar: true, // Specifically for Linux to prevent menu-triggered decorations
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
