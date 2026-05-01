@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PanelLeft, Server, Key, ArrowLeftRight, Settings } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -31,7 +32,15 @@ function AppContent() {
     setSidebarPage
   } = useAppStore()
 
+  const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
   const isElectron = !!window.electron
+
+  useEffect(() => {
+    if (isElectron && window.electron) {
+      window.electron.getWindowState().then(setWindowState)
+      window.electron.onWindowStateChange(setWindowState)
+    }
+  }, [isElectron])
 
   useKeyboardShortcuts({
     onNewTab: () => {
@@ -57,8 +66,8 @@ function AppContent() {
 
   return (
     <div className={cn(
-      "flex h-screen w-full bg-background text-foreground overflow-hidden",
-      isElectron && "rounded-xl border shadow-2xl"
+      "flex h-screen w-full bg-background text-foreground overflow-hidden transition-all duration-300",
+      isElectron && windowState !== 'maximized' && "rounded-xl border shadow-2xl"
     )}>
       {/* Sidebar */}
       <aside

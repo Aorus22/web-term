@@ -1,5 +1,5 @@
 import { X, Circle, Plus, Copy, Minus, Square, X as CloseIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { 
@@ -23,7 +23,16 @@ export function TabBar() {
   const duplicateSession = useAppStore((s) => s.duplicateSession)
   const [confirmingClose, setConfirmingClose] = useState<string | null>(null)
   const [plusPopoverOpen, setPlusPopoverOpen] = useState(false)
+  const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
   const isElectron = !!window.electron
+  const isWindows = window.electron?.platform === 'win32'
+
+  useEffect(() => {
+    if (isElectron && window.electron) {
+      window.electron.getWindowState().then(setWindowState)
+      window.electron.onWindowStateChange(setWindowState)
+    }
+  }, [isElectron])
 
   const handleDuplicate = async () => {
     if (!activeSessionId) return
@@ -199,8 +208,8 @@ export function TabBar() {
         )}
       </div>
 
-      {/* Electron Window Controls */}
-      {isElectron && (
+      {/* Electron Window Controls - Hidden on Windows because we use titleBarOverlay */}
+      {isElectron && !isWindows && (
         <div className="flex items-center h-full">
           <button 
             onClick={() => window.electron?.minimize()}
@@ -214,9 +223,13 @@ export function TabBar() {
             onClick={() => window.electron?.maximize()}
             className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
             style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
-            title="Maximize"
+            title={windowState === 'maximized' ? "Restore" : "Maximize"}
           >
-            <Square className="h-3.5 w-3.5 stroke-[1.5]" />
+            {windowState === 'maximized' ? (
+              <Copy className="h-3.5 w-3.5 stroke-[1.5]" />
+            ) : (
+              <Square className="h-3.5 w-3.5 stroke-[1.5]" />
+            )}
           </button>
           <button 
             onClick={() => window.electron?.close()}
@@ -227,6 +240,11 @@ export function TabBar() {
             <CloseIcon className="h-4 w-4 stroke-[1.5]" />
           </button>
         </div>
+      )}
+
+      {/* Reserve space for Windows native caption buttons if using titleBarOverlay */}
+      {isElectron && isWindows && (
+        <div className="w-[138px] h-full shrink-0" />
       )}
     </div>
   )

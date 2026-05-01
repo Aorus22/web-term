@@ -58,9 +58,16 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        frame: false, // Frameless window
-        transparent: true, // Support rounded corners
+        minWidth: 800,
+        minHeight: 600,
+        frame: false, // Keep frameless for custom title bar area
+        transparent: false, // Disable transparency to allow native rounded corners and snap layouts on Windows 11
         titleBarStyle: 'hidden',
+        titleBarOverlay: process.platform === 'win32' ? {
+            color: '#00000000', // Transparent overlay to blend with header
+            symbolColor: '#94a3b8', // text-muted-foreground color (slate-400)
+            height: 48 // Match App.tsx header height (h-12 = 48px)
+        } : true,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -75,7 +82,7 @@ function createWindow() {
     
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173');
-        mainWindow.webContents.openDevTools();
+        // mainWindow.webContents.openDevTools();
     } else if (app.isPackaged) {
         mainWindow.loadFile(path.join(process.resourcesPath, 'fe', 'dist', 'index.html'));
     } else {
@@ -84,6 +91,15 @@ function createWindow() {
 
     mainWindow.on('closed', function () {
         mainWindow = null;
+    });
+
+    // Send window state changes to frontend
+    mainWindow.on('maximize', () => {
+        mainWindow.webContents.send('window-state-change', 'maximized');
+    });
+
+    mainWindow.on('unmaximize', () => {
+        mainWindow.webContents.send('window-state-change', 'restored');
     });
 }
 
@@ -102,6 +118,10 @@ ipcMain.on('window-maximize', () => {
 
 ipcMain.on('window-close', () => {
     mainWindow.close();
+});
+
+ipcMain.handle('get-window-state', () => {
+    return mainWindow.isMaximized() ? 'maximized' : 'restored';
 });
 
 app.on('ready', () => {
