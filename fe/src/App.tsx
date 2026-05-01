@@ -18,6 +18,49 @@ import { SettingsPage } from '@/features/settings/components/SettingsPage'
 import { NewTabView } from '@/components/NewTabView'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
+import { 
+  isDesktop, 
+  isTauri,
+  getWindowState, 
+  onWindowStateChange,
+  getBackendPort,
+  onBackendReady,
+  startDragging,
+  startResizing
+} from '@/lib/desktop-ipc'
+
+function ResizeHandles({ windowState }: { windowState: 'maximized' | 'restored' }) {
+  if (!isTauri || windowState === 'maximized') return null;
+
+  const handles = [
+    { id: 'top', dir: 'North', className: 'absolute top-0 left-0 right-0 h-1 cursor-ns-resize z-50 border-none' },
+    { id: 'bottom', dir: 'South', className: 'absolute bottom-0 left-0 right-0 h-1 cursor-ns-resize z-50 border-none' },
+    { id: 'left', dir: 'West', className: 'absolute top-0 bottom-0 left-0 w-1 cursor-ew-resize z-50 border-none' },
+    { id: 'right', dir: 'East', className: 'absolute top-0 bottom-0 right-0 w-1 cursor-ew-resize z-50 border-none' },
+    { id: 'top-left', dir: 'NorthWest', className: 'absolute top-0 left-0 w-2 h-2 cursor-nwse-resize z-[60] border-none' },
+    { id: 'top-right', dir: 'NorthEast', className: 'absolute top-0 right-0 w-2 h-2 cursor-nesw-resize z-[60] border-none' },
+    { id: 'bottom-left', dir: 'SouthWest', className: 'absolute bottom-0 left-0 w-2 h-2 cursor-nesw-resize z-[60] border-none' },
+    { id: 'bottom-right', dir: 'SouthEast', className: 'absolute bottom-0 right-0 w-2 h-2 cursor-nwse-resize z-[60] border-none' },
+  ];
+
+  return (
+    <>
+      {handles.map((h) => (
+        <div
+          key={h.id}
+          className={h.className}
+          onMouseDown={(e) => {
+            if (e.button === 0) {
+              e.preventDefault();
+              startResizing(h.dir);
+            }
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 const queryClient = new QueryClient()
 
 function AppContent() {
@@ -29,18 +72,54 @@ function AppContent() {
     setActiveSession,
     removeSession,
     sidebarPage,
-    setSidebarPage
+    setSidebarPage,
+    setBackendPort,
+    backendPort
   } = useAppStore()
 
   const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
-  const isElectron = !!window.electron
+  const [resizeKey, setResizeKey] = useState(0)
 
   useEffect(() => {
-    if (isElectron && window.electron) {
-      window.electron.getWindowState().then(setWindowState)
-      window.electron.onWindowStateChange(setWindowState)
+    if (isDesktop) {
+      getWindowState().then(setWindowState)
+      getBackendPort().then((port) => {
+        if (port !== 0) setBackendPort(port)
+      })
+      
+      const unlistenWindow = onWindowStateChange(setWindowState)
+      const unlistenBackend = onBackendReady((port) => {
+        setBackendPort(port)
+      })
+      
+      // Force repaint on any resize to fix Linux WebKit bugs
+      const handleResize = () => {
+        setResizeKey(prev => prev + 1)
+      };
+      window.addEventListener('resize', handleResize);
+      
+      // Manual drag fallback for Tauri on Linux
+      const handleMouseDown = (e: MouseEvent) => {
+        if (isTauri) {
+          const target = e.target as HTMLElement;
+          // Check if the target or any parent has the drag attribute
+          if (target.closest('[data-tauri-drag-region]') && e.button === 0) {
+            startDragging();
+          }
+        }
+      };
+      window.addEventListener('mousedown', handleMouseDown);
+      
+      return () => {
+        unlistenWindow()
+        unlistenBackend()
+        window.removeEventListener('mousedown', handleMouseDown)
+        window.removeEventListener('resize', handleResize)
+      }
+    } else {
+      setBackendPort(8080)
     }
-  }, [isElectron])
+  }, [setBackendPort])
 
   useKeyboardShortcuts({
     onNewTab: () => {
@@ -64,11 +143,25 @@ function AppContent() {
     },
   })
 
+  if (isDesktop && backendPort === 0) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm font-medium animate-pulse">Starting Backend...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={cn(
-      "flex h-screen w-full bg-background text-foreground overflow-hidden transition-all duration-300",
-      isElectron && windowState !== 'maximized' && "rounded-xl border shadow-2xl"
-    )}>
+    <div 
+      className={cn(
+        "flex h-screen w-full bg-background text-foreground transition-all duration-300 relative",
+        isDesktop && windowState !== 'maximized' && "rounded-xl border border-border shadow-2xl overflow-hidden"
+      )}
+    >
+      <ResizeHandles windowState={windowState} />
       {/* Sidebar */}
       <aside
         className={cn(
@@ -140,21 +233,22 @@ function AppContent() {
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 bg-transparent overflow-hidden">
         {/* Tab Bar / Header */}
         <header 
+          data-tauri-drag-region
           className={cn(
             "h-12 border-b flex items-center px-4 gap-4 bg-muted/10 shrink-0",
-            isElectron && "drag-region"
+            isDesktop && "drag-region"
           )}
-          style={isElectron ? { WebkitAppRegion: 'drag' } as any : {}}
+          style={isDesktop ? { WebkitAppRegion: 'drag' } as any : {}}
         >
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={toggleSidebar} 
-            className="h-8 w-8 shrink-0 relative z-20"
-            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+            className="h-8 w-8 shrink-0 relative z-20 no-drag"
+            style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
           >
             <PanelLeft className="h-4 w-4" />
           </Button>

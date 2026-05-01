@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electron', {
     close: () => ipcRenderer.send('window-close'),
     getWindowState: () => ipcRenderer.invoke('get-window-state'),
     onWindowStateChange: (callback) => ipcRenderer.on('window-state-change', (event, state) => callback(state)),
+    getBackendPort: () => ipcRenderer.invoke('get-backend-port'),
+    onBackendReady: (callback) => ipcRenderer.on('backend-ready', (event, port) => callback(port)),
     isElectron: true,
     platform: process.platform
 });

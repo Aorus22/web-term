@@ -1,6 +1,20 @@
-const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/connections`
-const KEYS_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/keys`
-const FORWARDS_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/forwards`
+import { useAppStore } from '@/stores/app-store'
+import { isDesktop } from './desktop-ipc'
+
+const getBaseUrl = () => {
+  const port = useAppStore.getState().backendPort
+  // In desktop mode, ALWAYS use the dynamically discovered port.
+  // In web mode, fallback to env variable or default 8080.
+  if (isDesktop) {
+    return `http://localhost:${port}`
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:8080'
+}
+
+const getApiBase = () => `${getBaseUrl()}/api/connections`
+const getKeysApiBase = () => `${getBaseUrl()}/api/keys`
+const getForwardsApiBase = () => `${getBaseUrl()}/api/forwards`
+const getSettingsApiBase = () => `${getBaseUrl()}/api/settings`
 
 export interface SSHKey {
   id: string
@@ -27,28 +41,28 @@ export interface Connection {
 }
 
 export const connectionsApi = {
-  list: (): Promise<Connection[]> => fetch(API_BASE).then(r => r.json()),
-  get: (id: string): Promise<Connection> => fetch(`${API_BASE}/${id}`).then(r => r.json()),
+  list: (): Promise<Connection[]> => fetch(getApiBase()).then(r => r.json()),
+  get: (id: string): Promise<Connection> => fetch(`${getApiBase()}/${id}`).then(r => r.json()),
   create: (data: Partial<Connection>): Promise<Connection> =>
-    fetch(API_BASE, { 
+    fetch(getApiBase(), { 
         method: 'POST', 
         headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify(data) 
     }).then(r => r.json()),
   update: (id: string, data: Partial<Connection>): Promise<Connection> =>
-    fetch(`${API_BASE}/${id}`, { 
+    fetch(`${getApiBase()}/${id}`, { 
         method: 'PUT', 
         headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify(data) 
     }).then(r => r.json()),
   delete: (id: string): Promise<void> =>
-    fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then(r => { 
+    fetch(`${getApiBase()}/${id}`, { method: 'DELETE' }).then(r => { 
         if (!r.ok) throw new Error('Delete failed') 
     }),
   export: (): Promise<Blob> =>
-    fetch(`${API_BASE}/export`).then(r => r.blob()),
+    fetch(`${getApiBase()}/export`).then(r => r.blob()),
   import: (data: Connection[]): Promise<{imported: number, skipped: number}> =>
-    fetch(`${API_BASE}/import`, { 
+    fetch(`${getApiBase()}/import`, { 
         method: 'POST', 
         headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify({connections: data}) 
@@ -68,9 +82,9 @@ export interface PortForward {
 }
 
 export const forwardsApi = {
-  list: (): Promise<PortForward[]> => fetch(FORWARDS_API_BASE).then(r => r.json()),
+  list: (): Promise<PortForward[]> => fetch(getForwardsApiBase()).then(r => r.json()),
   create: (data: Omit<PortForward, 'id' | 'active' | 'error' | 'created_at' | 'updated_at'>): Promise<PortForward> =>
-    fetch(FORWARDS_API_BASE, {
+    fetch(getForwardsApiBase(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -79,52 +93,50 @@ export const forwardsApi = {
       return r.json()
     }),
   delete: (id: string): Promise<void> =>
-    fetch(`${FORWARDS_API_BASE}/${id}`, { method: 'DELETE' }).then(r => {
+    fetch(`${getForwardsApiBase()}/${id}`, { method: 'DELETE' }).then(r => {
       if (!r.ok) throw new Error('Delete failed')
     }),
   start: (id: string): Promise<PortForward> =>
-    fetch(`${FORWARDS_API_BASE}/${id}/start`, { method: 'POST' }).then(r => {
+    fetch(`${getForwardsApiBase()}/${id}/start`, { method: 'POST' }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
       return r.json()
     }),
   stop: (id: string): Promise<PortForward> =>
-    fetch(`${FORWARDS_API_BASE}/${id}/stop`, { method: 'POST' }).then(r => {
+    fetch(`${getForwardsApiBase()}/${id}/stop`, { method: 'POST' }).then(r => {
       if (!r.ok) throw new Error('Failed to stop forward')
       return r.json()
     }),
 }
 
 export const keysApi = {
-  list: (): Promise<SSHKey[]> => fetch(KEYS_API_BASE).then(r => r.json()),
-  get: (id: string): Promise<SSHKey> => fetch(`${KEYS_API_BASE}/${id}`).then(r => r.json()),
+  list: (): Promise<SSHKey[]> => fetch(getKeysApiBase()).then(r => r.json()),
+  get: (id: string): Promise<SSHKey> => fetch(`${getKeysApiBase()}/${id}`).then(r => r.json()),
   create: (data: { name: string; key_base64: string }): Promise<SSHKey> =>
-    fetch(KEYS_API_BASE, {
+    fetch(getKeysApiBase(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(r => r.json()),
   update: (id: string, data: { name: string }): Promise<SSHKey> =>
-    fetch(`${KEYS_API_BASE}/${id}`, {
+    fetch(`${getKeysApiBase()}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(r => r.json()),
   delete: (id: string): Promise<{ warning?: string; affected_connections?: number } | void> =>
-    fetch(`${KEYS_API_BASE}/${id}`, { method: 'DELETE' }).then(r => {
+    fetch(`${getKeysApiBase()}/${id}`, { method: 'DELETE' }).then(r => {
       if (!r.ok) throw new Error('Delete failed')
       if (r.status === 200) return r.json()
     }),
 }
 
-const SETTINGS_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/settings`
-
 export type SettingsResponse = { settings: Record<string, string> }
 
 export const settingsApi = {
   list: (): Promise<SettingsResponse> =>
-    fetch(SETTINGS_API_BASE).then(r => r.json()),
+    fetch(getSettingsApiBase()).then(r => r.json()),
   update: (settings: Record<string, string>): Promise<SettingsResponse> =>
-    fetch(SETTINGS_API_BASE, {
+    fetch(getSettingsApiBase(), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings }),

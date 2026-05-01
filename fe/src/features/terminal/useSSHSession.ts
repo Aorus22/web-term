@@ -1,6 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react'
 import { useTerminal } from '@wterm/react'
 import { useAppStore } from '@/stores/app-store'
+import { isDesktop } from '@/lib/desktop-ipc'
 import type { ConnectOptions } from './types'
 
 // Global map for WebSocket references so TabBar can access them for get-cwd
@@ -96,8 +97,12 @@ export function useSSHSession(sessionId: string) {
       }
 
       // Create WebSocket connection
-      const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8080`
-      const socket = new WebSocket(`${wsUrl}/ws`)
+      const bPort = useAppStore.getState().backendPort
+      const wsBase = (isDesktop) 
+        ? `ws://localhost:${bPort}` 
+        : (import.meta.env.VITE_WS_URL || `ws://localhost:8080`)
+      
+      const socket = new WebSocket(`${wsBase}/ws`)
       wsRef.current = socket
       wsMap.set(sessionId, socket)
       socket.binaryType = 'arraybuffer'

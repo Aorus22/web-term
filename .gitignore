@@ -11,8 +11,11 @@ desktop/node_modules
 desktop/dist/
 
 # Tauri
-desktop-tauri/
-run-tauri.sh
+desktop-tauri/src-tauri/target
+desktop-tauri/src-tauri/binaries
+desktop-tauri/node_modules
+!run-tauri.sh
+!desktop-tauri/
 
 # OS
 .DS_Store

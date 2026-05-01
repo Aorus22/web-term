@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,12 +17,16 @@ import (
 
 func corsMux(next http.Handler, origins []string) http.Handler {
 	allowed := make(map[string]bool, len(origins))
+	allowAll := false
 	for _, o := range origins {
+		if o == "*" {
+			allowAll = true
+		}
 		allowed[o] = true
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if allowed[origin] {
+		if allowAll || allowed[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -50,8 +56,14 @@ func main() {
 
 	handler := corsMux(mux, cfg.AllowedOrigins)
 
+	// Create listener first to support port 0 (dynamic port)
+	ln, err := net.Listen("tcp", "0.0.0.0"+cfg.Port)
+	if err != nil {
+		log.Fatalf("Failed to listen: %v", err)
+	}
+	actualPort := ln.Addr().(*net.TCPAddr).Port
+
 	server := &http.Server{
-		Addr:    "0.0.0.0" + cfg.Port,
 		Handler: handler,
 	}
 
@@ -65,9 +77,12 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		server.Shutdown(ctx)
+		ln.Close()
 	}()
 
-	log.Printf("WebTerm backend starting on %s (DB: %s)", cfg.Port, cfg.DBPath)
+	log.Printf("WebTerm backend starting on :%d (DB: %s)", actualPort, cfg.DBPath)
+	// Output the port in a specific format for parent process to catch
+	fmt.Printf("BACKEND_PORT:%d\n", actualPort)
 	log.Printf("TLS: Use reverse proxy for production")
 	if len(cfg.SSRFAllowlist) > 0 {
 		log.Printf("SSRF allowlist: loaded %d patterns", len(cfg.SSRFAllowlist))
@@ -75,7 +90,7 @@ func main() {
 		log.Printf("SSRF allowlist: empty (allowing all)")
 	}
 
-	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+	if err := server.Serve(ln); err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
 	}
 	log.Println("Server stopped")

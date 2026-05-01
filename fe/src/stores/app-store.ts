@@ -23,6 +23,9 @@ interface AppState {
   updateSession: (id: string, updates: Partial<SSHSession>) => void
   setActiveSession: (id: string | null) => void
   duplicateSession: (sessionId: string, cwd: string) => string | null
+  // Backend port for dynamic discovery
+  backendPort: number
+  setBackendPort: (port: number) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -76,4 +79,6 @@ export const useAppStore = create<AppState>((set) => ({
     }))
     return newId
   },
+  backendPort: 0,
+  setBackendPort: (port) => set({ backendPort: port }),
 }))

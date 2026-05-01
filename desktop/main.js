@@ -9,6 +9,8 @@ let backendProcess;
 // Remove the default menu (File, Edit, etc.)
 Menu.setApplicationMenu(null);
 
+let backendPort = 0;
+
 function startBackend() {
     const isDev = process.env.NODE_ENV === 'development';
     
@@ -34,15 +36,25 @@ function startBackend() {
 
     const env = {
         ...process.env,
-        WEBTERM_PORT: ':8080',
+        WEBTERM_PORT: ':0', // Request dynamic port
         WEBTERM_DB_PATH: dbPath,
-        WEBTERM_ALLOWED_ORIGINS: '*', // For electron, allow all or specific file://
+        WEBTERM_ALLOWED_ORIGINS: '*', 
     };
 
     backendProcess = spawn(backendPath, [], { env });
 
     backendProcess.stdout.on('data', (data) => {
-        console.log(`Backend: ${data}`);
+        const text = data.toString();
+        console.log(`Backend: ${text}`);
+        if (text.includes('BACKEND_PORT:')) {
+            const port = parseInt(text.split('BACKEND_PORT:')[1].trim());
+            if (!isNaN(port)) {
+                backendPort = port;
+                if (mainWindow) {
+                    mainWindow.webContents.send('backend-ready', port);
+                }
+            }
+        }
     });
 
     backendProcess.stderr.on('data', (data) => {
@@ -53,6 +65,11 @@ function startBackend() {
         console.log(`Backend process exited with code ${code}`);
     });
 }
+
+// IPC Handlers
+ipcMain.handle('get-backend-port', () => {
+    return backendPort;
+});
 
 function createWindow() {
     const isWin = process.platform === 'win32';
