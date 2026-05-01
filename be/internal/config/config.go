@@ -26,7 +26,7 @@ func Load() (*Config, error) {
 		Port:           getEnv("WEBTERM_PORT", ":8080"),
 		DBPath:         getEnv("WEBTERM_DB_PATH", "data/webterm.db"),
 		SSRFAllowlist:  splitEnv("WEBTERM_SSRF_ALLOWLIST", ""),
-		AllowedOrigins: splitEnv("WEBTERM_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8080"),
+		AllowedOrigins: splitEnv("WEBTERM_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8080,file://,null"),
 	}
 
 	keyHex := os.Getenv("WEBTERM_ENCRYPTION_KEY")

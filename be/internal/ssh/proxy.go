@@ -29,9 +29,12 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	upgrader.CheckOrigin = func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
 		if origin == "" {
-			return true // Allow non-browser clients (curl/etc)
+			return true
 		}
 		for _, allowed := range cfg.AllowedOrigins {
+			if allowed == "*" {
+				return true
+			}
 			if origin == allowed {
 				return true
 			}
