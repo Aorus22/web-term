@@ -63,17 +63,18 @@ function createWindow() {
         height: 800,
         minWidth: 800,
         minHeight: 600,
-        frame: false, // Frameless for all platforms
-        transparent: false,
-        // titleBarStyle is ONLY for macOS and Windows. 
-        // Applying it on Linux can cause some window managers to force decorations.
+        frame: false,
+        // Windows 11 handles rounding natively for frameless windows but ONLY if transparent is false.
+        // Linux/macOS need transparent: true to let the web-content's CSS rounding show through.
+        transparent: !isWin,
+        backgroundColor: isWin ? undefined : '#00000000',
         ...( (isWin || isMac) ? { titleBarStyle: 'hidden' } : {} ),
         titleBarOverlay: isWin ? {
             color: '#00000000', 
             symbolColor: '#94a3b8',
             height: 48 
         } : false,
-        autoHideMenuBar: true, // Specifically for Linux to prevent menu-triggered decorations
+        autoHideMenuBar: true,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
