@@ -125,8 +125,9 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
+  body, html {
+    background: transparent !important;
+    @apply text-foreground;
   }
   html {
     @apply font-sans;
