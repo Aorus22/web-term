@@ -26,6 +26,12 @@ export function TabBar() {
   const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
   const isElectron = !!window.electron
   const isWindows = window.electron?.platform === 'win32'
+  const isMac = window.electron?.platform === 'darwin'
+  
+  // Custom controls are only needed for macOS (where we use hidden title bar) 
+  // or on other platforms where we might force a frameless window.
+  // On Windows, we use titleBarOverlay (native). On Linux, we use standard frames.
+  const showCustomControls = isElectron && isMac;
 
   useEffect(() => {
     if (isElectron && window.electron) {
@@ -208,8 +214,8 @@ export function TabBar() {
         )}
       </div>
 
-      {/* Electron Window Controls - Hidden on Windows because we use titleBarOverlay */}
-      {isElectron && !isWindows && (
+      {/* Custom Window Controls (mainly for macOS) */}
+      {showCustomControls && (
         <div className="flex items-center h-full">
           <button 
             onClick={() => window.electron?.minimize()}

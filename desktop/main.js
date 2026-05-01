@@ -55,19 +55,24 @@ function startBackend() {
 }
 
 function createWindow() {
+    const isWin = process.platform === 'win32';
+    const isMac = process.platform === 'darwin';
+
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         minWidth: 800,
         minHeight: 600,
-        frame: false, // Keep frameless for custom title bar area
-        transparent: false, // Disable transparency to allow native rounded corners and snap layouts on Windows 11
-        titleBarStyle: 'hidden',
-        titleBarOverlay: process.platform === 'win32' ? {
-            color: '#00000000', // Transparent overlay to blend with header
-            symbolColor: '#94a3b8', // text-muted-foreground color (slate-400)
-            height: 48 // Match App.tsx header height (h-12 = 48px)
-        } : true,
+        // Only use frameless/custom title bar on Windows and macOS.
+        // On Linux, standard frames are often more reliable unless using a fully custom header.
+        frame: isWin || isMac ? false : true, 
+        transparent: false,
+        titleBarStyle: isWin || isMac ? 'hidden' : 'default',
+        titleBarOverlay: isWin ? {
+            color: '#00000000', 
+            symbolColor: '#94a3b8',
+            height: 48 
+        } : (isMac ? true : false),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -76,13 +81,10 @@ function createWindow() {
         title: "WebTerm Desktop"
     });
 
-    // In dev, we might want to load from Vite dev server
-    // In prod, load the built files
     const isDev = process.env.NODE_ENV === 'development';
     
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173');
-        // mainWindow.webContents.openDevTools();
     } else if (app.isPackaged) {
         mainWindow.loadFile(path.join(process.resourcesPath, 'fe', 'dist', 'index.html'));
     } else {
@@ -93,7 +95,6 @@ function createWindow() {
         mainWindow = null;
     });
 
-    // Send window state changes to frontend
     mainWindow.on('maximize', () => {
         mainWindow.webContents.send('window-state-change', 'maximized');
     });
@@ -121,7 +122,7 @@ ipcMain.on('window-close', () => {
 });
 
 ipcMain.handle('get-window-state', () => {
-    return mainWindow.isMaximized() ? 'maximized' : 'restored';
+    return mainWindow ? (mainWindow.isMaximized() ? 'maximized' : 'restored') : 'restored';
 });
 
 app.on('ready', () => {
