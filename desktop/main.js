@@ -56,23 +56,20 @@ function startBackend() {
 
 function createWindow() {
     const isWin = process.platform === 'win32';
-    const isMac = process.platform === 'darwin';
 
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         minWidth: 800,
         minHeight: 600,
-        // Only use frameless/custom title bar on Windows and macOS.
-        // On Linux, standard frames are often more reliable unless using a fully custom header.
-        frame: isWin || isMac ? false : true, 
+        frame: false, // Frameless for all platforms as requested
         transparent: false,
-        titleBarStyle: isWin || isMac ? 'hidden' : 'default',
+        titleBarStyle: 'hidden',
         titleBarOverlay: isWin ? {
             color: '#00000000', 
             symbolColor: '#94a3b8',
             height: 48 
-        } : (isMac ? true : false),
+        } : false, // Only use native overlay on Windows
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
