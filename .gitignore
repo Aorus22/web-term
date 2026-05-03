@@ -2,6 +2,12 @@
 be/webterm
 be/webterm-backend
 be/webterm-backend.exe
+be/main
+be/server
+be/webterm-backend
+*.exe
+*.test
+*.prof
 
 # Frontend build
 fe/dist/
