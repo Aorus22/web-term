@@ -60,6 +60,9 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	mux.HandleFunc("GET /api/settings", sh.GetSettings)
 	mux.HandleFunc("PUT /api/settings", sh.UpdateSettings)
 
+	// Session endpoints
+	mux.HandleFunc("GET /api/sessions", ListSessions())
+
 	// WebSocket handler
 	mux.HandleFunc("GET /ws", ssh.HandleWebSocket(database, cfg))
 }

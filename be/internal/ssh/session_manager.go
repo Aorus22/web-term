@@ -99,6 +99,12 @@ func (s *ManagedSession) WriteWS(msgType int, data []byte) error {
 	return conn.WriteMessage(msgType, data)
 }
 
+func (s *ManagedSession) IsActive() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.WS != nil
+}
+
 // SessionManager tracks all active SSH sessions.
 type SessionManager struct {
 	sessions map[string]*ManagedSession
