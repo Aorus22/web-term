@@ -35,6 +35,10 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ### Phase 13: SFTP Backend Core
 - **Goal:** Provide a unified API for interacting with local and remote filesystems.
+- **Plans:** 1 plan
+- **Plan list:**
+    - [ ] 13-01-PLAN.md — Implement FileSystem drivers and SFTP REST API.
+- **Requirements:** [SFTP-01, SFTP-02, SFTP-03, SFTP-04]
 - **Tasks:**
     - Add `pkg/sftp` dependency.
     - Implement a `FileSystem` interface in Go with `Local` and `SFTP` implementations.
