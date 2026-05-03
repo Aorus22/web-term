@@ -142,3 +142,16 @@ export const settingsApi = {
       body: JSON.stringify({ settings }),
     }).then(r => r.json()),
 }
+
+export interface BackendSession {
+  id: string
+  host: string
+  user: string
+  port: number
+  connection_id: string
+  status: 'active' | 'detached'
+}
+
+export const sessionsApi = {
+  list: (): Promise<BackendSession[]> => fetch(`${getBaseUrl()}/api/sessions`).then(r => r.json()),
+}

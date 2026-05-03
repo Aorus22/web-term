@@ -23,6 +23,7 @@ interface AppState {
   updateSession: (id: string, updates: Partial<SSHSession>) => void
   setActiveSession: (id: string | null) => void
   duplicateSession: (sessionId: string, cwd: string) => string | null
+  rehydrateSessions: () => Promise<void>
   // Backend port for dynamic discovery
   backendPort: number
   setBackendPort: (port: number) => void
@@ -78,6 +79,39 @@ export const useAppStore = create<AppState>((set) => ({
       activeSessionId: newId,
     }))
     return newId
+  },
+  rehydrateSessions: async () => {
+    const { sessionsApi } = await import('@/lib/api')
+    try {
+      const backendSessions = await sessionsApi.list()
+      if (backendSessions.length === 0) return
+
+      set((state) => {
+        const existingIds = new Set(state.sessions.map((s) => s.id))
+        const newSessions: SSHSession[] = backendSessions
+          .filter((bs) => !existingIds.has(bs.id))
+          .map((bs) => ({
+            id: bs.id,
+            connectionId: bs.connection_id,
+            host: bs.host,
+            port: bs.port,
+            username: bs.user,
+            label: `${bs.user}@${bs.host}`,
+            status: 'detached',
+            isQuickConnect: !bs.connection_id,
+          }))
+
+        if (newSessions.length === 0) return state
+
+        const updatedSessions = [...state.sessions, ...newSessions]
+        return {
+          sessions: updatedSessions,
+          activeSessionId: state.activeSessionId ?? updatedSessions[0].id,
+        }
+      })
+    } catch (error) {
+      console.error('Failed to rehydrate sessions:', error)
+    }
   },
   backendPort: 0,
   setBackendPort: (port) => set({ backendPort: port }),

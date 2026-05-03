@@ -1,4 +1,4 @@
-export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error' | 'needs-passphrase'
+export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error' | 'needs-passphrase' | 'detached'
 
 export interface SSHSession {
   id: string                     // unique session ID (matches backend session_id)
