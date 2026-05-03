@@ -28,6 +28,25 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		if origin == "" {
 			return true
 		}
+		
+		// Robust same-host check (allows different ports on the same machine/IP)
+		isSameHost := false
+		if origin == "null" {
+			isSameHost = true
+		} else {
+			if parts := strings.Split(origin, "://"); len(parts) > 1 {
+				originHostWithPort := strings.Split(parts[1], "/")[0]
+				originHost := strings.Split(originHostWithPort, ":")[0]
+				requestHost := strings.Split(r.Host, ":")[0]
+				if originHost == requestHost || originHost == "localhost" || originHost == "127.0.0.1" {
+					isSameHost = true
+				}
+			}
+		}
+
+		if isSameHost {
+			return true
+		}
 		for _, allowed := range cfg.AllowedOrigins {
 			if allowed == "*" {
 				return true
@@ -63,36 +82,35 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		var session *ManagedSession
 
 		if connectMsg.Type == "attach" {
+			log.Printf("[WS] Attempting to attach to session: %s", connectMsg.SessionID)
 			var ok bool
 			session, ok = GlobalSessionManager.GetSession(connectMsg.SessionID)
 			if !ok {
+				log.Printf("[WS] Session NOT FOUND for attach: %s", connectMsg.SessionID)
 				sendWSError(conn, "Session not found")
 				return
 			}
 
+			log.Printf("[WS] Session found, re-binding WebSocket for session: %s", session.ID)
 			session.mu.Lock()
 			if session.WS != nil {
+				log.Printf("[WS] Closing old WebSocket for session: %s", session.ID)
 				session.WS.Close()
 			}
 			session.WS = conn
 			session.mu.Unlock()
 
-			// Send scrollback
-			scrollback := session.Buffer.Bytes()
-			if len(scrollback) > 0 {
-				if err := conn.WriteMessage(websocket.BinaryMessage, scrollback); err != nil {
-					return
-				}
-			}
-
-			// Notify client that re-attachment is ready.
+			// 1. Notify client that re-attachment is ready FIRST.
 			connectedMsg := ServerMessage{
 				Type:      "connected",
 				SessionID: session.ID,
 			}
 			connectedJSON, _ := json.Marshal(connectedMsg)
-			conn.WriteMessage(websocket.TextMessage, connectedJSON)
-
+			log.Printf("[WS] Sending connected message for session attach: %s", session.ID)
+			if err := session.WriteWS(websocket.TextMessage, connectedJSON); err != nil {
+				log.Printf("[WS] Error sending connected message: %v", err)
+				return
+			}
 		} else if connectMsg.Type == "connect" {
 			// Resolve connection credentials: either from saved connection_id or direct fields.
 			var keySigner ssh.Signer
@@ -292,7 +310,7 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 				SessionID: session.ID,
 			}
 			connectedJSON, _ := json.Marshal(connectedMsg)
-			conn.WriteMessage(websocket.TextMessage, connectedJSON)
+			_ = session.WriteWS(websocket.TextMessage, connectedJSON)
 		} else {
 			sendWSError(conn, "Invalid message type: expected connect or attach")
 			return
@@ -357,6 +375,13 @@ func wsMessageLoop(conn *websocket.Conn, session *ManagedSession) {
 							H    uint32
 						}{uint32(ctrl.Cols), uint32(ctrl.Rows), 0, 0}
 						_, _ = session.SSHSession.SendRequest("window-change", false, ssh.Marshal(winSize))
+					}
+				case "ready":
+					// Send scrollback when client says it's ready (D-11-01 refactor)
+					scrollback := session.Buffer.Bytes()
+					if len(scrollback) > 0 {
+						log.Printf("[WS:%s] Client ready, sending scrollback (%d bytes)", session.ID, len(scrollback))
+						_ = session.WriteWS(websocket.BinaryMessage, scrollback)
 					}
 				case "get-cwd":
 					go func(pid int, client *ssh.Client) {

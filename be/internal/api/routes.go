@@ -2,6 +2,9 @@ package api
 
 import (
 	"net/http"
+	"os"
+	"path"
+	"strings"
 	"webterm/internal/config"
 	"webterm/internal/ssh"
 
@@ -65,4 +68,26 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 
 	// WebSocket handler
 	mux.HandleFunc("GET /ws", ssh.HandleWebSocket(database, cfg))
+
+	// Static file serving for the frontend (Web mode)
+	// Priority: fe/dist (local build) -> current directory (production bundle)
+	distPath := "./fe/dist"
+	if _, err := os.Stat(distPath); os.IsNotExist(err) {
+		// Fallback to current directory if fe/dist doesn't exist
+		distPath = "."
+	}
+
+	fs := http.FileServer(http.Dir(distPath))
+
+	// Handle all other routes by serving static files (for SPA support, we should ideally serve index.html)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// If it's a request for a file that exists, serve it
+		fpath := path.Join(distPath, r.URL.Path)
+		if _, err := os.Stat(fpath); err == nil && !strings.HasSuffix(fpath, "/") {
+			fs.ServeHTTP(w, r)
+			return
+		}
+		// Otherwise serve index.html for SPA routing
+		http.ServeFile(w, r, path.Join(distPath, "index.html"))
+	})
 }

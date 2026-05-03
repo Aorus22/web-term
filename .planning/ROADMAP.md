@@ -150,7 +150,21 @@ Plans:
 
 Plans:
 - [x] 10-01-PLAN.md — Backend cwd support: ConnectMessage.Cwd field, get-cwd WebSocket handler with stdout interception
-- [ ] 10-02-PLAN.md — Frontend plus button popover with Duplicate (same connection + directory) and New Connection options
+- [x] 10-02-PLAN.md — Frontend plus button popover with Duplicate (same connection + directory) and New Connection options
+
+### Phase 11: Backend Session Persistence
+**Goal**: Persist active SSH sessions in the backend so that refreshing the frontend or closing the browser doesn't kill the connection; allow re-attaching to active terminal sessions
+**Depends on**: Phase 10
+**Success Criteria** (what must be TRUE):
+1. Active SSH sessions are tracked in the backend (database or in-memory session manager)
+2. Frontend can request a list of active sessions upon reload and re-attach to existing WebSockets
+3. Terminal state (scrollback buffer or last N lines) is preserved and sent to frontend upon re-attach
+4. Disconnecting a session explicitly from the frontend removes it from backend persistence
+**Plans:** 2 plans
+
+Plans:
+- [x] 11-01-PLAN.md — Backend Session Manager: Track active connections, heartbeat, and re-attach protocol
+- [x] 11-02-PLAN.md — Frontend Re-attachment: App-store hydration from backend, session recovery flow, and UI recovery
 
 ## Progress
 
@@ -168,4 +182,5 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 | 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 8. Port Forwarding | v0.3.0 | 2/2 | Complete | 2026-04-28 |
 | 9. Settings Page | v0.3.0 | 3/3 | Complete | 2026-04-28 |
-| 10. Tab Plus Button Popover | — | 1/2 | In Progress | — |
+| 10. Tab Plus Button Popover | — | 2/2 | Complete | 2026-04-29 |
+| 11. Backend Session Persistence | — | 2/2 | Complete | 2026-04-29 |

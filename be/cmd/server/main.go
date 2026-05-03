@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	"webterm/internal/api"
@@ -26,7 +27,29 @@ func corsMux(next http.Handler, origins []string) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if allowAll || allowed[origin] {
+		
+		// Robust same-host check (allows different ports on the same machine/IP)
+		isSameHost := false
+		if origin != "" {
+			if origin == "null" {
+				isSameHost = true // Support some electron/local file contexts
+			} else {
+				// Parse origin
+				if parts := strings.Split(origin, "://"); len(parts) > 1 {
+					originHostWithPort := strings.Split(parts[1], "/")[0]
+					originHost := strings.Split(originHostWithPort, ":")[0]
+					
+					// Parse request host
+					requestHost := strings.Split(r.Host, ":")[0]
+					
+					if originHost == requestHost || originHost == "localhost" || originHost == "127.0.0.1" {
+						isSameHost = true
+					}
+				}
+			}
+		}
+
+		if allowAll || allowed[origin] || isSameHost {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")

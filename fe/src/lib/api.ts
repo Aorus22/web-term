@@ -2,13 +2,29 @@ import { useAppStore } from '@/stores/app-store'
 import { isDesktop } from './desktop-ipc'
 
 const getBaseUrl = () => {
+  // Mode 1: Desktop (Tauri/Electron)
+  // If we have a discovered backend port, prioritize it.
   const port = useAppStore.getState().backendPort
-  // In desktop mode, ALWAYS use the dynamically discovered port.
-  // In web mode, fallback to env variable or default 8080.
-  if (isDesktop) {
+  if (isDesktop && port !== 0) {
     return `http://localhost:${port}`
   }
-  return import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+  // Mode 2: Decoupled (FE served separately, e.g., Vite dev server or Vercel)
+  // Prioritize explicit environment variable if set.
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+
+  // Mode 3: Unified (FE served by Go Backend)
+  // Fallback to the origin the app was loaded from.
+  if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
+    // If we are in dev mode (localhost:5173), we likely want Mode 2's fallback or .env
+    // but if no .env is set, we use origin.
+    return window.location.origin
+  }
+
+  // Absolute fallback
+  return 'http://localhost:8080'
 }
 
 const getApiBase = () => `${getBaseUrl()}/api/connections`

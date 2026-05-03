@@ -277,7 +277,7 @@ function AppContent() {
               <TerminalPane
                 sessionId={session.id}
                 isActive={session.id === activeSessionId}
-                initialConnect={session.connectionId ? { connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
+                initialConnect={session.connectionId && session.status !== 'detached' ? { connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
               />
             </div>
           ))}

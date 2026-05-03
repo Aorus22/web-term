@@ -1,7 +1,9 @@
 package ssh
 
 import (
+	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -62,6 +64,7 @@ func (r *RingBuffer) Bytes() []byte {
 	}
 
 	out := make([]byte, r.size)
+	// data[head:] is the older part, data[:head] is the newer part
 	copy(out, r.data[r.head:])
 	copy(out[r.size-r.head:], r.data[:r.head])
 	return out
@@ -105,6 +108,25 @@ func (s *ManagedSession) IsActive() bool {
 	return s.WS != nil
 }
 
+func (s *ManagedSession) GetCwd() string {
+	if s.ShellPid <= 0 {
+		return ""
+	}
+
+	sess, err := s.SSHClient.NewSession()
+	if err != nil {
+		return ""
+	}
+	defer sess.Close()
+
+	out, err := sess.Output(fmt.Sprintf("readlink /proc/%d/cwd 2>/dev/null", s.ShellPid))
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(out))
+}
+
 // SessionManager tracks all active SSH sessions.
 type SessionManager struct {
 	sessions map[string]*ManagedSession
@@ -135,7 +157,7 @@ func (m *SessionManager) CreateSession(client *ssh.Client, session *ssh.Session,
 		User:         user,
 		Port:         port,
 		ConnectionID: connID,
-		Buffer:       NewRingBuffer(64 * 1024), // 64KB
+		Buffer:       NewRingBuffer(256 * 1024), // 256KB history
 		LastSeen:     time.Now(),
 	}
 

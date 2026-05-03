@@ -13,6 +13,7 @@ type SessionInfo struct {
 	Port         int    `json:"port"`
 	ConnectionID string `json:"connection_id,omitempty"`
 	Status       string `json:"status"` // "active" | "detached"
+	Cwd          string `json:"cwd,omitempty"`
 }
 
 func ListSessions() http.HandlerFunc {
@@ -33,6 +34,7 @@ func ListSessions() http.HandlerFunc {
 				Port:         s.Port,
 				ConnectionID: s.ConnectionID,
 				Status:       status,
+				Cwd:          s.GetCwd(),
 			})
 		}
 

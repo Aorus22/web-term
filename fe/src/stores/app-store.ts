@@ -91,7 +91,8 @@ export const useAppStore = create<AppState>((set) => ({
         const newSessions: SSHSession[] = backendSessions
           .filter((bs) => !existingIds.has(bs.id))
           .map((bs) => ({
-            id: bs.id,
+            id: bs.id, // Use backend ID as stable local ID for recovered sessions
+            backendId: bs.id,
             connectionId: bs.connection_id,
             host: bs.host,
             port: bs.port,
@@ -99,6 +100,8 @@ export const useAppStore = create<AppState>((set) => ({
             label: `${bs.user}@${bs.host}`,
             status: 'detached',
             isQuickConnect: !bs.connection_id,
+            cwd: bs.cwd,
+            isRecovered: true,
           }))
 
         if (newSessions.length === 0) return state

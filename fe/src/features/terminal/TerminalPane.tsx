@@ -21,10 +21,16 @@ interface TerminalPaneProps {
 }
 
 export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPaneProps) {
-  const { ref, connect, sendData, sendResize } = useSSHSession(sessionId)
-  const { onReady: onTerminalReady } = useTerminalMouse(sendData)
+  const { ref, connect, attach, sendData, sendResize, signalReady } = useSSHSession(sessionId)
+  const { onReady: onTerminalMouseReady } = useTerminalMouse(sendData)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const { data: settings } = useSettings()
+
+  const handleTerminalReady = (wt: any) => {
+    onTerminalMouseReady(wt)
+    signalReady()
+  }
+
   const removeSession = useAppStore((s) => s.removeSession)
   const lastOptionsRef = useRef<ConnectOptions | null>(initialConnect ?? null)
   const passphraseRef = useRef<string | null>(null)
@@ -32,6 +38,8 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
   const [passwordProvided, setPasswordProvided] = useState(false)
 
   const hasConnectedRef = useRef(false)
+
+  console.log(`[TerminalPane:${sessionId}] Render. Status: ${session?.status}, HasAttach: ${!!attach}`)
 
   // Derive Terminal props from settings
   const terminalTheme = settings?.terminal_color_theme || 'default'
@@ -57,7 +65,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
 
   // Auto-connect on mount (or as soon as settings are available)
   useEffect(() => {
-    if (hasConnectedRef.current || !settings) return
+    if (hasConnectedRef.current || !settings || session?.isRecovered) return
 
     const rows = 24
     const cols = 80
@@ -108,6 +116,14 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
       connect(opts)
     }
   }, [settings, initialConnect, session?.status, connect]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-attach for recovered sessions
+  useEffect(() => {
+    if (session?.status === 'detached' && attach) {
+      console.log(`[TerminalPane:${sessionId}] Triggering auto-attach...`)
+      attach()
+    }
+  }, [session?.status, attach, sessionId])
 
   // Show save banner when quick-connect session disconnects (D-06)
   useEffect(() => {
@@ -206,6 +222,16 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
     )
   }
 
+  // Detached state — spinner for re-attachment initiation
+  if (session.status === 'detached') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="text-sm">Resuming session to {session.host}...</p>
+      </div>
+    )
+  }
+
   // Connecting state — spinner (auto-connect via useEffect for saved connections)
   if (session.status === 'connecting') {
     return (
@@ -241,7 +267,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
           className={terminalClassName}
           onData={sendData}
           onResize={sendResize}
-          onReady={onTerminalReady}
+          onReady={handleTerminalReady}
           style={terminalStyle}
         />
       </div>
