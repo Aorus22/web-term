@@ -1,97 +1,49 @@
----
 gsd_state_version: 1.0
-milestone: v0.3.0
-milestone_name: SSH Key Auth & UI Redesign
-status: completed
-stopped_at: Phase 11 verified
-last_updated: "2026-04-29T14:40:00.000Z"
-last_activity: 2026-04-29 — Phase 11 Backend Session Persistence verified. Milestone v0.3.0 complete.
+milestone: v0.4.0
+milestone_name: Local Terminal & SFTP
+status: planning
+stopped_at: v0.4.0 planning
+last_updated: "2026-05-03T10:00:00.000Z"
+last_activity: 2026-05-03 — Initializing Milestone v0.4.0: Local Terminal & SFTP.
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 26
-  completed_plans: 26
-  percent: 100
----
-
-# Project State
-
-## Project Reference
-
-See: .planning/PROJECT.md (updated 2026-04-28)
-
-**Core value:** SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable
-**Current focus:** Project Complete (v0.3.0)
-
-## Current Position
-
-Phase: 11 (Backend Session Persistence)
-Plan: 11-02
-Status: Completed
-Last activity: 2026-04-29 — Phase 11 Backend Session Persistence verified.
-
-Progress: [▓▓▓▓▓▓▓▓▓▓] 100% (Milestone v0.3.0 Complete — 26/26 plans across 11 phases)
-
-## Performance Metrics
-
-**Velocity:**
-
-- Total plans completed: 26
-- Average duration: 14 min
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-wterm-spike | 2 | 25 min | 12.5 min |
-| 02-connection-mgmt | 2 | 35 min | 17.5 min |
-| 03-ssh-terminal | 3 | 40 min | 13 min |
-| 04-multi-tab-polish | 3 | 50 min | 16.6 min |
-| 05-backend-ssh-key-storage | 2 | 28 min | 14 min |
-| 06-frontend-ui-navigation | 3 | 42 min | 14 min |
-| 07-websocket-key-auth-integration | 2 | 28 min | 14 min |
-| 08-port-forwarding | 2 | 8 min | 4 min |
-| 09-settings-page | 3 | 45 min | 15 min |
-| 10-tab-plus-button-popover | 2 | 30 min | 15 min |
-| 11-backend-session-persistence | 2 | 40 min | 20 min |
-
-## Accumulated Context
-
-### Decisions
-
-Decisions logged in PROJECT.md Key Decisions table.
-
-Recent decisions for Phase 11:
-- In-memory SessionManager for SSH persistence (no database persistence for active streams)
-- 10-minute timeout for orphaned sessions
-- Fixed-size ring buffer (256KB) for scrollback recovery
-- Unified sessionId from backend to allow re-attachment
-- REST API /api/sessions for hydration
-- Ready signal handshake from frontend to backend to trigger scrollback delivery after terminal mount.
-
-### Roadmap Evolution
-
-- Phase 11: Backend Session Persistence — Survive reloads and re-attach to active SSH sessions. (Complete)
-
-### Pending Todos
-
-None.
-
-### Blockers/Concerns
-
-None.
-
-## Deferred Items
-
-Items acknowledged and carried forward from previous milestone close:
-
-| Category | Item | Status | Deferred At |
-|----------|------|--------|-------------|
-| *(none)* | | | |
-
-## Session Continuity
-
-Last session: 2026-04-29T14:40:00.000Z
-Stopped at: Phase 11 verified
-Resume file: .planning/phases/11-backend-session-persistence/11-VERIFICATION.md
-Next step: New Milestone Planning
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+performance_metrics:
+  velocity:
+    total_plans_completed: 26
+    average_duration_min: 14
+  by_phase:
+    - { phase: "01-wterm-spike", plans: 2, total_min: 25, avg_min: 12.5 }
+    - { phase: "02-connection-mgmt", plans: 2, total_min: 35, avg_min: 17.5 }
+    - { phase: "03-ssh-terminal", plans: 3, total_min: 40, avg_min: 13 }
+    - { phase: "04-multi-tab-polish", plans: 3, total_min: 50, avg_min: 16.6 }
+    - { phase: "05-backend-ssh-key-storage", plans: 2, total_min: 28, avg_min: 14 }
+    - { phase: "06-frontend-ui-navigation", plans: 3, total_min: 42, avg_min: 14 }
+    - { phase: "07-websocket-key-auth-integration", plans: 2, total_min: 28, avg_min: 14 }
+    - { phase: "08-port-forwarding", plans: 2, total_min: 8, avg_min: 4 }
+    - { phase: "09-settings-page", plans: 3, total_min: 45, avg_min: 15 }
+    - { phase: "10-tab-plus-button-popover", plans: 2, total_min: 30, avg_min: 15 }
+    - { phase: "11-backend-session-persistence", plans: 2, total_min: 40, avg_min: 20 }
+accumulated_context:
+  decisions:
+    - "@wterm/react handles SSH workloads cleanly"
+    - "WebSocket proxy pattern is stable for bidirectional I/O"
+    - "SQLite with AES-256-GCM is sufficient for single-user credential storage"
+    - "No-auth v1 is appropriate for self-hosted use cases"
+    - "Theme preferences synced with terminal via localStorage"
+    - "Session re-attachment works via unique session IDs mapped to active SSH connections"
+  roadmap_evolution:
+    - "v0.2.0: MVP Terminal & Connections"
+    - "v0.3.0: SSH Key Auth & UI Redesign"
+    - "v0.4.0: Local Terminal & SFTP"
+  pending_todos: []
+  blockers_concerns: []
+deferred_items: []
+session_continuity:
+  last_session: 2026-05-03T10:00:00.000Z
+  stopped_at: Milestone v0.4.0 planning start
+  resume_file: .planning/ROADMAP.md
+  next_step: Create REQUIREMENTS.md and ROADMAP.md for v0.4.0

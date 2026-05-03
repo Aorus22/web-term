@@ -2,11 +2,11 @@
 
 ## What This Is
 
-Self-hosted web-based SSH client. Browser-based terminal with connection management, multi-tab sessions, dark/light theme, and keyboard shortcuts. Built with Go backend (WebSocket SSH proxy) and React frontend (@wterm/react + shadcn).
+Self-hosted web-based SSH client and file manager. Browser-based terminal with connection management, multi-tab sessions, dark/light theme, local terminal support, and SFTP file management. Built with Go backend (WebSocket SSH proxy) and React frontend (@wterm/react + shadcn).
 
 ## Core Value
 
-SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable — save connections, multi-tab, dan UI yang clean.
+SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable — save connections, multi-tab, SFTP file management, dan UI yang clean.
 
 ## Requirements
 
@@ -29,19 +29,19 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 - ✓ Hosts page with card-based layout and kebab menus — v0.3.0
 - ✓ SSH Keys page with key pool management — v0.3.0
 - ✓ Per-connection auth method selection (password vs key) — v0.3.0
+- ✓ SSH local port forwarding (bind remote port to localhost) — v0.3.0
+- ✓ Backend session persistence (survive reloads and re-attach) — v0.3.0
 
 ### Active
 
-- [ ] SSH local port forwarding (bind remote port to localhost)
-- [ ] Port forwarding sheet UI with connection selector
-- [ ] Port conflict detection with toast error
+- [ ] Local terminal support (spawn shell on backend host)
+- [ ] Dual-pane SFTP file manager UI
+- [ ] SFTP file operations (list, upload, download, delete, rename)
 
 ### Out of Scope
 
 - **Authentication/User login** — v1 tanpa auth, fokus ke fitur terminal dulu
-- **SFTP/File transfer** — ditunda ke v2
 - **Team/Shared credentials** — target individual developer dulu
-- **SSH key management** — v1 pakai password-based auth
 - **Mobile responsive** — desktop-first untuk v1
 - **Mosh protocol** — requires UDP, incompatible with WebSocket proxy
 - **Plugin/extension system** — premature abstraction, no demand yet
@@ -49,11 +49,11 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 
 ## Context
 
-- **Shipped:** v0.2.0 on 2026-04-28
-- **LOC:** ~5,007 lines across 53 source files (Go + TypeScript + CSS)
-- **Tech stack:** Go backend (gorilla/websocket, golang.org/x/crypto/ssh), Vite + React + shadcn frontend, @wterm/react terminal, SQLite
-- **Architecture:** WebSocket proxy pattern — browser ↔ Go backend ↔ SSH target
-- **Timeline:** 2 days (2026-04-27 → 2026-04-28), 51 commits, 10 plans across 4 phases
+- **Shipped:** v0.3.0 on 2026-04-29
+- **LOC:** ~7,200 lines across 75 source files (Go + TypeScript + CSS)
+- **Tech stack:** Go backend (gorilla/websocket, golang.org/x/crypto/ssh, pkg/sftp), Vite + React + shadcn frontend, @wterm/react terminal, SQLite
+- **Architecture:** WebSocket proxy pattern — browser ↔ Go backend ↔ SSH/Local target
+- **Timeline:** 3 days (2026-04-27 → 2026-04-29), 96 commits, 26 plans across 11 phases
 
 ## Constraints
 
@@ -71,11 +71,11 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 | WebSocket proxy pattern | Browser cannot SSH directly | ✓ Good — stable bidirectional I/O |
 | SQLite | Simple, no setup, sufficient for single-user | ✓ Good — AES-256-GCM encryption for passwords |
 | No auth for v1 | Focus on core terminal features | ✓ Good — appropriate for self-hosted single-user |
-| Password-only SSH auth | Simpler for v1 | ✓ Good — keyboard-interactive supported |
 | Theme in localStorage | Persist preference without backend | ✓ Good |
 | QuickConnect in NewTabView | Simplify sidebar, reduce clutter | ✓ Good — cleaner architecture |
 | TabBar status dots | Visual session status at a glance | ✓ Good |
 | Passphrase caching via ref | Session-scoped, never stored, auto-cleared on disconnect | ✓ Good — secure UX without repeated prompts |
+| Backend Session Re-attach | Uses a session manager to map IDs to active SSH connections | ✓ Good — handles reloads seamlessly |
 
 ## Evolution
 
@@ -93,17 +93,24 @@ This document evolves at phase transitions and milestone boundaries.
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
-## Current Milestone: v0.3.0 SSH Key Auth & UI Redesign
 
-**Goal:** Add SSH key-based authentication + redesign sidebar into a 2-page navigation (Hosts & SSH Keys).
+## Current Milestone: v0.4.0 Local Terminal & SFTP
+
+**Goal:** Add support for local terminal sessions and a dual-pane SFTP file manager.
 
 **Target features:**
-- Sidebar → 2-page nav: "Hosts" and "SSH Keys" menu items
-- Hosts page: Card-based layout showing all hosts, kebab menu per card (edit/delete/duplicate), click to connect. Add/edit via right-side sheet (existing pattern)
-- SSH Keys page: Key pool management — upload, list, rename, delete keys
-- SSH Key auth: Upload existing private keys, encrypted at rest (AES-256-GCM), passphrase-protected key support (prompt on connect)
-- Per-connection auth: When adding/editing a host, select auth method (password vs key) and which key to use
+- **Local Terminal:**
+    - Option in "New Tab" view to open a local shell on the backend host.
+    - Local terminal should be the first/primary option in New Tab.
+    - Full PTY support (ANSI colors, window resizing).
+- **Dual-Pane SFTP Manager:**
+    - New "SFTP" navigation item in the sidebar.
+    - Split-screen view allowing two independent directory browsers.
+    - Each pane can select a "Source": Local Filesystem or Remote Host (via SSH/SFTP).
+    - File operations: List, Upload, Download, Delete, Rename.
+    - Drag-and-drop support between panes.
+    - High-quality UI inspired by Termius.
 
 ---
 
-*Last updated: 2026-04-28 after Phase 7 complete*
+*Last updated: 2026-05-03 after Milestone v0.3.0 complete*

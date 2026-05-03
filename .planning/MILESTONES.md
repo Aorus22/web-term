@@ -1,5 +1,29 @@
 # Milestones
 
+- ✅ **v0.2.0 — MVP** (shipped 2026-04-28)
+- ✅ **v0.3.0 — SSH Key Auth & UI Redesign** (shipped 2026-04-29)
+
+---
+
+## v0.3.0 — SSH Key Auth & UI Redesign
+**Goal:** Add SSH key-based authentication + redesign sidebar into a 2-page navigation.
+
+### Key Accomplishments
+- **Backend Key Storage:** Secure AES-256-GCM encrypted storage for SSH private keys.
+- **Frontend Navigation:** Redesigned sidebar with "Hosts" and "SSH Keys" views.
+- **SSH Key Auth:** Full support for key-based authentication, including passphrase-protected keys.
+- **Port Forwarding:** Basic local port forwarding support.
+- **Settings Page:** Centralized configuration for themes and UI preferences.
+- **Session Persistence:** Backend-managed SSH sessions that survive browser reloads.
+
+### Stats
+- **Phases:** 7 (05-11)
+- **Plans:** 16
+- **Duration:** ~4 hours active development
+- **Commits:** ~45
+
+---
+
 ## v0.2.0 — MVP
 
 **Shipped:** 2026-04-28

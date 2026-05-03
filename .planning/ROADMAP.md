@@ -1,33 +1,65 @@
-# Roadmap: WebTerm
+# Roadmap: WebTerm v0.4.0 — Local Terminal & SFTP
 
 ## Overview
-
-WebTerm v0.3.0 adds SSH key-based authentication and a sidebar UI redesign. Three phases: backend key storage foundation → frontend navigation & key management UI → WebSocket key auth integration. Each phase is independently testable and builds on the previous.
+Milestone v0.4.0 introduces local terminal access and a dual-pane SFTP file manager.
 
 ## Milestones
-
 - ✅ **v0.2.0 MVP** - [Archive](milestones/v0.2.0-ROADMAP.md) (shipped 2026-04-28)
 - ✅ **v0.3.0 SSH Key Auth & UI Redesign** - [Archive](milestones/v0.3.0-ROADMAP.md) (shipped 2026-04-29)
+- 🏗️ **v0.4.0 Local Terminal & SFTP** - (Target: 2026-05-05)
 
 ## Current Objective
-*Next milestone objective to be defined.*
-
+Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ## Progress
+**Execution Order:** Phases 12 → 13 → 14 → 15 → 16
 
-**Execution Order:**
-Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
+| Phase | Milestone | Description | Status | Target |
+|-------|-----------|-------------|--------|--------|
+| **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | 🏗️ Planned | 2026-05-03 |
+| **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | 🏗️ Planned | 2026-05-04 |
+| **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | 🏗️ Planned | 2026-05-04 |
+| **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | 🏗️ Planned | 2026-05-05 |
+| **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | 🏗️ Planned | 2026-05-05 |
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. wterm Spike | v0.2.0 | 2/2 | Complete | 2026-04-27 |
-| 2. Connection Management | v0.2.0 | 2/2 | Complete | 2026-04-27 |
-| 3. SSH Terminal | v0.2.0 | 3/3 | Complete | 2026-04-28 |
-| 4. Multi-tab & Polish | v0.2.0 | 3/3 | Complete | 2026-04-28 |
-| 5. Backend SSH Key Storage | v0.3.0 | 2/2 | Complete | 2026-04-28 |
-| 6. Frontend UI & Navigation | v0.3.0 | 3/3 | Complete | 2026-04-28 |
-| 7. WebSocket Key Auth Integration | v0.3.0 | 2/2 | Complete | 2026-04-28 |
-| 8. Port Forwarding | v0.3.0 | 2/2 | Complete | 2026-04-28 |
-| 9. Settings Page | v0.3.0 | 3/3 | Complete | 2026-04-28 |
-| 10. Tab Plus Button Popover | — | 2/2 | Complete | 2026-04-29 |
-| 11. Backend Session Persistence | — | 2/2 | Complete | 2026-04-29 |
+## Phase Details
+
+### Phase 12: Local Terminal Foundation
+- **Goal:** Enable users to open a terminal session on the machine running the WebTerm backend.
+- **Tasks:**
+    - Integrate `creack/pty` in Go backend.
+    - Add `ConnectionID: "local"` support to WebSocket handler.
+    - Update `NewTabView.tsx` to show "Local Terminal" as the primary option.
+    - Ensure terminal resizing and I/O work for local PTY.
+
+### Phase 13: SFTP Backend Core
+- **Goal:** Provide a unified API for interacting with local and remote filesystems.
+- **Tasks:**
+    - Add `pkg/sftp` dependency.
+    - Implement a `FileSystem` interface in Go with `Local` and `SFTP` implementations.
+    - Create REST endpoints for `list`, `upload`, `download`, `delete`, `rename`.
+    - Handle authentication by reusing existing SSH client sessions.
+
+### Phase 14: SFTP Frontend UI
+- **Goal:** Create the visual framework for the SFTP manager.
+- **Tasks:**
+    - Add "SFTP" to sidebar navigation.
+    - Create `SFTPView` component with a dual-pane `SplitLayout`.
+    - Implement `DirectoryBrowser` component with source selector (Local vs Hosts).
+    - Basic directory listing and navigation (double-click to enter folder).
+
+### Phase 15: SFTP Operations & DND
+- **Goal:** Enable file management and inter-host transfers.
+- **Tasks:**
+    - Implement file upload (multipart) and download (stream).
+    - Add UI for Delete and Rename (with confirmation).
+    - Implement drag-and-drop between panes to trigger transfers.
+    - Handle large file transfers with chunked/streamed backend processing.
+
+### Phase 16: Polish & UI Cohesion
+- **Goal:** Finalize the UX and visual design.
+- **Tasks:**
+    - Add interactive breadcrumbs for path navigation.
+    - Implement keyboard shortcuts (Delete, F5, Ctrl+C/V).
+    - Add a "Transfer Queue" or toast-based progress indicators.
+    - Visual polish: high-quality icons, row highlighting, and transition animations.
