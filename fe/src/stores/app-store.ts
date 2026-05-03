@@ -3,11 +3,19 @@ import type { Connection } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
 import { generateId } from '@/lib/utils'
 
+export interface SFTPClipboard {
+  action: 'cut' | 'copy';
+  connectionId: string;
+  path: string;
+  fileName: string;
+  isDir: boolean;
+}
+
 interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
-  sidebarPage: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab'
-  setSidebarPage: (page: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab') => void
+  sidebarPage: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp'
+  setSidebarPage: (page: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp') => void
   editingConnection: Connection | null
   setEditingConnection: (c: Connection | null) => void
   creatingConnection: boolean
@@ -23,6 +31,13 @@ interface AppState {
   updateSession: (id: string, updates: Partial<SSHSession>) => void
   setActiveSession: (id: string | null) => void
   duplicateSession: (sessionId: string, cwd: string) => string | null
+  rehydrateSessions: () => Promise<void>
+  // Backend port for dynamic discovery
+  backendPort: number
+  setBackendPort: (port: number) => void
+  // SFTP Clipboard
+  sftpClipboard: SFTPClipboard | null
+  setSftpClipboard: (clipboard: SFTPClipboard | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -76,4 +91,45 @@ export const useAppStore = create<AppState>((set) => ({
     }))
     return newId
   },
+  rehydrateSessions: async () => {
+    const { sessionsApi } = await import('@/lib/api')
+    try {
+      const backendSessions = await sessionsApi.list()
+      if (backendSessions.length === 0) return
+
+      set((state) => {
+        const existingIds = new Set(state.sessions.map((s) => s.id))
+        const newSessions: SSHSession[] = backendSessions
+          .filter((bs) => !existingIds.has(bs.id))
+          .map((bs) => ({
+            id: bs.id, // Use backend ID as stable local ID for recovered sessions
+            type: bs.type,
+            backendId: bs.id,
+            connectionId: bs.connection_id,
+            host: bs.host,
+            port: bs.port,
+            username: bs.user,
+            label: bs.type === 'local' ? 'Local Terminal' : `${bs.user}@${bs.host}`,
+            status: 'detached',
+            isQuickConnect: bs.type === 'ssh' && !bs.connection_id,
+            cwd: bs.cwd,
+            isRecovered: true,
+          }))
+
+        if (newSessions.length === 0) return state
+
+        const updatedSessions = [...state.sessions, ...newSessions]
+        return {
+          sessions: updatedSessions,
+          activeSessionId: state.activeSessionId ?? updatedSessions[0].id,
+        }
+      })
+    } catch (error) {
+      console.error('Failed to rehydrate sessions:', error)
+    }
+  },
+  backendPort: 0,
+  setBackendPort: (port) => set({ backendPort: port }),
+  sftpClipboard: null,
+  setSftpClipboard: (clipboard) => set({ sftpClipboard: clipboard }),
 }))

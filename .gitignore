@@ -2,6 +2,12 @@
 be/webterm
 be/webterm-backend
 be/webterm-backend.exe
+be/main
+be/server
+be/webterm-backend
+*.exe
+*.test
+*.prof
 
 # Frontend build
 fe/dist/
@@ -11,8 +17,11 @@ desktop/node_modules
 desktop/dist/
 
 # Tauri
-desktop-tauri/
-run-tauri.sh
+desktop-tauri/src-tauri/target
+desktop-tauri/src-tauri/binaries
+desktop-tauri/node_modules
+!run-tauri.sh
+!desktop-tauri/
 
 # OS
 .DS_Store
@@ -21,4 +30,4 @@ Thumbs.db
 # Env
 .env
 *.db
-.serena
+.serenabe/storage/

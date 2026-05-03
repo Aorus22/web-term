@@ -1,0 +1,22 @@
+[package]
+name = "webterm"
+version = "0.1.0"
+description = "WebTerm Desktop Application"
+authors = ["Programmer"]
+edition = "2021"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-log = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+tokio = { version = "1", features = ["time"] }

@@ -127,6 +127,9 @@
   }
   body, html {
     background: transparent !important;
+    overflow: hidden !important; /* Prevent base level scrolling */
+    height: 100vh;
+    width: 100vw;
     @apply text-foreground;
   }
   html {
@@ -433,4 +436,20 @@
   background: transparent !important;
   outline: none !important;
   border-left: 2px solid var(--term-cursor);
+  }
+
+  .drag-region {
+    -webkit-app-region: drag;
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  /* Force WebKit to clip rounded corners properly on Linux */
+  .rounded-xl {
+    isolation: isolate;
+    overflow: hidden !important;
+    /* Use clip-path which is more robust during resizing than mask-image */
+    clip-path: inset(0 round 0.875rem); 
+    -webkit-clip-path: inset(0 round 0.875rem);
+  }
   }

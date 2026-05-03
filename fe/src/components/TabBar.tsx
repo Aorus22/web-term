@@ -9,6 +9,16 @@ import {
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { getSessionWebSocket } from '@/features/terminal/useSSHSession'
+import { sessionsApi } from '@/lib/api'
+import { 
+  isDesktop, 
+  platform, 
+  minimizeWindow, 
+  maximizeWindow, 
+  closeWindow, 
+  getWindowState, 
+  onWindowStateChange 
+} from '@/lib/desktop-ipc'
 
 /**
  * Horizontal tab bar showing active SSH sessions.
@@ -24,19 +34,18 @@ export function TabBar() {
   const [confirmingClose, setConfirmingClose] = useState<string | null>(null)
   const [plusPopoverOpen, setPlusPopoverOpen] = useState(false)
   const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
-  const isElectron = !!window.electron
-  const isWindows = window.electron?.platform === 'win32'
+  const isWindows = platform === 'win32'
   
-  // On Windows, we use titleBarOverlay (native caption buttons).
-  // On Linux and macOS, we use custom web-based controls since we use a hidden title bar / frameless window.
-  const showCustomControls = isElectron && !isWindows;
+  // On Windows, we use titleBarOverlay (native caption buttons) in Electron.
+  // For Tauri or other platforms, we might use custom controls.
+  const showCustomControls = isDesktop && !isWindows;
 
   useEffect(() => {
-    if (isElectron && window.electron) {
-      window.electron.getWindowState().then(setWindowState)
-      window.electron.onWindowStateChange(setWindowState)
+    if (isDesktop) {
+      getWindowState().then(setWindowState)
+      return onWindowStateChange(setWindowState)
     }
-  }, [isElectron])
+  }, [])
 
   const handleDuplicate = async () => {
     if (!activeSessionId) return
@@ -73,18 +82,18 @@ export function TabBar() {
   }
 
   return (
-    <div className="flex items-center w-full justify-between select-none">
-      <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar flex-1 px-1 pt-1">
+    <div data-tauri-drag-region className="flex items-center w-full justify-between select-none">
+      <div data-tauri-drag-region className="flex items-center gap-0.5 overflow-x-auto no-scrollbar flex-1 px-1 pt-1">
         {sessions.map((session) => (
           <button
             key={session.id}
             className={cn(
-              "group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium whitespace-nowrap transition-colors border border-b-0",
+              "group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium whitespace-nowrap transition-colors border border-b-0 no-drag",
               session.id === activeSessionId
                 ? "bg-background border-border text-foreground"
                 : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
-            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+            style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             onClick={() => setActiveSession(session.id)}
           >
             <Circle
@@ -115,6 +124,10 @@ export function TabBar() {
                       if (session.status === 'connected') {
                         setConfirmingClose(session.id)
                       } else {
+                        const bId = session.backendId || session.id
+                        if (session.isRecovered || session.status === 'disconnected' || session.status === 'error') {
+                           sessionsApi.delete(bId).catch(() => {})
+                        }
                         removeSession(session.id)
                       }
                     }}
@@ -135,6 +148,16 @@ export function TabBar() {
                     variant="destructive" 
                     className="flex-1 h-7 text-[10px]"
                     onClick={() => {
+                      // 1. Tell backend to kill session
+                      const bId = session.backendId || session.id
+                      sessionsApi.delete(bId).catch(console.error)
+                      
+                      // 2. Also send WS disconnect if socket is open (optional but good for immediate cleanup)
+                      const ws = getSessionWebSocket(session.id)
+                      if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'disconnect' }))
+                      }
+
                       removeSession(session.id)
                       setConfirmingClose(null)
                     }}
@@ -159,7 +182,7 @@ export function TabBar() {
           <Popover open={plusPopoverOpen} onOpenChange={setPlusPopoverOpen}>
             <PopoverTrigger
               className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-              style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+              style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
               aria-label="New tab"
             >
               <Plus className="h-4 w-4" />
@@ -200,7 +223,7 @@ export function TabBar() {
         ) : (
           <button
             className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+            style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             aria-label="New tab"
             onClick={() => {
               setActiveSession(null)
@@ -216,17 +239,17 @@ export function TabBar() {
       {showCustomControls && (
         <div className="flex items-center h-full">
           <button 
-            onClick={() => window.electron?.minimize()}
+            onClick={() => minimizeWindow()}
             className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
-            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+            style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title="Minimize"
           >
             <Minus className="h-4 w-4 stroke-[1.5]" />
           </button>
           <button 
-            onClick={() => window.electron?.maximize()}
+            onClick={() => maximizeWindow()}
             className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
-            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+            style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title={windowState === 'maximized' ? "Restore" : "Maximize"}
           >
             {windowState === 'maximized' ? (
@@ -236,9 +259,9 @@ export function TabBar() {
             )}
           </button>
           <button 
-            onClick={() => window.electron?.close()}
+            onClick={() => closeWindow()}
             className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 ease-in-out"
-            style={isElectron ? { WebkitAppRegion: 'no-drag' } as any : {}}
+            style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title="Close"
           >
             <CloseIcon className="h-4 w-4 stroke-[1.5]" />
@@ -247,7 +270,7 @@ export function TabBar() {
       )}
 
       {/* Reserve space for Windows native caption buttons if using titleBarOverlay */}
-      {isElectron && isWindows && (
+      {isDesktop && isWindows && (
         <div className="w-[138px] h-full shrink-0" />
       )}
     </div>
