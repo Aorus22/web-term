@@ -74,11 +74,18 @@ function AppContent() {
     sidebarPage,
     setSidebarPage,
     setBackendPort,
+    rehydrateSessions,
     backendPort
   } = useAppStore()
 
   const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
   const [resizeKey, setResizeKey] = useState(0)
+
+  useEffect(() => {
+    if (backendPort !== 0) {
+      rehydrateSessions()
+    }
+  }, [backendPort, rehydrateSessions])
 
   useEffect(() => {
     if (isDesktop) {
