@@ -18,7 +18,7 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 |-------|-----------|-------------|--------|--------|
 | **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | ✅ Shipped | 2026-05-03 |
 | **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | ✅ Shipped | 2026-05-03 |
-| **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | 🏗️ Planned | 2026-05-04 |
+| **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | ✅ Shipped | 2026-05-04 |
 | **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | 🏗️ Planned | 2026-05-05 |
 | **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | 🏗️ Planned | 2026-05-05 |
 

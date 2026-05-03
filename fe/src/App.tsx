@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { PanelLeft, Server, Key, ArrowLeftRight, Settings } from 'lucide-react'
+import { PanelLeft, Server, Key, ArrowLeftRight, Settings, Files } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -15,6 +15,7 @@ import { HostsPage } from '@/features/hosts/components/HostsPage'
 import { SSHKeysPage } from '@/features/ssh-keys/components/SSHKeysPage'
 import { PortForwardsPage } from '@/features/forwards/components/PortForwardsPage'
 import { SettingsPage } from '@/features/settings/components/SettingsPage'
+import { SFTPView } from '@/features/sftp/components/SFTPView'
 import { NewTabView } from '@/components/NewTabView'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
@@ -79,7 +80,7 @@ function AppContent() {
   } = useAppStore()
 
   const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
-  const [resizeKey, setResizeKey] = useState(0)
+  const [, setResizeKey] = useState(0)
 
   useEffect(() => {
     if (backendPort !== 0) {
@@ -219,6 +220,18 @@ function AppContent() {
           >
             <ArrowLeftRight className="h-4 w-4" /> Port Forwards
           </button>
+          <button 
+            onClick={() => {
+              setSidebarPage('sftp')
+              setActiveSession(null)
+            }} 
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
+              sidebarPage === 'sftp' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+            )}
+          >
+            <Files className="h-4 w-4" /> SFTP
+          </button>
         </nav>
 
         <div className="flex-1" />
@@ -277,7 +290,7 @@ function AppContent() {
               <TerminalPane
                 sessionId={session.id}
                 isActive={session.id === activeSessionId}
-                initialConnect={session.connectionId && session.status !== 'detached' ? { connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
+                initialConnect={session.connectionId && session.status !== 'detached' ? { type: session.type, connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
               />
             </div>
           ))}
@@ -295,6 +308,9 @@ function AppContent() {
           )}
           {!activeSessionId && sidebarPage === 'settings' && (
             <SettingsPage />
+          )}
+          {!activeSessionId && sidebarPage === 'sftp' && (
+            <SFTPView />
           )}
         </div>
       </main>

@@ -36,6 +36,11 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 		Cfg: cfg,
 	}
 
+	sfh := &SFTPHandler{
+		DB:  database,
+		Cfg: cfg,
+	}
+
 	// Go 1.22+ method routing
 	mux.HandleFunc("GET /api/connections", h.ListConnections)
 	mux.HandleFunc("GET /api/connections/{id}", h.GetConnection)
@@ -62,6 +67,14 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	// Settings endpoints
 	mux.HandleFunc("GET /api/settings", sh.GetSettings)
 	mux.HandleFunc("PUT /api/settings", sh.UpdateSettings)
+
+	// SFTP endpoints
+	mux.HandleFunc("GET /api/sftp/ls", sfh.List)
+	mux.HandleFunc("GET /api/sftp/download", sfh.Download)
+	mux.HandleFunc("POST /api/sftp/upload", sfh.Upload)
+	mux.HandleFunc("DELETE /api/sftp/remove", sfh.Remove)
+	mux.HandleFunc("POST /api/sftp/rename", sfh.Rename)
+	mux.HandleFunc("POST /api/sftp/mkdir", sfh.Mkdir)
 
 	// Session endpoints
 	mux.HandleFunc("GET /api/sessions", ListSessions())

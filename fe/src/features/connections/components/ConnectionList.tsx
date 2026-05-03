@@ -46,6 +46,7 @@ export const ConnectionList = () => {
         const key = await keysApi.get(conn.ssh_key_id)
         const session: SSHSession = {
           id: generateId(),
+          type: 'ssh',
           connectionId: conn.id,
           host: conn.host,
           port: conn.port,
@@ -64,6 +65,7 @@ export const ConnectionList = () => {
         console.error('Failed to fetch key metadata:', error)
         const session: SSHSession = {
           id: generateId(),
+          type: 'ssh',
           connectionId: conn.id,
           host: conn.host,
           port: conn.port,
@@ -79,6 +81,7 @@ export const ConnectionList = () => {
     } else {
       const session: SSHSession = {
         id: generateId(),
+        type: 'ssh',
         connectionId: conn.id,
         host: conn.host,
         port: conn.port,

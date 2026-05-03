@@ -2,15 +2,15 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
 status: active
-stopped_at: Phase 14 Plan 02 complete
-last_updated: "2026-05-18T00:00:00.000Z"
-last_activity: 2026-05-18 — Completed Phase 14 Plan 02: Implement directory listing, navigation logic, and source selection
+stopped_at: Phase 14 completed
+last_updated: "2026-05-18T00:10:00.000Z"
+last_activity: 2026-05-18 — Completed Phase 14: SFTP Frontend UI.
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 60
 performance_metrics:
   velocity:
     total_plans_completed: 30
@@ -41,7 +41,7 @@ accumulated_context:
   blockers_concerns: []
 deferred_items: []
 session_continuity:
-  last_session: 2026-05-18T00:00:00.000Z
-  stopped_at: Phase 14 Plan 02 complete
+  last_session: 2026-05-18T00:10:00.000Z
+  stopped_at: Phase 14 completed
   resume_file: None
-  next_step: Proceed to next plan or phase
+  next_step: Execute Phase 15: SFTP Operations & DND

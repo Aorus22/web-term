@@ -31,6 +31,7 @@ const getApiBase = () => `${getBaseUrl()}/api/connections`
 const getKeysApiBase = () => `${getBaseUrl()}/api/keys`
 const getForwardsApiBase = () => `${getBaseUrl()}/api/forwards`
 const getSettingsApiBase = () => `${getBaseUrl()}/api/settings`
+const getSftpApiBase = () => `${getBaseUrl()}/api/sftp`
 
 export interface SSHKey {
   id: string
@@ -175,5 +176,52 @@ export const sessionsApi = {
   delete: (id: string): Promise<void> =>
     fetch(`${getBaseUrl()}/api/sessions/${id}`, { method: 'DELETE' }).then(r => {
       if (!r.ok) throw new Error('Failed to delete session')
+    }),
+}
+
+export interface FileInfo {
+  name: string
+  size: number
+  mode: number
+  modTime: string
+  isDir: boolean
+}
+
+export const sftpApi = {
+  list: (connectionId: string, path: string): Promise<FileInfo[]> =>
+    fetch(`${getSftpApiBase()}/ls?connectionId=${connectionId}&path=${encodeURIComponent(path)}`)
+      .then(r => {
+        if (!r.ok) return r.json().then(e => Promise.reject(e))
+        return r.json()
+      }),
+  downloadUrl: (connectionId: string, path: string): string =>
+    `${getSftpApiBase()}/download?connectionId=${connectionId}&path=${encodeURIComponent(path)}`,
+  upload: (connectionId: string, path: string, file: File): Promise<void> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return fetch(`${getSftpApiBase()}/upload?connectionId=${connectionId}&path=${encodeURIComponent(path)}`, {
+      method: 'POST',
+      body: formData,
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
+    })
+  },
+  remove: (connectionId: string, path: string): Promise<void> =>
+    fetch(`${getSftpApiBase()}/remove?connectionId=${connectionId}&path=${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
+    }),
+  rename: (connectionId: string, oldPath: string, newPath: string): Promise<void> =>
+    fetch(`${getSftpApiBase()}/rename?connectionId=${connectionId}&oldPath=${encodeURIComponent(oldPath)}&newPath=${encodeURIComponent(newPath)}`, {
+      method: 'POST',
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
+    }),
+  mkdir: (connectionId: string, path: string): Promise<void> =>
+    fetch(`${getSftpApiBase()}/mkdir?connectionId=${connectionId}&path=${encodeURIComponent(path)}`, {
+      method: 'POST',
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
     }),
 }

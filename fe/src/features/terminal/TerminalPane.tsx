@@ -95,6 +95,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
     } else if (session?.auth_method === 'key' && !session?.has_passphrase && session?.status === 'connecting') {
       hasConnectedRef.current = true
       const opts: ConnectOptions = {
+        type: 'ssh',
         connectionId: session.connectionId,
         host: session.host,
         port: session.port,
@@ -111,6 +112,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
     } else if (session?.cwd && session?.status === 'connecting') {
       hasConnectedRef.current = true
       const opts: ConnectOptions = {
+        type: 'ssh',
         connectionId: session.connectionId,
         host: session.host,
         port: session.port,
@@ -170,6 +172,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
   const handlePasswordConnect = (password: string) => {
     setPasswordProvided(true)
     const opts: ConnectOptions = {
+      type: 'ssh',
       host: session!.host,
       port: session!.port,
       username: session!.username,
@@ -188,6 +191,7 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
   const handlePassphraseConnect = (passphrase: string) => {
     passphraseRef.current = passphrase
     const opts: ConnectOptions = {
+      type: 'ssh',
       connectionId: session!.connectionId,
       host: session!.host,
       port: session!.port,

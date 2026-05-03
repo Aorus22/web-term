@@ -6,8 +6,8 @@ import { generateId } from '@/lib/utils'
 interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
-  sidebarPage: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab'
-  setSidebarPage: (page: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab') => void
+  sidebarPage: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp'
+  setSidebarPage: (page: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp') => void
   editingConnection: Connection | null
   setEditingConnection: (c: Connection | null) => void
   creatingConnection: boolean

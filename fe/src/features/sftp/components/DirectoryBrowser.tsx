@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useQuery } from '@tanstack/react-query'
-import { connectionsApi, sftpApi, FileInfo } from '@/lib/api'
+import { connectionsApi, sftpApi } from '@/lib/api'
+import type { FileInfo } from '@/lib/api'
 import { Folder, File as FileIcon, Loader2, AlertCircle, CornerLeftUp } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -65,7 +66,8 @@ export function DirectoryBrowser() {
     }
   }
 
-  const handleSourceChange = (v: string) => {
+  const handleSourceChange = (v: string | null) => {
+    if (!v) return
     setSelectedConnection(v)
     setPath(".") // Reset path when source changes
   }
