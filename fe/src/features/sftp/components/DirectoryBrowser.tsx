@@ -67,7 +67,7 @@ export function DirectoryBrowser() {
   }
 
   const handleAction = (action: 'cut' | 'copy', file: FileInfo) => {
-    const fullPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
     setSftpClipboard({
       action,
       connectionId: selectedConnection,
@@ -82,28 +82,11 @@ export function DirectoryBrowser() {
     const targetPath = path === '.' || path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
 
     try {
-      if (sftpClipboard.connectionId === selectedConnection) {
-        if (sftpClipboard.action === 'cut') {
-          await sftpApi.rename(selectedConnection, sftpClipboard.path, targetPath)
-          setSftpClipboard(null)
-        } else {
-          const url = sftpApi.downloadUrl(sftpClipboard.connectionId, sftpClipboard.path)
-          const res = await fetch(url)
-          const blob = await res.blob()
-          const file = new File([blob], sftpClipboard.fileName)
-          await sftpApi.upload(selectedConnection, path, file)
-        }
-      } else {
-        const url = sftpApi.downloadUrl(sftpClipboard.connectionId, sftpClipboard.path)
-        const res = await fetch(url)
-        const blob = await res.blob()
-        const file = new File([blob], sftpClipboard.fileName)
-        await sftpApi.upload(selectedConnection, path, file)
-        
-        if (sftpClipboard.action === 'cut') {
-          await sftpApi.remove(sftpClipboard.connectionId, sftpClipboard.path)
-          setSftpClipboard(null)
-        }
+      await sftpApi.transfer(sftpClipboard.connectionId, sftpClipboard.path, selectedConnection, targetPath)
+      
+      if (sftpClipboard.action === 'cut') {
+         await sftpApi.remove(sftpClipboard.connectionId, sftpClipboard.path)
+         setSftpClipboard(null)
       }
       refreshDir()
     } catch (e) {
@@ -115,8 +98,8 @@ export function DirectoryBrowser() {
   const handleRename = async (file: FileInfo) => {
     const newName = window.prompt('Enter new name', file.name)
     if (!newName || newName === file.name) return
-    const oldPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
-    const newPath = path === '.' || path === '/' ? `/${newName}` : `${path}/${newName}`
+    const oldPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const newPath = path === '.' ? newName : path === '/' ? `/${newName}` : `${path}/${newName}`
     
     try {
       await sftpApi.rename(selectedConnection, oldPath, newPath)
@@ -129,7 +112,7 @@ export function DirectoryBrowser() {
 
   const handleDelete = async (file: FileInfo) => {
     if (!window.confirm(`Are you sure you want to delete ${file.name}?`)) return
-    const fullPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
     try {
       await sftpApi.remove(selectedConnection, fullPath)
       refreshDir()
@@ -140,7 +123,7 @@ export function DirectoryBrowser() {
   }
 
   const handleDragStart = (e: React.DragEvent, file: FileInfo) => {
-    const fullPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
     e.dataTransfer.setData('application/json', JSON.stringify({
       connectionId: selectedConnection,
       path: fullPath,
@@ -157,22 +140,18 @@ export function DirectoryBrowser() {
       if (!dataStr) return
       const data = JSON.parse(dataStr)
       // skip drop on same folder and same file name
-      const targetPath = path === '.' || path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
+      const targetPath = path === '.' ? data.fileName : path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
       if (data.connectionId === selectedConnection && data.path === targetPath) return
 
-      const url = sftpApi.downloadUrl(data.connectionId, data.path)
-      const res = await fetch(url)
-      const blob = await res.blob()
-      const file = new File([blob], data.fileName)
-      
-      await sftpApi.upload(selectedConnection, path, file)
-      
+      await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
+
       if (data.action === 'cut') {
          await sftpApi.remove(data.connectionId, data.path)
       }
       refreshDir()
     } catch (err) {
       console.error('Drop error:', err)
+      alert('Failed to transfer file')
     }
   }
 

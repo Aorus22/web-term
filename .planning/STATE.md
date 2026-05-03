@@ -19,6 +19,11 @@ performance_metrics:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
     - { phase: "13-sftp-backend-core", plans: 1, total_min: 15, avg_min: 15 }
     - { phase: "14-sftp-frontend-ui", plans: 2, total_min: 4, avg_min: 2 }
+
+quick_tasks:
+  completed:
+    - { slug: "20260503-sftp-context-dnd", date: "2026-05-03", description: "Context Menu & Drag-and-Drop" }
+
 accumulated_context:
   decisions:
     - "@wterm/react handles SSH workloads cleanly"

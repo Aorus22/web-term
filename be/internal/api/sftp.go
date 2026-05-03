@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"webterm/internal/config"
 	"webterm/internal/db"
 	"webterm/internal/ssh"
@@ -15,6 +17,7 @@ import (
 type SFTPHandler struct {
 	DB  *gorm.DB
 	Cfg *config.Config
+	SM  *ssh.StagingManager
 }
 
 func (h *SFTPHandler) getFS(r *http.Request) (ssh.FileSystem, io.Closer, error) {
@@ -185,4 +188,76 @@ func (h *SFTPHandler) Mkdir(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *SFTPHandler) Transfer(w http.ResponseWriter, r *http.Request) {
+	srcConnID := r.URL.Query().Get("srcConnectionId")
+	srcPath := r.URL.Query().Get("srcPath")
+	dstConnID := r.URL.Query().Get("dstConnectionId")
+	dstPath := r.URL.Query().Get("dstPath")
+
+	getFS := func(connID string) (ssh.FileSystem, io.Closer, error) {
+		if connID == "local" || connID == "" {
+			return &ssh.LocalFS{}, nil, nil
+		}
+		var dbConn db.Connection
+		if err := h.DB.First(&dbConn, "id = ?", connID).Error; err != nil {
+			return nil, nil, fmt.Errorf("connection %s not found", connID)
+		}
+		sftpClient, sshClient, err := ssh.ConnectSFTP(h.DB, dbConn, h.Cfg, "")
+		if err != nil {
+			return nil, nil, err
+		}
+		return &ssh.SFTPFS{Client: sftpClient}, sshClient, nil
+	}
+
+	srcFS, srcCloser, err := getFS(srcConnID)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if srcCloser != nil {
+		defer srcCloser.Close()
+	}
+
+	dstFS, dstCloser, err := getFS(dstConnID)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if dstCloser != nil {
+		defer dstCloser.Close()
+	}
+
+	reader, err := srcFS.Read(srcPath)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer reader.Close()
+stagingPath, err := h.SM.StageFile(reader)
+if err != nil {
+	log.Printf("SFTP Transfer: Failed to stage file: %v", err)
+	sendError(w, fmt.Sprintf("Failed to stage file: %v", err), http.StatusInternalServerError)
+	return
+}
+defer h.SM.Cleanup(stagingPath)
+
+// Stream from staging to destination
+stagingFile, err := os.Open(stagingPath)
+if err != nil {
+	log.Printf("SFTP Transfer: Failed to open staging file %s: %v", stagingPath, err)
+	sendError(w, fmt.Sprintf("Failed to open staging file: %v", err), http.StatusInternalServerError)
+	return
+}
+defer stagingFile.Close()
+
+err = dstFS.Write(dstPath, stagingFile)
+if err != nil {
+	log.Printf("SFTP Transfer: Failed to write to destination %s: %v", dstPath, err)
+	sendError(w, fmt.Sprintf("Failed to write to destination: %v", err), http.StatusInternalServerError)
+	return
+}
+
+	w.WriteHeader(http.StatusOK)
 }

@@ -123,7 +123,7 @@ func (fs *SFTPFS) Read(path string) (io.ReadCloser, error) {
 }
 
 func (fs *SFTPFS) Write(path string, r io.Reader) error {
-	f, err := fs.Client.Create(path)
+	f, err := fs.Client.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return err
 	}
