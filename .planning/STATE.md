@@ -2,9 +2,9 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
 status: active
-stopped_at: Phase 12 completion
-last_updated: "2026-05-03T12:00:00.000Z"
-last_activity: 2026-05-03 — Completed Phase 12: Local Terminal Foundation.
+stopped_at: Phase 13 context gathered
+last_updated: "2026-05-03T12:30:00.000Z"
+last_activity: 2026-05-03 — Completed Phase 12; gathered Phase 13 context.
 progress:
   total_phases: 5
   completed_phases: 1
@@ -45,7 +45,7 @@ accumulated_context:
   blockers_concerns: []
 deferred_items: []
 session_continuity:
-  last_session: 2026-05-03T12:00:00.000Z
-  stopped_at: Phase 13 start
-  resume_file: .planning/ROADMAP.md
-  next_step: Start Phase 13: SFTP Backend Core
+  last_session: 2026-05-03T12:30:00.000Z
+  stopped_at: Phase 13 context gathered
+  resume_file: .planning/milestones/v0.4.0-phases/13-sftp-backend-core/13-CONTEXT.md
+  next_step: Plan Phase 13: SFTP Backend Core
