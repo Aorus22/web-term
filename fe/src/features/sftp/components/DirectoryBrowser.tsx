@@ -1,10 +1,18 @@
 import { useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { connectionsApi, sftpApi } from '@/lib/api'
 import type { FileInfo } from '@/lib/api'
 import { Folder, File as FileIcon, Loader2, AlertCircle, CornerLeftUp } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import { useAppStore } from '@/stores/app-store'
 
 const formatSize = (size: number) => {
   if (size === 0) return '0 B'
@@ -40,6 +48,9 @@ export function DirectoryBrowser() {
   const [selectedConnection, setSelectedConnection] = useState<string>("local")
   const [path, setPath] = useState<string>(".")
   
+  const queryClient = useQueryClient()
+  const { sftpClipboard, setSftpClipboard } = useAppStore()
+  
   const { data: connections } = useQuery({
     queryKey: ['connections'],
     queryFn: () => connectionsApi.list()
@@ -50,6 +61,120 @@ export function DirectoryBrowser() {
     queryFn: () => sftpApi.list(selectedConnection, path),
     enabled: !!selectedConnection
   })
+
+  const refreshDir = () => {
+    queryClient.invalidateQueries({ queryKey: ['sftp'] })
+  }
+
+  const handleAction = (action: 'cut' | 'copy', file: FileInfo) => {
+    const fullPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    setSftpClipboard({
+      action,
+      connectionId: selectedConnection,
+      path: fullPath,
+      fileName: file.name,
+      isDir: file.isDir
+    })
+  }
+
+  const handlePaste = async () => {
+    if (!sftpClipboard) return
+    const targetPath = path === '.' || path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
+
+    try {
+      if (sftpClipboard.connectionId === selectedConnection) {
+        if (sftpClipboard.action === 'cut') {
+          await sftpApi.rename(selectedConnection, sftpClipboard.path, targetPath)
+          setSftpClipboard(null)
+        } else {
+          const url = sftpApi.downloadUrl(sftpClipboard.connectionId, sftpClipboard.path)
+          const res = await fetch(url)
+          const blob = await res.blob()
+          const file = new File([blob], sftpClipboard.fileName)
+          await sftpApi.upload(selectedConnection, path, file)
+        }
+      } else {
+        const url = sftpApi.downloadUrl(sftpClipboard.connectionId, sftpClipboard.path)
+        const res = await fetch(url)
+        const blob = await res.blob()
+        const file = new File([blob], sftpClipboard.fileName)
+        await sftpApi.upload(selectedConnection, path, file)
+        
+        if (sftpClipboard.action === 'cut') {
+          await sftpApi.remove(sftpClipboard.connectionId, sftpClipboard.path)
+          setSftpClipboard(null)
+        }
+      }
+      refreshDir()
+    } catch (e) {
+      console.error('Paste error:', e)
+      alert('Failed to paste')
+    }
+  }
+
+  const handleRename = async (file: FileInfo) => {
+    const newName = window.prompt('Enter new name', file.name)
+    if (!newName || newName === file.name) return
+    const oldPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const newPath = path === '.' || path === '/' ? `/${newName}` : `${path}/${newName}`
+    
+    try {
+      await sftpApi.rename(selectedConnection, oldPath, newPath)
+      refreshDir()
+    } catch (e) {
+      console.error('Rename error:', e)
+      alert('Failed to rename')
+    }
+  }
+
+  const handleDelete = async (file: FileInfo) => {
+    if (!window.confirm(`Are you sure you want to delete ${file.name}?`)) return
+    const fullPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    try {
+      await sftpApi.remove(selectedConnection, fullPath)
+      refreshDir()
+    } catch (e) {
+      console.error('Delete error:', e)
+      alert('Failed to delete')
+    }
+  }
+
+  const handleDragStart = (e: React.DragEvent, file: FileInfo) => {
+    const fullPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      connectionId: selectedConnection,
+      path: fullPath,
+      fileName: file.name,
+      isDir: file.isDir,
+      action: 'copy'
+    }))
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    try {
+      const dataStr = e.dataTransfer.getData('application/json')
+      if (!dataStr) return
+      const data = JSON.parse(dataStr)
+      // skip drop on same folder and same file name
+      const targetPath = path === '.' || path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
+      if (data.connectionId === selectedConnection && data.path === targetPath) return
+
+      const url = sftpApi.downloadUrl(data.connectionId, data.path)
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const file = new File([blob], data.fileName)
+      
+      await sftpApi.upload(selectedConnection, path, file)
+      
+      if (data.action === 'cut') {
+         await sftpApi.remove(data.connectionId, data.path)
+      }
+      refreshDir()
+    } catch (err) {
+      console.error('Drop error:', err)
+    }
+  }
 
   const handleNavigate = (entry: FileInfo) => {
     if (!entry.isDir) return
@@ -125,7 +250,11 @@ export function DirectoryBrowser() {
             <p className="text-xs opacity-80">{error instanceof Error ? error.message : String(error)}</p>
           </div>
         ) : (
-          <ScrollArea className="h-full">
+          <ScrollArea 
+            className="h-full" 
+            onDragOver={(e) => e.preventDefault()} 
+            onDrop={handleDrop}
+          >
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-background border-b z-10">
                 <tr className="text-muted-foreground text-left text-xs">
@@ -142,30 +271,62 @@ export function DirectoryBrowser() {
                     </td>
                   </tr>
                 )}
-                {displayFiles.map((file, i) => (
-                  <tr 
-                    key={`${file.name}-${i}`}
-                    className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${file.isDir ? 'cursor-pointer' : ''} select-none`}
-                    onDoubleClick={() => handleNavigate(file)}
-                  >
-                    <td className="p-2 pl-4 flex items-center gap-2 font-medium">
-                      {file.name === '..' ? (
-                        <CornerLeftUp className="h-4 w-4 text-muted-foreground" />
-                      ) : file.isDir ? (
-                        <Folder className="h-4 w-4 text-blue-500 fill-blue-500/20" />
-                      ) : (
-                        <FileIcon className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="truncate">{file.name}</span>
-                    </td>
-                    <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
-                      {!file.isDir && file.name !== '..' ? formatSize(file.size) : ''}
-                    </td>
-                    <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
-                      {file.name !== '..' && file.modTime ? formatDate(file.modTime) : ''}
-                    </td>
-                  </tr>
-                ))}
+                {displayFiles.map((file, i) => {
+                  if (file.name === '..') {
+                    return (
+                      <tr 
+                        key={`${file.name}-${i}`}
+                        className={`border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer select-none`}
+                        onDoubleClick={() => handleNavigate(file)}
+                      >
+                        <td className="p-2 pl-4 flex items-center gap-2 font-medium">
+                          <CornerLeftUp className="h-4 w-4 text-muted-foreground" />
+                          <span className="truncate">{file.name}</span>
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  return (
+                    <ContextMenu key={`${file.name}-${i}`}>
+                      <ContextMenuTrigger render={
+                        <tr 
+                          className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${file.isDir ? 'cursor-pointer' : ''} select-none`}
+                          onDoubleClick={() => handleNavigate(file)}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, file)}
+                        />
+                      }>
+                        <td className="p-2 pl-4 flex items-center gap-2 font-medium">
+                          {file.isDir ? (
+                            <Folder className="h-4 w-4 text-blue-500 fill-blue-500/20" />
+                          ) : (
+                            <FileIcon className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="truncate">{file.name}</span>
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
+                          {!file.isDir ? formatSize(file.size) : ''}
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
+                          {file.modTime ? formatDate(file.modTime) : ''}
+                        </td>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent className="w-48">
+                        <ContextMenuItem onClick={() => handleAction('cut', file)}>Cut</ContextMenuItem>
+                        <ContextMenuItem onClick={() => handleAction('copy', file)}>Copy</ContextMenuItem>
+                        <ContextMenuItem disabled={!sftpClipboard} onClick={handlePaste}>Paste Here</ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onClick={() => handleRename(file)}>Rename</ContextMenuItem>
+                        <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(file)}>Delete</ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
+                  )
+                })}
               </tbody>
             </table>
           </ScrollArea>
