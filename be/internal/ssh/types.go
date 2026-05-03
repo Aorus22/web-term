@@ -5,7 +5,8 @@ package ssh
 //   - Quick-connect: client provides Host/Port/User/Password directly
 //   - Saved connection: client provides ConnectionID, backend fetches from DB
 type ConnectMessage struct {
-	Type         string `json:"type"`                  // "connect"
+	Type         string `json:"type"`                  // "connect" | "attach"
+	SessionID    string `json:"session_id,omitempty"`   // for re-attaching to existing session
 	Host         string `json:"host"`                  // SSH hostname (quick-connect)
 	Port         int    `json:"port"`                  // SSH port (quick-connect)
 	User         string `json:"user"`                  // SSH username (quick-connect)

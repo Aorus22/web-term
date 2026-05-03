@@ -80,7 +80,23 @@ type ManagedSession struct {
 	Buffer       *RingBuffer
 	WS           *websocket.Conn
 	LastSeen     time.Time
+	ShellPid     int
 	mu           sync.Mutex
+	wsMu         sync.Mutex // protects concurrent writes to WS
+}
+
+func (s *ManagedSession) WriteWS(msgType int, data []byte) error {
+	s.wsMu.Lock()
+	defer s.wsMu.Unlock()
+
+	s.mu.Lock()
+	conn := s.WS
+	s.mu.Unlock()
+
+	if conn == nil {
+		return io.ErrClosedPipe
+	}
+	return conn.WriteMessage(msgType, data)
 }
 
 // SessionManager tracks all active SSH sessions.
