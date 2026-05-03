@@ -3,6 +3,14 @@ import type { Connection } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
 import { generateId } from '@/lib/utils'
 
+export interface SFTPClipboard {
+  action: 'cut' | 'copy';
+  connectionId: string;
+  path: string;
+  fileName: string;
+  isDir: boolean;
+}
+
 interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
@@ -27,6 +35,9 @@ interface AppState {
   // Backend port for dynamic discovery
   backendPort: number
   setBackendPort: (port: number) => void
+  // SFTP Clipboard
+  sftpClipboard: SFTPClipboard | null
+  setSftpClipboard: (clipboard: SFTPClipboard | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -119,4 +130,6 @@ export const useAppStore = create<AppState>((set) => ({
   },
   backendPort: 0,
   setBackendPort: (port) => set({ backendPort: port }),
+  sftpClipboard: null,
+  setSftpClipboard: (clipboard) => set({ sftpClipboard: clipboard }),
 }))
