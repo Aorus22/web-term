@@ -102,6 +102,7 @@ export function useSSHSession(sessionId: string) {
       // Store options for retry/reconnect (strip password per D-07 for saved connections)
       lastOptionsRef.current = opts.connectionId
         ? { 
+            type: opts.type,
             connectionId: opts.connectionId, 
             host: opts.host, 
             port: opts.port, 
@@ -116,13 +117,13 @@ export function useSSHSession(sessionId: string) {
           }
         : opts
 
-      const host = opts.host ?? ''
+      const host = opts.host ?? (opts.type === 'local' ? 'local' : '')
       const port = opts.port ?? 22
-      const username = opts.username ?? ''
+      const username = opts.username ?? (opts.type === 'local' ? 'local' : '')
       const rows = opts.rows ?? 24
       const cols = opts.cols ?? 80
-      const isQuickConnect = !opts.connectionId
-      const label = opts.connectionId ? (host || 'Connecting...') : `${username}@${host}`
+      const isQuickConnect = !opts.connectionId && opts.type === 'ssh'
+      const label = opts.type === 'local' ? 'Local Terminal' : (opts.connectionId ? (host || 'Connecting...') : `${username}@${host}`)
 
       // Update or add session to store with connecting status
       const found = useAppStore.getState().sessions.find((s) => s.id === sessionId)
@@ -131,6 +132,7 @@ export function useSSHSession(sessionId: string) {
       } else {
         addSession({
           id: sessionId,
+          type: opts.type,
           connectionId: opts.connectionId,
           host,
           port,
@@ -151,29 +153,41 @@ export function useSSHSession(sessionId: string) {
 
       socket.onopen = () => {
         // Send connect message based on options type
-        const connectMsg = opts.connectionId
+        const connectMsg = opts.type === 'local'
           ? JSON.stringify({
               type: 'connect',
-              connection_id: opts.connectionId,
-              auth_method: opts.auth_method || 'password',
-              ...(opts.ssh_key_id && { ssh_key_id: opts.ssh_key_id }),
-              ...(opts.passphrase && { passphrase: opts.passphrase }),
+              session_type: 'local',
+              connection_id: 'local',
               ...(opts.cwd && { cwd: opts.cwd }),
               ...(opts.term && { term: opts.term }),
               rows,
               cols,
             })
-          : JSON.stringify({
-              type: 'connect',
-              host: opts.host,
-              port: opts.port ?? 22,
-              user: opts.username,
-              password: opts.password,
-              ...(opts.cwd && { cwd: opts.cwd }),
-              ...(opts.term && { term: opts.term }),
-              rows,
-              cols,
-            })
+          : opts.connectionId
+            ? JSON.stringify({
+                type: 'connect',
+                session_type: 'ssh',
+                connection_id: opts.connectionId,
+                auth_method: opts.auth_method || 'password',
+                ...(opts.ssh_key_id && { ssh_key_id: opts.ssh_key_id }),
+                ...(opts.passphrase && { passphrase: opts.passphrase }),
+                ...(opts.cwd && { cwd: opts.cwd }),
+                ...(opts.term && { term: opts.term }),
+                rows,
+                cols,
+              })
+            : JSON.stringify({
+                type: 'connect',
+                session_type: 'ssh',
+                host: opts.host,
+                port: opts.port ?? 22,
+                user: opts.username,
+                password: opts.password,
+                ...(opts.cwd && { cwd: opts.cwd }),
+                ...(opts.term && { term: opts.term }),
+                rows,
+                cols,
+              })
         socket.send(connectMsg)
       }
 
@@ -184,18 +198,21 @@ export function useSSHSession(sessionId: string) {
             const msg = JSON.parse(event.data)
             if (msg.type === 'connected') {
               const bId = msg.session_id || msg.sessionId;
+              const session = useAppStore.getState().sessions.find((s) => s.id === sessionId)
+              const newLabel = session?.type === 'local' ? 'Local Terminal' : `${username}@${host}`
+
               if (bId) {
                 updateSession(sessionId, { 
                   backendId: bId,
                   status: 'connected',
                   host: host,
-                  label: `${username}@${host}`,
+                  label: newLabel,
                 })
               } else {
                 updateSession(sessionId, {
                   status: 'connected',
                   host: host,
-                  label: `${username}@${host}`,
+                  label: newLabel,
                 })
               }
               

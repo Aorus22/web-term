@@ -26,6 +26,7 @@ export const NewTabView = () => {
         const key = await keysApi.get(conn.ssh_key_id)
         const session: SSHSession = {
           id: generateId(),
+          type: 'ssh',
           connectionId: conn.id,
           host: conn.host,
           port: conn.port,
@@ -44,6 +45,7 @@ export const NewTabView = () => {
         console.error('Failed to fetch key metadata:', error)
         const session: SSHSession = {
           id: generateId(),
+          type: 'ssh',
           connectionId: conn.id,
           host: conn.host,
           port: conn.port,
@@ -59,6 +61,7 @@ export const NewTabView = () => {
     } else {
       const session: SSHSession = {
         id: generateId(),
+        type: 'ssh',
         connectionId: conn.id,
         host: conn.host,
         port: conn.port,
@@ -69,6 +72,20 @@ export const NewTabView = () => {
       }
       addSession(session)
     }
+  }
+
+  const handleLocalConnect = () => {
+    const session: SSHSession = {
+      id: generateId(),
+      type: 'local',
+      host: 'local',
+      port: 0,
+      username: 'local',
+      label: 'Local Terminal',
+      status: 'connecting',
+      isQuickConnect: false,
+    }
+    addSession(session)
   }
 
   return (
@@ -87,9 +104,31 @@ export const NewTabView = () => {
           </div>
         </div>
 
-        {/* Connection grid */}
+        {/* Local Terminal and Saved Connections */}
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold tracking-tight">Direct Access</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card
+                className="cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md border-primary/20 bg-primary/5 hover:border-primary relative group"
+                onClick={handleLocalConnect}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Terminal className="h-5 w-5 text-primary" />
+                      Local Terminal
+                    </CardTitle>
+                  </div>
+                  <CardDescription>
+                    Spawn a shell on the backend host
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t">
             <div className="space-y-1">
               <h3 className="text-xl font-semibold tracking-tight">Saved Connections</h3>
               <p className="text-sm text-muted-foreground">

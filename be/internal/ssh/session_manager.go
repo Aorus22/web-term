@@ -3,6 +3,7 @@ package ssh
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,11 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
 )
+
+// RingBuffer stores the last N bytes of output.
+// ... (omitted RingBuffer methods for brevity, but I must provide full file or exact match)
+// Actually, I'll just match the ManagedSession struct.
+
 
 // RingBuffer stores the last N bytes of output.
 type RingBuffer struct {
@@ -70,11 +76,13 @@ func (r *RingBuffer) Bytes() []byte {
 	return out
 }
 
-// ManagedSession represents an active SSH session that can survive WebSocket disconnects.
+// ManagedSession represents an active SSH or Local session that can survive WebSocket disconnects.
 type ManagedSession struct {
 	ID           string
-	SSHClient    *ssh.Client
-	SSHSession   *ssh.Session
+	Type         SessionType
+	SSHClient    *ssh.Client  // nil for local sessions
+	SSHSession   *ssh.Session // nil for local sessions
+	LocalPTY     *os.File     // nil for SSH sessions
 	Stdin        io.WriteCloser
 	Host         string
 	User         string
@@ -113,6 +121,18 @@ func (s *ManagedSession) GetCwd() string {
 		return ""
 	}
 
+	if s.Type == SessionTypeLocal {
+		out, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", s.ShellPid))
+		if err != nil {
+			return ""
+		}
+		return out
+	}
+
+	if s.SSHClient == nil {
+		return ""
+	}
+
 	sess, err := s.SSHClient.NewSession()
 	if err != nil {
 		return ""
@@ -127,7 +147,7 @@ func (s *ManagedSession) GetCwd() string {
 	return strings.TrimSpace(string(out))
 }
 
-// SessionManager tracks all active SSH sessions.
+// SessionManager tracks all active SSH and Local sessions.
 type SessionManager struct {
 	sessions map[string]*ManagedSession
 	mu       sync.RWMutex
@@ -146,12 +166,14 @@ func NewSessionManager() *SessionManager {
 	}
 }
 
-func (m *SessionManager) CreateSession(client *ssh.Client, session *ssh.Session, stdin io.WriteCloser, host string, user string, port int, connID string) *ManagedSession {
+func (m *SessionManager) CreateSession(sType SessionType, client *ssh.Client, session *ssh.Session, pty *os.File, stdin io.WriteCloser, host string, user string, port int, connID string) *ManagedSession {
 	id := uuid.New().String()
 	s := &ManagedSession{
 		ID:           id,
+		Type:         sType,
 		SSHClient:    client,
 		SSHSession:   session,
+		LocalPTY:     pty,
 		Stdin:        stdin,
 		Host:         host,
 		User:         user,
@@ -178,8 +200,18 @@ func (m *SessionManager) RemoveSession(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if s, ok := m.sessions[id]; ok {
-		s.SSHSession.Close()
-		s.SSHClient.Close()
+		if s.Type == SessionTypeSSH {
+			if s.SSHSession != nil {
+				s.SSHSession.Close()
+			}
+			if s.SSHClient != nil {
+				s.SSHClient.Close()
+			}
+		} else if s.Type == SessionTypeLocal {
+			if s.LocalPTY != nil {
+				s.LocalPTY.Close()
+			}
+		}
 		delete(m.sessions, id)
 	}
 }
@@ -201,8 +233,18 @@ func (m *SessionManager) CleanupWorker() {
 		for id, s := range m.sessions {
 			s.mu.Lock()
 			if s.WS == nil && time.Since(s.LastSeen) > 10*time.Minute {
-				s.SSHSession.Close()
-				s.SSHClient.Close()
+				if s.Type == SessionTypeSSH {
+					if s.SSHSession != nil {
+						s.SSHSession.Close()
+					}
+					if s.SSHClient != nil {
+						s.SSHClient.Close()
+					}
+				} else if s.Type == SessionTypeLocal {
+					if s.LocalPTY != nil {
+						s.LocalPTY.Close()
+					}
+				}
 				delete(m.sessions, id)
 			}
 			s.mu.Unlock()

@@ -92,14 +92,15 @@ export const useAppStore = create<AppState>((set) => ({
           .filter((bs) => !existingIds.has(bs.id))
           .map((bs) => ({
             id: bs.id, // Use backend ID as stable local ID for recovered sessions
+            type: bs.type,
             backendId: bs.id,
             connectionId: bs.connection_id,
             host: bs.host,
             port: bs.port,
             username: bs.user,
-            label: `${bs.user}@${bs.host}`,
+            label: bs.type === 'local' ? 'Local Terminal' : `${bs.user}@${bs.host}`,
             status: 'detached',
-            isQuickConnect: !bs.connection_id,
+            isQuickConnect: bs.type === 'ssh' && !bs.connection_id,
             cwd: bs.cwd,
             isRecovered: true,
           }))

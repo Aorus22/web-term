@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/creack/pty v1.1.24 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect

@@ -6,12 +6,15 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 	"webterm/internal/config"
 	"webterm/internal/db"
 
+	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
@@ -112,206 +115,230 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 				return
 			}
 		} else if connectMsg.Type == "connect" {
-			// Resolve connection credentials: either from saved connection_id or direct fields.
-			var keySigner ssh.Signer
-			if connectMsg.ConnectionID != "" {
-				var dbConn db.Connection
-				if err := database.First(&dbConn, "id = ?", connectMsg.ConnectionID).Error; err != nil {
-					sendWSError(conn, "Connection not found")
+			if connectMsg.ConnectionID == "local" || connectMsg.SessionType == SessionTypeLocal {
+				ptyFile, pid, err := spawnLocalPTY(connectMsg)
+				if err != nil {
+					sendWSError(conn, fmt.Sprintf("Failed to spawn local PTY: %v", err))
 					return
 				}
 
-				if connectMsg.AuthMethod == "key" && dbConn.AuthMethod == "key" && dbConn.SSHKeyID != nil {
-					var key db.SSHKey
-					if err := database.First(&key, "id = ?", *dbConn.SSHKeyID).Error; err != nil {
-						sendWSError(conn, "SSH key not found")
+				session = GlobalSessionManager.CreateSession(SessionTypeLocal, nil, nil, ptyFile, ptyFile, "local", "local", 0, "local")
+				session.mu.Lock()
+				session.WS = conn
+				session.ShellPid = pid
+				session.mu.Unlock()
+
+				go masterForwarder(session, ptyFile)
+
+				connectedMsg := ServerMessage{
+					Type:      "connected",
+					SessionID: session.ID,
+				}
+				connectedJSON, _ := json.Marshal(connectedMsg)
+				_ = session.WriteWS(websocket.TextMessage, connectedJSON)
+			} else {
+				// Resolve connection credentials: either from saved connection_id or direct fields.
+				var keySigner ssh.Signer
+				if connectMsg.ConnectionID != "" {
+					var dbConn db.Connection
+					if err := database.First(&dbConn, "id = ?", connectMsg.ConnectionID).Error; err != nil {
+						sendWSError(conn, "Connection not found")
 						return
 					}
 
-					decryptedKey, err := config.DecryptWithAAD(key.EncryptedKey, cfg.EncryptionKey, []byte(config.SSHKeyAAD))
-					if err != nil {
-						sendWSError(conn, "Failed to decrypt SSH key")
-						return
-					}
+					if connectMsg.AuthMethod == "key" && dbConn.AuthMethod == "key" && dbConn.SSHKeyID != nil {
+						var key db.SSHKey
+						if err := database.First(&key, "id = ?", *dbConn.SSHKeyID).Error; err != nil {
+							sendWSError(conn, "SSH key not found")
+							return
+						}
 
-					var parsedKey interface{}
-					if connectMsg.Passphrase != "" {
-						parsedKey, err = ssh.ParseRawPrivateKeyWithPassphrase([]byte(decryptedKey), []byte(connectMsg.Passphrase))
+						decryptedKey, err := config.DecryptWithAAD(key.EncryptedKey, cfg.EncryptionKey, []byte(config.SSHKeyAAD))
+						if err != nil {
+							sendWSError(conn, "Failed to decrypt SSH key")
+							return
+						}
+
+						var parsedKey interface{}
+						if connectMsg.Passphrase != "" {
+							parsedKey, err = ssh.ParseRawPrivateKeyWithPassphrase([]byte(decryptedKey), []byte(connectMsg.Passphrase))
+						} else {
+							parsedKey, err = ssh.ParseRawPrivateKey([]byte(decryptedKey))
+						}
+
+						if err != nil {
+							sendWSError(conn, "Failed to parse SSH key: invalid passphrase or corrupted key")
+							return
+						}
+
+						keySigner, err = ssh.NewSignerFromKey(parsedKey)
+						if err != nil {
+							sendWSError(conn, "Failed to create SSH signer from key")
+							return
+						}
+
+						connectMsg.Host = dbConn.Host
+						connectMsg.Port = dbConn.Port
+						connectMsg.User = dbConn.Username
+					} else if connectMsg.AuthMethod == "key" || dbConn.AuthMethod == "key" {
+						sendWSError(conn, "Authentication method mismatch")
+						return
 					} else {
-						parsedKey, err = ssh.ParseRawPrivateKey([]byte(decryptedKey))
+						decrypted, err := config.Decrypt(dbConn.Encrypted, cfg.EncryptionKey)
+						if err != nil {
+							sendWSError(conn, "Failed to decrypt connection credentials")
+							return
+						}
+						connectMsg.Host = dbConn.Host
+						connectMsg.Port = dbConn.Port
+						connectMsg.User = dbConn.Username
+						connectMsg.Password = decrypted
 					}
+				}
 
-					if err != nil {
-						sendWSError(conn, "Failed to parse SSH key: invalid passphrase or corrupted key")
-						return
-					}
-
-					keySigner, err = ssh.NewSignerFromKey(parsedKey)
-					if err != nil {
-						sendWSError(conn, "Failed to create SSH signer from key")
-						return
-					}
-
-					connectMsg.Host = dbConn.Host
-					connectMsg.Port = dbConn.Port
-					connectMsg.User = dbConn.Username
-				} else if connectMsg.AuthMethod == "key" || dbConn.AuthMethod == "key" {
-					sendWSError(conn, "Authentication method mismatch")
+				// Security Fix CR-03: SSRF Protection
+				if !cfg.IsHostAllowed(connectMsg.Host) {
+					sendWSError(conn, "Host not authorized by security policy")
 					return
+				}
+
+				if connectMsg.Port <= 0 || connectMsg.Port > 65535 {
+					connectMsg.Port = 22
+				}
+
+				// Step 2: Dial SSH.
+				addr := fmt.Sprintf("%s:%d", connectMsg.Host, connectMsg.Port)
+				sshConfig := &ssh.ClientConfig{
+					User:            connectMsg.User,
+					HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+					Timeout:         10 * time.Second,
+				}
+
+				if keySigner != nil {
+					sshConfig.Auth = []ssh.AuthMethod{ssh.PublicKeys(keySigner)}
 				} else {
-					decrypted, err := config.Decrypt(dbConn.Encrypted, cfg.EncryptionKey)
-					if err != nil {
-						sendWSError(conn, "Failed to decrypt connection credentials")
+					sshConfig.Auth = []ssh.AuthMethod{
+						ssh.Password(connectMsg.Password),
+						ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+							answers := make([]string, len(questions))
+							for i := range answers {
+								answers[i] = connectMsg.Password
+							}
+							return answers, nil
+						}),
+					}
+				}
+
+				client, err := ssh.Dial("tcp", addr, sshConfig)
+				if err != nil {
+					sendWSError(conn, fmt.Sprintf("SSH connection failed: %v", err))
+					return
+				}
+
+				sshSession, err := client.NewSession()
+				if err != nil {
+					client.Close()
+					sendWSError(conn, fmt.Sprintf("SSH session failed: %v", err))
+					return
+				}
+
+				// Step 3: Request PTY.
+				if connectMsg.Rows == 0 {
+					connectMsg.Rows = 24
+				}
+				if connectMsg.Cols == 0 {
+					connectMsg.Cols = 80
+				}
+				modes := ssh.TerminalModes{
+					ssh.ECHO:          1,
+					ssh.TTY_OP_ISPEED: 14400,
+					ssh.TTY_OP_OSPEED: 14400,
+				}
+				termType := connectMsg.Term
+				if termType == "" {
+					termType = "screen-256color"
+				}
+				if err := sshSession.RequestPty(termType, connectMsg.Rows, connectMsg.Cols, modes); err != nil {
+					sshSession.Close()
+					client.Close()
+					sendWSError(conn, "Failed to request PTY")
+					return
+				}
+
+				stdinPipe, _ := sshSession.StdinPipe()
+				stdoutPipe, _ := sshSession.StdoutPipe()
+				stderrPipe, _ := sshSession.StderrPipe()
+
+				if connectMsg.Cwd != "" && !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
+					if err := sshSession.Start(fmt.Sprintf("cd '%s' && exec -l $SHELL", connectMsg.Cwd)); err != nil {
+						sshSession.Close()
+						client.Close()
 						return
 					}
-					connectMsg.Host = dbConn.Host
-					connectMsg.Port = dbConn.Port
-					connectMsg.User = dbConn.Username
-					connectMsg.Password = decrypted
+				} else {
+					if err := sshSession.Shell(); err != nil {
+						sshSession.Close()
+						client.Close()
+						return
+					}
 				}
-			}
 
-			// Security Fix CR-03: SSRF Protection
-			if !cfg.IsHostAllowed(connectMsg.Host) {
-				sendWSError(conn, "Host not authorized by security policy")
-				return
-			}
-
-			if connectMsg.Port <= 0 || connectMsg.Port > 65535 {
-				connectMsg.Port = 22
-			}
-
-			// Step 2: Dial SSH.
-			addr := fmt.Sprintf("%s:%d", connectMsg.Host, connectMsg.Port)
-			sshConfig := &ssh.ClientConfig{
-				User:            connectMsg.User,
-				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-				Timeout:         10 * time.Second,
-			}
-
-			if keySigner != nil {
-				sshConfig.Auth = []ssh.AuthMethod{ssh.PublicKeys(keySigner)}
-			} else {
-				sshConfig.Auth = []ssh.AuthMethod{
-					ssh.Password(connectMsg.Password),
-					ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
-						answers := make([]string, len(questions))
-						for i := range answers {
-							answers[i] = connectMsg.Password
-						}
-						return answers, nil
-					}),
-				}
-			}
-
-			client, err := ssh.Dial("tcp", addr, sshConfig)
-			if err != nil {
-				sendWSError(conn, fmt.Sprintf("SSH connection failed: %v", err))
-				return
-			}
-
-			sshSession, err := client.NewSession()
-			if err != nil {
-				client.Close()
-				sendWSError(conn, fmt.Sprintf("SSH session failed: %v", err))
-				return
-			}
-
-			// Step 3: Request PTY.
-			if connectMsg.Rows == 0 {
-				connectMsg.Rows = 24
-			}
-			if connectMsg.Cols == 0 {
-				connectMsg.Cols = 80
-			}
-			modes := ssh.TerminalModes{
-				ssh.ECHO:          1,
-				ssh.TTY_OP_ISPEED: 14400,
-				ssh.TTY_OP_OSPEED: 14400,
-			}
-			termType := connectMsg.Term
-			if termType == "" {
-				termType = "screen-256color"
-			}
-			if err := sshSession.RequestPty(termType, connectMsg.Rows, connectMsg.Cols, modes); err != nil {
-				sshSession.Close()
-				client.Close()
-				sendWSError(conn, "Failed to request PTY")
-				return
-			}
-
-			stdinPipe, _ := sshSession.StdinPipe()
-			stdoutPipe, _ := sshSession.StdoutPipe()
-			stderrPipe, _ := sshSession.StderrPipe()
-
-			if connectMsg.Cwd != "" && !strings.Contains(connectMsg.Cwd, "'") && !strings.Contains(connectMsg.Cwd, "\n") {
-				if err := sshSession.Start(fmt.Sprintf("cd '%s' && exec -l $SHELL", connectMsg.Cwd)); err != nil {
-					sshSession.Close()
-					client.Close()
-					return
-				}
-			} else {
-				if err := sshSession.Shell(); err != nil {
-					sshSession.Close()
-					client.Close()
-					return
-				}
-			}
-
-			// Find shell PID
-			var shellPid int
-			{
-				s, err := client.NewSession()
-				if err == nil {
-					out, err := s.Output("echo $$; ps -eo pid,ppid --no-headers")
-					s.Close()
+				// Find shell PID
+				var shellPid int
+				{
+					s, err := client.NewSession()
 					if err == nil {
-						lines := strings.Split(string(out), "\n")
-						if len(lines) > 0 {
-							execPid, _ := strconv.Atoi(strings.TrimSpace(lines[0]))
-							type proc struct{ pid, ppid int }
-							var procs []proc
-							for _, line := range lines[1:] {
-								fields := strings.Fields(line)
-								if len(fields) >= 2 {
-									p, _ := strconv.Atoi(fields[0])
-									pp, _ := strconv.Atoi(fields[1])
-									procs = append(procs, proc{p, pp})
+						out, err := s.Output("echo $$; ps -eo pid,ppid --no-headers")
+						s.Close()
+						if err == nil {
+							lines := strings.Split(string(out), "\n")
+							if len(lines) > 0 {
+								execPid, _ := strconv.Atoi(strings.TrimSpace(lines[0]))
+								type proc struct{ pid, ppid int }
+								var procs []proc
+								for _, line := range lines[1:] {
+									fields := strings.Fields(line)
+									if len(fields) >= 2 {
+										p, _ := strconv.Atoi(fields[0])
+										pp, _ := strconv.Atoi(fields[1])
+										procs = append(procs, proc{p, pp})
+									}
 								}
-							}
-							var execPpid int
-							for _, pr := range procs {
-								if pr.pid == execPid {
-									execPpid = pr.ppid
-									break
+								var execPpid int
+								for _, pr := range procs {
+									if pr.pid == execPid {
+										execPpid = pr.ppid
+										break
+									}
 								}
-							}
-							for _, pr := range procs {
-								if pr.ppid == execPpid && pr.pid != execPid {
-									shellPid = pr.pid
+								for _, pr := range procs {
+									if pr.ppid == execPpid && pr.pid != execPid {
+										shellPid = pr.pid
+									}
 								}
 							}
 						}
 					}
 				}
+
+				session = GlobalSessionManager.CreateSession(SessionTypeSSH, client, sshSession, nil, stdinPipe, connectMsg.Host, connectMsg.User, connectMsg.Port, connectMsg.ConnectionID)
+				session.mu.Lock()
+				session.WS = conn
+				session.ShellPid = shellPid
+				session.mu.Unlock()
+
+				go masterForwarder(session, stdoutPipe, stderrPipe)
+
+				// Notify client that connection is ready.
+				connectedMsg := ServerMessage{
+					Type:      "connected",
+					SessionID: session.ID,
+				}
+				connectedJSON, _ := json.Marshal(connectedMsg)
+				_ = session.WriteWS(websocket.TextMessage, connectedJSON)
 			}
-
-			session = GlobalSessionManager.CreateSession(client, sshSession, stdinPipe, connectMsg.Host, connectMsg.User, connectMsg.Port, connectMsg.ConnectionID)
-			session.mu.Lock()
-			session.WS = conn
-			session.ShellPid = shellPid
-			session.mu.Unlock()
-
-			go masterForwarder(session, stdoutPipe, stderrPipe)
-
-			// Notify client that connection is ready.
-			connectedMsg := ServerMessage{
-				Type:      "connected",
-				SessionID: session.ID,
-			}
-			connectedJSON, _ := json.Marshal(connectedMsg)
-			_ = session.WriteWS(websocket.TextMessage, connectedJSON)
 		} else {
+
 			sendWSError(conn, "Invalid message type: expected connect or attach")
 			return
 		}
@@ -320,7 +347,25 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	}
 }
 
-func masterForwarder(session *ManagedSession, stdout, stderr io.Reader) {
+func spawnLocalPTY(connectMsg ConnectMessage) (*os.File, int, error) {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+	c := exec.Command(shell)
+	f, err := pty.Start(c)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if connectMsg.Rows > 0 && connectMsg.Cols > 0 {
+		_ = pty.Setsize(f, &pty.Winsize{Rows: uint16(connectMsg.Rows), Cols: uint16(connectMsg.Cols)})
+	}
+
+	return f, c.Process.Pid, nil
+}
+
+func masterForwarder(session *ManagedSession, readers ...io.Reader) {
 	forward := func(src io.Reader) {
 		buf := make([]byte, 4096)
 		for {
@@ -332,14 +377,17 @@ func masterForwarder(session *ManagedSession, stdout, stderr io.Reader) {
 				_ = session.WriteWS(websocket.BinaryMessage, data)
 			}
 			if err != nil {
-				// SSH session ended
+				// session ended
 				GlobalSessionManager.RemoveSession(session.ID)
 				return
 			}
 		}
 	}
-	go forward(stdout)
-	go forward(stderr)
+	for _, r := range readers {
+		if r != nil {
+			go forward(r)
+		}
+	}
 }
 
 func wsMessageLoop(conn *websocket.Conn, session *ManagedSession) {
@@ -368,13 +416,17 @@ func wsMessageLoop(conn *websocket.Conn, session *ManagedSession) {
 				switch ctrl.Type {
 				case "resize":
 					if ctrl.Cols > 0 && ctrl.Rows > 0 {
-						winSize := struct {
-							Cols uint32
-							Rows uint32
-							W    uint32
-							H    uint32
-						}{uint32(ctrl.Cols), uint32(ctrl.Rows), 0, 0}
-						_, _ = session.SSHSession.SendRequest("window-change", false, ssh.Marshal(winSize))
+						if session.Type == SessionTypeSSH && session.SSHSession != nil {
+							winSize := struct {
+								Cols uint32
+								Rows uint32
+								W    uint32
+								H    uint32
+							}{uint32(ctrl.Cols), uint32(ctrl.Rows), 0, 0}
+							_, _ = session.SSHSession.SendRequest("window-change", false, ssh.Marshal(winSize))
+						} else if session.Type == SessionTypeLocal && session.LocalPTY != nil {
+							_ = pty.Setsize(session.LocalPTY, &pty.Winsize{Rows: uint16(ctrl.Rows), Cols: uint16(ctrl.Cols)})
+						}
 					}
 				case "ready":
 					// Send scrollback when client says it's ready (D-11-01 refactor)
@@ -384,24 +436,14 @@ func wsMessageLoop(conn *websocket.Conn, session *ManagedSession) {
 						_ = session.WriteWS(websocket.BinaryMessage, scrollback)
 					}
 				case "get-cwd":
-					go func(pid int, client *ssh.Client) {
-						path := ""
-						if pid > 0 {
-							s, sessErr := client.NewSession()
-							if sessErr == nil {
-								defer s.Close()
-								out, outErr := s.Output(fmt.Sprintf("readlink /proc/%d/cwd 2>/dev/null", pid))
-								if outErr == nil {
-									path = strings.TrimSpace(string(out))
-								}
-							}
-						}
+					go func(s *ManagedSession) {
+						path := s.GetCwd()
 						if path == "" {
 							path = "/"
 						}
 						cwdResp, _ := json.Marshal(CwdResponseMessage{Type: "cwd", Path: path})
-						_ = session.WriteWS(websocket.TextMessage, cwdResp)
-					}(session.ShellPid, session.SSHClient)
+						_ = s.WriteWS(websocket.TextMessage, cwdResp)
+					}(session)
 				case "disconnect":
 					GlobalSessionManager.RemoveSession(session.ID)
 					return

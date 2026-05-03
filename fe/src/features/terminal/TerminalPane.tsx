@@ -82,6 +82,16 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
       }
       lastOptionsRef.current = opts
       connect(opts)
+    } else if (session?.type === 'local' && session?.status === 'connecting') {
+      hasConnectedRef.current = true
+      const opts: ConnectOptions = {
+        type: 'local',
+        rows,
+        cols,
+        term,
+      }
+      lastOptionsRef.current = opts
+      connect(opts)
     } else if (session?.auth_method === 'key' && !session?.has_passphrase && session?.status === 'connecting') {
       hasConnectedRef.current = true
       const opts: ConnectOptions = {
@@ -227,7 +237,9 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <p className="text-sm">Resuming session to {session.host}...</p>
+        <p className="text-sm">
+          {session.type === 'local' ? 'Resuming local session...' : `Resuming session to ${session.host}...`}
+        </p>
       </div>
     )
   }
@@ -237,7 +249,9 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <p className="text-sm">Connecting to {session.host}...</p>
+        <p className="text-sm">
+          {session.type === 'local' ? 'Spawning local shell...' : `Connecting to ${session.host}...`}
+        </p>
       </div>
     )
   }

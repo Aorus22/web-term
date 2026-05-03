@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { getSessionWebSocket } from '@/features/terminal/useSSHSession'
+import { sessionsApi } from '@/lib/api'
 import { 
   isDesktop, 
   platform, 
@@ -123,6 +124,10 @@ export function TabBar() {
                       if (session.status === 'connected') {
                         setConfirmingClose(session.id)
                       } else {
+                        const bId = session.backendId || session.id
+                        if (session.isRecovered || session.status === 'disconnected' || session.status === 'error') {
+                           sessionsApi.delete(bId).catch(() => {})
+                        }
                         removeSession(session.id)
                       }
                     }}
@@ -143,6 +148,16 @@ export function TabBar() {
                     variant="destructive" 
                     className="flex-1 h-7 text-[10px]"
                     onClick={() => {
+                      // 1. Tell backend to kill session
+                      const bId = session.backendId || session.id
+                      sessionsApi.delete(bId).catch(console.error)
+                      
+                      // 2. Also send WS disconnect if socket is open (optional but good for immediate cleanup)
+                      const ws = getSessionWebSocket(session.id)
+                      if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'disconnect' }))
+                      }
+
                       removeSession(session.id)
                       setConfirmingClose(null)
                     }}

@@ -65,6 +65,7 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 
 	// Session endpoints
 	mux.HandleFunc("GET /api/sessions", ListSessions())
+	mux.HandleFunc("DELETE /api/sessions/{id}", RemoveSession())
 
 	// WebSocket handler
 	mux.HandleFunc("GET /ws", ssh.HandleWebSocket(database, cfg))

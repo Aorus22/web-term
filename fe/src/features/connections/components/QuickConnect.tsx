@@ -28,6 +28,7 @@ export const QuickConnect = () => {
       const sessionId = generateId()
       const session: SSHSession = {
         id: sessionId,
+        type: 'ssh',
         connectionId: savedConn.id,
         host: savedConn.host,
         port: savedConn.port,
@@ -61,6 +62,7 @@ export const QuickConnect = () => {
     const sessionId = generateId()
     const session: SSHSession = {
       id: sessionId,
+      type: 'ssh',
       host: host.trim(),
       port,
       username: username.trim(),

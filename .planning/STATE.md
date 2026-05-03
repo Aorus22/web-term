@@ -1,21 +1,22 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
-status: planning
-stopped_at: v0.4.0 planning
-last_updated: "2026-05-03T10:00:00.000Z"
-last_activity: 2026-05-03 — Initializing Milestone v0.4.0: Local Terminal & SFTP.
+status: active
+stopped_at: Phase 12 completion
+last_updated: "2026-05-03T12:00:00.000Z"
+last_activity: 2026-05-03 — Completed Phase 12: Local Terminal Foundation.
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 5
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 20
 performance_metrics:
   velocity:
-    total_plans_completed: 26
+    total_plans_completed: 28
     average_duration_min: 14
   by_phase:
+    - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
     - { phase: "01-wterm-spike", plans: 2, total_min: 25, avg_min: 12.5 }
     - { phase: "02-connection-mgmt", plans: 2, total_min: 35, avg_min: 17.5 }
     - { phase: "03-ssh-terminal", plans: 3, total_min: 40, avg_min: 13 }
@@ -35,6 +36,7 @@ accumulated_context:
     - "No-auth v1 is appropriate for self-hosted use cases"
     - "Theme preferences synced with terminal via localStorage"
     - "Session re-attachment works via unique session IDs mapped to active SSH connections"
+    - "Local terminal access added via creack/pty"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -43,7 +45,7 @@ accumulated_context:
   blockers_concerns: []
 deferred_items: []
 session_continuity:
-  last_session: 2026-05-03T10:00:00.000Z
-  stopped_at: Milestone v0.4.0 planning start
+  last_session: 2026-05-03T12:00:00.000Z
+  stopped_at: Phase 13 start
   resume_file: .planning/ROADMAP.md
-  next_step: Create REQUIREMENTS.md and ROADMAP.md for v0.4.0
+  next_step: Start Phase 13: SFTP Backend Core

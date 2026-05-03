@@ -16,7 +16,7 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 | Phase | Milestone | Description | Status | Target |
 |-------|-----------|-------------|--------|--------|
-| **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | 🏗️ Planned | 2026-05-03 |
+| **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | ✅ Shipped | 2026-05-03 |
 | **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | 🏗️ Planned | 2026-05-04 |
 | **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | 🏗️ Planned | 2026-05-04 |
 | **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | 🏗️ Planned | 2026-05-05 |
@@ -26,6 +26,7 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ### Phase 12: Local Terminal Foundation
 - **Goal:** Enable users to open a terminal session on the machine running the WebTerm backend.
+- **Requirements:** [REQ-PTY-INTEGRATION, REQ-LOCAL-WS-HANDLER, REQ-LOCAL-UI-OPTION]
 - **Tasks:**
     - Integrate `creack/pty` in Go backend.
     - Add `ConnectionID: "local"` support to WebSocket handler.

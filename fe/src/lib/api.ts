@@ -161,13 +161,19 @@ export const settingsApi = {
 
 export interface BackendSession {
   id: string
+  type: 'ssh' | 'local'
   host: string
   user: string
   port: number
   connection_id: string
   status: 'active' | 'detached'
+  cwd?: string
 }
 
 export const sessionsApi = {
   list: (): Promise<BackendSession[]> => fetch(`${getBaseUrl()}/api/sessions`).then(r => r.json()),
+  delete: (id: string): Promise<void> =>
+    fetch(`${getBaseUrl()}/api/sessions/${id}`, { method: 'DELETE' }).then(r => {
+      if (!r.ok) throw new Error('Failed to delete session')
+    }),
 }
