@@ -2,32 +2,23 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
 status: active
-stopped_at: Phase 13 context gathered
-last_updated: "2026-05-03T12:30:00.000Z"
-last_activity: 2026-05-03 — Completed Phase 12; gathered Phase 13 context.
+stopped_at: Phase 14 Plan 02 complete
+last_updated: "2026-05-18T00:00:00.000Z"
+last_activity: 2026-05-18 — Completed Phase 14 Plan 02: Implement directory listing, navigation logic, and source selection
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 20
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 4
+  percent: 80
 performance_metrics:
   velocity:
-    total_plans_completed: 28
+    total_plans_completed: 30
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
-    - { phase: "01-wterm-spike", plans: 2, total_min: 25, avg_min: 12.5 }
-    - { phase: "02-connection-mgmt", plans: 2, total_min: 35, avg_min: 17.5 }
-    - { phase: "03-ssh-terminal", plans: 3, total_min: 40, avg_min: 13 }
-    - { phase: "04-multi-tab-polish", plans: 3, total_min: 50, avg_min: 16.6 }
-    - { phase: "05-backend-ssh-key-storage", plans: 2, total_min: 28, avg_min: 14 }
-    - { phase: "06-frontend-ui-navigation", plans: 3, total_min: 42, avg_min: 14 }
-    - { phase: "07-websocket-key-auth-integration", plans: 2, total_min: 28, avg_min: 14 }
-    - { phase: "08-port-forwarding", plans: 2, total_min: 8, avg_min: 4 }
-    - { phase: "09-settings-page", plans: 3, total_min: 45, avg_min: 15 }
-    - { phase: "10-tab-plus-button-popover", plans: 2, total_min: 30, avg_min: 15 }
-    - { phase: "11-backend-session-persistence", plans: 2, total_min: 40, avg_min: 20 }
+    - { phase: "13-sftp-backend-core", plans: 1, total_min: 15, avg_min: 15 }
+    - { phase: "14-sftp-frontend-ui", plans: 2, total_min: 4, avg_min: 2 }
 accumulated_context:
   decisions:
     - "@wterm/react handles SSH workloads cleanly"
@@ -37,6 +28,11 @@ accumulated_context:
     - "Theme preferences synced with terminal via localStorage"
     - "Session re-attachment works via unique session IDs mapped to active SSH connections"
     - "Local terminal access added via creack/pty"
+    - "D-01: Standalone SSH connections for SFTP"
+    - "D-06: Streaming for file uploads/downloads"
+    - "Phase 14: Use shadcn/ui Resizable for dual-pane SFTP layout"
+    - "Used internal path resolution (getParentPath) for \`..\` navigation to avoid unnecessary backend calls."
+    - "Prepended \`..\` virtual entry in frontend logic to ensure consistency across connections."
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -45,7 +41,7 @@ accumulated_context:
   blockers_concerns: []
 deferred_items: []
 session_continuity:
-  last_session: 2026-05-03T12:30:00.000Z
-  stopped_at: Phase 13 context gathered
-  resume_file: .planning/milestones/v0.4.0-phases/13-sftp-backend-core/13-CONTEXT.md
-  next_step: Plan Phase 13: SFTP Backend Core
+  last_session: 2026-05-18T00:00:00.000Z
+  stopped_at: Phase 14 Plan 02 complete
+  resume_file: None
+  next_step: Proceed to next plan or phase

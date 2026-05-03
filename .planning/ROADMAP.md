@@ -17,7 +17,7 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 | Phase | Milestone | Description | Status | Target |
 |-------|-----------|-------------|--------|--------|
 | **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | ✅ Shipped | 2026-05-03 |
-| **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | 🏗️ Planned | 2026-05-04 |
+| **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | ✅ Shipped | 2026-05-03 |
 | **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | 🏗️ Planned | 2026-05-04 |
 | **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | 🏗️ Planned | 2026-05-05 |
 | **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | 🏗️ Planned | 2026-05-05 |
@@ -47,6 +47,11 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ### Phase 14: SFTP Frontend UI
 - **Goal:** Create the visual framework for the SFTP manager.
+- **Plans:** 2 plans
+- **Plan list:**
+    - [ ] 14-01-PLAN.md — Setup navigation, API extensions, and dual-pane resizable layout.
+    - [x] 14-02-PLAN.md — Implement directory listing, navigation logic, and source selection.
+- **Requirements:** [SFTP-01, SFTP-02, SFTP-03, SFTP-04]
 - **Tasks:**
     - Add "SFTP" to sidebar navigation.
     - Create `SFTPView` component with a dual-pane `SplitLayout`.
