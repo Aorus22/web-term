@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo, useCallback } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { connectionsApi, sftpApi } from '@/lib/api'
@@ -19,6 +19,7 @@ import { useSFTPTransfer } from '@/hooks/use-sftp-transfer'
 import { toast } from 'sonner'
 import { FileIcon } from './FileIcon'
 import { SftpBreadcrumbs } from './SftpBreadcrumbs'
+import { useSFTPShortcuts } from '../hooks/use-sftp-shortcuts'
 
 const formatSize = (size: number) => {
   if (size === 0) return '0 B'
@@ -54,6 +55,8 @@ export function DirectoryBrowser() {
   const [selectedConnection, setSelectedConnection] = useState<string>("local")
   const [path, setPath] = useState<string>(".")
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
+  const [isFocused, setIsFocused] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   
   // Dialog states
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
@@ -79,11 +82,11 @@ export function DirectoryBrowser() {
     enabled: !!selectedConnection
   })
 
-  const refreshDir = () => {
+  const refreshDir = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['sftp', selectedConnection, path] })
-  }
+  }, [queryClient, selectedConnection, path])
 
-  const handleAction = (action: 'cut' | 'copy', file: FileInfo) => {
+  const handleAction = useCallback((action: 'cut' | 'copy', file: FileInfo) => {
     const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
     setSftpClipboard({
       action,
@@ -92,9 +95,9 @@ export function DirectoryBrowser() {
       fileName: file.name,
       isDir: file.isDir
     })
-  }
+  }, [path, selectedConnection, setSftpClipboard])
 
-  const handlePaste = async () => {
+  const handlePaste = useCallback(async () => {
     if (!sftpClipboard) return
     const targetPath = path === '.' || path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
 
@@ -106,9 +109,9 @@ export function DirectoryBrowser() {
     }
 
     executeTransfer(sftpClipboard, targetPath)
-  }
+  }, [sftpClipboard, path, files, executeTransfer])
 
-  const executeTransfer = async (data: any, targetPath: string) => {
+  const executeTransfer = useCallback(async (data: any, targetPath: string) => {
     try {
       const { transferId } = await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
       trackTransfer(transferId, data.fileName, 'transfer')
@@ -122,7 +125,7 @@ export function DirectoryBrowser() {
       console.error('Transfer error:', e)
       toast.error('Failed to transfer file')
     }
-  }
+  }, [selectedConnection, trackTransfer, setSftpClipboard, refreshDir])
 
   const handleRenameConfirm = async (newName: string) => {
     if (!selectedFile || !newName || newName === selectedFile.name) return
@@ -184,7 +187,7 @@ export function DirectoryBrowser() {
     e.target.value = ''
   }
 
-  const executeUpload = async (file: File) => {
+  const executeUpload = useCallback(async (file: File) => {
     const targetPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
     try {
       const { transferId } = await sftpApi.upload(selectedConnection, targetPath, file)
@@ -194,7 +197,7 @@ export function DirectoryBrowser() {
       console.error('Upload error:', e)
       toast.error(`Failed to upload ${file.name}`)
     }
-  }
+  }, [path, selectedConnection, trackTransfer, refreshDir])
 
   const handleOverwriteConfirm = () => {
     if (pendingUpload) {
@@ -207,7 +210,7 @@ export function DirectoryBrowser() {
     setIsOverwriteDialogOpen(false)
   }
 
-  const handleDownload = (file: FileInfo) => {
+  const handleDownload = useCallback((file: FileInfo) => {
     const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
     const url = sftpApi.downloadUrl(selectedConnection, fullPath)
     
@@ -217,7 +220,7 @@ export function DirectoryBrowser() {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-  }
+  }, [path, selectedConnection])
 
   const handleDragStart = (e: React.DragEvent, file: FileInfo) => {
     const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
@@ -267,7 +270,7 @@ export function DirectoryBrowser() {
     }
   }
 
-  const handleNavigate = (entry: FileInfo) => {
+  const handleNavigate = useCallback((entry: FileInfo) => {
     setSelectedFile(null)
     if (!entry.isDir) return
     
@@ -281,7 +284,7 @@ export function DirectoryBrowser() {
           : `${path}/${entry.name}`
       setPath(newPath)
     }
-  }
+  }, [path])
 
   const handleSourceChange = (v: string | null) => {
     if (!v) return
@@ -289,6 +292,33 @@ export function DirectoryBrowser() {
     setPath(".") // Reset path when source changes
     setSelectedFile(null)
   }
+
+  const shortcutHandlers = useMemo(() => ({
+    onEnter: () => {
+      if (selectedFile) {
+        if (selectedFile.isDir) {
+          handleNavigate(selectedFile)
+        } else {
+          handleDownload(selectedFile)
+        }
+      }
+    },
+    onBackspace: () => {
+      setPath(getParentPath(path))
+      setSelectedFile(null)
+    },
+    onDelete: () => {
+      if (selectedFile) {
+        setIsDeleteDialogOpen(true)
+      }
+    },
+    onRefresh: refreshDir,
+    onCopy: () => selectedFile && handleAction('copy', selectedFile),
+    onCut: () => selectedFile && handleAction('cut', selectedFile),
+    onPaste: handlePaste,
+  }), [selectedFile, path, refreshDir, handleAction, handlePaste, handleNavigate, handleDownload])
+
+  useSFTPShortcuts(containerRef, shortcutHandlers)
 
   // Virtual entry for parent directory if not at root/default
   const displayFiles = (() => {
@@ -309,7 +339,14 @@ export function DirectoryBrowser() {
   })()
 
   return (
-    <div className="flex flex-col h-full bg-background border rounded-lg overflow-hidden" onClick={() => setSelectedFile(null)}>
+    <div 
+      ref={containerRef}
+      tabIndex={0}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      className={`flex flex-col h-full bg-background border rounded-lg overflow-hidden transition-all outline-none ${isFocused ? 'ring-1 ring-primary border-primary' : ''}`} 
+      onClick={() => setSelectedFile(null)}
+    >
       <div className="p-2 border-b bg-muted/50 flex items-center gap-2">
         <Select value={selectedConnection} onValueChange={handleSourceChange}>
           <SelectTrigger className="w-[180px] h-8 text-xs">
