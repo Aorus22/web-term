@@ -12,7 +12,7 @@ Milestone v0.4.0 introduces local terminal access and a dual-pane SFTP file mana
 Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ## Progress
-**Execution Order:** Phases 12 → 13 → 14 → 15 → 16
+**Execution Order:** Phases 12 → 13 → 14 → 15 → 16 → 17
 
 | Phase | Milestone | Description | Status | Target |
 |-------|-----------|-------------|--------|--------|
@@ -21,6 +21,7 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 | **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | ✅ Shipped | 2026-05-04 |
 | **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | 🏗️ Planned | 2026-05-05 |
 | **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | 🏗️ Planned | 2026-05-05 |
+| **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | 🏗️ Planned | 2026-05-05 |
 
 ## Phase Details
 
@@ -67,9 +68,23 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
     - Handle large file transfers with chunked/streamed backend processing.
 
 ### Phase 16: Polish & UI Cohesion
-- **Goal:** Finalize the UX and visual design.
+- **Goal:** Finalize the UX and visual design of the SFTP manager with breadcrumbs, shortcuts, and progress tracking.
+- **Plans:** 3 plans
+- **Plan list:**
+    - [ ] 16-01-PLAN.md — Implement interactive breadcrumbs and file-type icons.
+    - [ ] 16-02-PLAN.md — Implement keyboard shortcuts (Enter, Backspace, Delete, etc.).
+    - [ ] 16-03-PLAN.md — Create a centralized Transfer Manager for progress tracking.
+- **Requirements:** [SFTP-01, SFTP-04]
 - **Tasks:**
     - Add interactive breadcrumbs for path navigation.
     - Implement keyboard shortcuts (Delete, F5, Ctrl+C/V).
     - Add a "Transfer Queue" or toast-based progress indicators.
     - Visual polish: high-quality icons, row highlighting, and transition animations.
+
+### Phase 17: Terminal Theme Sync
+- **Goal:** When user selects a terminal theme in settings, apply the corresponding theme colors to the overall application UI for a cohesive visual experience.
+- **Tasks:**
+    - Map terminal theme palettes to app-level CSS variables.
+    - Update settings UI to trigger app theme change on terminal theme selection.
+    - Ensure all app components (sidebar, tabs, panels) respond to the synced theme.
+    - Handle edge cases (custom themes, fallback colors).
