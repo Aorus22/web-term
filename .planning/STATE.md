@@ -2,11 +2,11 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
 status: active
-stopped_at: Phase 14 completed
-last_updated: "2026-05-18T00:10:00.000Z"
-last_activity: 2026-05-18 — Completed Phase 14: SFTP Frontend UI.
+stopped_at: Phase 15 context gathered
+last_updated: "2026-05-18T00:35:00.000Z"
+last_activity: 2026-05-18 — Gathered Phase 15 context: SFTP Operations & DND.
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 3
   total_plans: 5
   completed_plans: 5
@@ -42,11 +42,12 @@ accumulated_context:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
     - "v0.4.0: Local Terminal & SFTP"
+    - "Phase 17 added: Sync terminal theme selection to overall application theme"
   pending_todos: []
   blockers_concerns: []
 deferred_items: []
 session_continuity:
-  last_session: 2026-05-18T00:10:00.000Z
-  stopped_at: Phase 14 completed
-  resume_file: None
-  next_step: Execute Phase 15: SFTP Operations & DND
+  last_session: 2026-05-18T00:35:00.000Z
+  stopped_at: Phase 15 context gathered
+  resume_file: .planning/phases/15-sftp-operations-dnd/15-CONTEXT.md
+  next_step: Plan Phase 15: SFTP Operations & DND
