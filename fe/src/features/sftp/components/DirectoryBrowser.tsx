@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { connectionsApi, sftpApi } from '@/lib/api'
 import type { FileInfo } from '@/lib/api'
-import { Folder, File as FileIcon, Loader2, AlertCircle, CornerLeftUp, Download } from 'lucide-react'
+import { Loader2, AlertCircle, CornerLeftUp, Download } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   ContextMenu,
@@ -17,6 +17,8 @@ import { DirectoryToolbar } from './DirectoryToolbar'
 import { RenameDialog, NewFolderDialog, DeleteConfirmDialog, OverwriteDialog } from './OperationDialogs'
 import { useSFTPTransfer } from '@/hooks/use-sftp-transfer'
 import { toast } from 'sonner'
+import { FileIcon } from './FileIcon'
+import { SftpBreadcrumbs } from './SftpBreadcrumbs'
 
 const formatSize = (size: number) => {
   if (size === 0) return '0 B'
@@ -322,8 +324,11 @@ export function DirectoryBrowser() {
             ))}
           </SelectContent>
         </Select>
-        <div className="flex-1 px-2 text-xs font-mono text-muted-foreground truncate" title={path === '.' ? 'Current Directory' : path}>
-          {path === '.' ? 'Current Directory' : path}
+        <div className="flex-1 px-2 overflow-hidden">
+          <SftpBreadcrumbs path={path} onNavigate={(newPath) => {
+            setPath(newPath)
+            setSelectedFile(null)
+          }} />
         </div>
       </div>
 
@@ -422,11 +427,7 @@ export function DirectoryBrowser() {
                         />
                       }>
                         <td className="p-2 pl-4 flex items-center gap-2 font-medium">
-                          {file.isDir ? (
-                            <Folder className="h-4 w-4 text-blue-500 fill-blue-500/20" />
-                          ) : (
-                            <FileIcon className="h-4 w-4 text-muted-foreground" />
-                          )}
+                          <FileIcon name={file.name} isDir={file.isDir} />
                           <span className="truncate">{file.name}</span>
                         </td>
                         <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
