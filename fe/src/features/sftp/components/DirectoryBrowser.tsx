@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { connectionsApi, sftpApi } from '@/lib/api'
 import type { FileInfo } from '@/lib/api'
-import { Folder, File as FileIcon, Loader2, AlertCircle, CornerLeftUp } from 'lucide-react'
+import { Folder, File as FileIcon, Loader2, AlertCircle, CornerLeftUp, Download } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   ContextMenu,
@@ -13,6 +13,10 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { useAppStore } from '@/stores/app-store'
+import { DirectoryToolbar } from './DirectoryToolbar'
+import { RenameDialog, NewFolderDialog, DeleteConfirmDialog, OverwriteDialog } from './OperationDialogs'
+import { useSFTPTransfer } from '@/hooks/use-sftp-transfer'
+import { toast } from 'sonner'
 
 const formatSize = (size: number) => {
   if (size === 0) return '0 B'
@@ -47,9 +51,20 @@ const getParentPath = (currentPath: string) => {
 export function DirectoryBrowser() {
   const [selectedConnection, setSelectedConnection] = useState<string>("local")
   const [path, setPath] = useState<string>(".")
+  const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
   
+  // Dialog states
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
+  const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isOverwriteDialogOpen, setIsOverwriteDialogOpen] = useState(false)
+  const [pendingUpload, setPendingUpload] = useState<File | null>(null)
+  const [pendingTransfer, setPendingTransfer] = useState<{data: any, targetPath: string} | null>(null)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const { sftpClipboard, setSftpClipboard } = useAppStore()
+  const { trackTransfer } = useSFTPTransfer()
   
   const { data: connections } = useQuery({
     queryKey: ['connections'],
@@ -63,7 +78,7 @@ export function DirectoryBrowser() {
   })
 
   const refreshDir = () => {
-    queryClient.invalidateQueries({ queryKey: ['sftp'] })
+    queryClient.invalidateQueries({ queryKey: ['sftp', selectedConnection, path] })
   }
 
   const handleAction = (action: 'cut' | 'copy', file: FileInfo) => {
@@ -81,45 +96,125 @@ export function DirectoryBrowser() {
     if (!sftpClipboard) return
     const targetPath = path === '.' || path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
 
+    // Overwrite check
+    if (files?.some(f => f.name === sftpClipboard.fileName)) {
+      setPendingTransfer({ data: sftpClipboard, targetPath })
+      setIsOverwriteDialogOpen(true)
+      return
+    }
+
+    executeTransfer(sftpClipboard, targetPath)
+  }
+
+  const executeTransfer = async (data: any, targetPath: string) => {
     try {
-      await sftpApi.transfer(sftpClipboard.connectionId, sftpClipboard.path, selectedConnection, targetPath)
+      const { transferId } = await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
+      trackTransfer(transferId, data.fileName, 'transfer')
       
-      if (sftpClipboard.action === 'cut') {
-         await sftpApi.remove(sftpClipboard.connectionId, sftpClipboard.path)
+      if (data.action === 'cut') {
+         await sftpApi.remove(data.connectionId, data.path)
          setSftpClipboard(null)
       }
       refreshDir()
     } catch (e) {
-      console.error('Paste error:', e)
-      alert('Failed to paste')
+      console.error('Transfer error:', e)
+      toast.error('Failed to transfer file')
     }
   }
 
-  const handleRename = async (file: FileInfo) => {
-    const newName = window.prompt('Enter new name', file.name)
-    if (!newName || newName === file.name) return
-    const oldPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
+  const handleRenameConfirm = async (newName: string) => {
+    if (!selectedFile || !newName || newName === selectedFile.name) return
+    const oldPath = path === '.' ? selectedFile.name : path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
     const newPath = path === '.' ? newName : path === '/' ? `/${newName}` : `${path}/${newName}`
     
     try {
       await sftpApi.rename(selectedConnection, oldPath, newPath)
       refreshDir()
+      setSelectedFile(null)
     } catch (e) {
       console.error('Rename error:', e)
-      alert('Failed to rename')
+      toast.error('Failed to rename')
     }
   }
 
-  const handleDelete = async (file: FileInfo) => {
-    if (!window.confirm(`Are you sure you want to delete ${file.name}?`)) return
-    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
+  const handleDeleteConfirm = async () => {
+    if (!selectedFile) return
+    const fullPath = path === '.' ? selectedFile.name : path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
     try {
       await sftpApi.remove(selectedConnection, fullPath)
       refreshDir()
+      setSelectedFile(null)
     } catch (e) {
       console.error('Delete error:', e)
-      alert('Failed to delete')
+      toast.error('Failed to delete')
     }
+  }
+
+  const handleMkdirConfirm = async (name: string) => {
+    if (!name) return
+    const fullPath = path === '.' ? name : path === '/' ? `/${name}` : `${path}/${name}`
+    try {
+      await sftpApi.mkdir(selectedConnection, fullPath)
+      refreshDir()
+    } catch (e) {
+      console.error('Mkdir error:', e)
+      toast.error('Failed to create folder')
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    // Overwrite check
+    if (files?.some(f => f.name === file.name)) {
+      setPendingUpload(file)
+      setIsOverwriteDialogOpen(true)
+    } else {
+      executeUpload(file)
+    }
+    
+    // Clear input so same file can be selected again
+    e.target.value = ''
+  }
+
+  const executeUpload = async (file: File) => {
+    const targetPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    try {
+      const { transferId } = await sftpApi.upload(selectedConnection, targetPath, file)
+      trackTransfer(transferId, file.name, 'upload')
+      refreshDir()
+    } catch (e) {
+      console.error('Upload error:', e)
+      toast.error(`Failed to upload ${file.name}`)
+    }
+  }
+
+  const handleOverwriteConfirm = () => {
+    if (pendingUpload) {
+      executeUpload(pendingUpload)
+      setPendingUpload(null)
+    } else if (pendingTransfer) {
+      executeTransfer(pendingTransfer.data, pendingTransfer.targetPath)
+      setPendingTransfer(null)
+    }
+    setIsOverwriteDialogOpen(false)
+  }
+
+  const handleDownload = (file: FileInfo) => {
+    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const url = sftpApi.downloadUrl(selectedConnection, fullPath)
+    
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file.name
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   }
 
   const handleDragStart = (e: React.DragEvent, file: FileInfo) => {
@@ -135,27 +230,43 @@ export function DirectoryBrowser() {
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
+    
+    // Check for OS files
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0]
+      if (files?.some(f => f.name === file.name)) {
+        setPendingUpload(file)
+        setIsOverwriteDialogOpen(true)
+      } else {
+        executeUpload(file)
+      }
+      return
+    }
+
     try {
       const dataStr = e.dataTransfer.getData('application/json')
       if (!dataStr) return
       const data = JSON.parse(dataStr)
       // skip drop on same folder and same file name
-      const targetPath = path === '.' ? data.fileName : path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
+      const targetPath = path === '.' || path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
       if (data.connectionId === selectedConnection && data.path === targetPath) return
 
-      await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
-
-      if (data.action === 'cut') {
-         await sftpApi.remove(data.connectionId, data.path)
+      // Overwrite check
+      if (files?.some(f => f.name === data.fileName)) {
+        setPendingTransfer({ data, targetPath })
+        setIsOverwriteDialogOpen(true)
+        return
       }
-      refreshDir()
+
+      executeTransfer(data, targetPath)
     } catch (err) {
       console.error('Drop error:', err)
-      alert('Failed to transfer file')
+      toast.error('Failed to transfer file')
     }
   }
 
   const handleNavigate = (entry: FileInfo) => {
+    setSelectedFile(null)
     if (!entry.isDir) return
     
     if (entry.name === '..') {
@@ -174,6 +285,7 @@ export function DirectoryBrowser() {
     if (!v) return
     setSelectedConnection(v)
     setPath(".") // Reset path when source changes
+    setSelectedFile(null)
   }
 
   // Virtual entry for parent directory if not at root/default
@@ -195,7 +307,7 @@ export function DirectoryBrowser() {
   })()
 
   return (
-    <div className="flex flex-col h-full bg-background border rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full bg-background border rounded-lg overflow-hidden" onClick={() => setSelectedFile(null)}>
       <div className="p-2 border-b bg-muted/50 flex items-center gap-2">
         <Select value={selectedConnection} onValueChange={handleSourceChange}>
           <SelectTrigger className="w-[180px] h-8 text-xs">
@@ -214,8 +326,25 @@ export function DirectoryBrowser() {
           {path === '.' ? 'Current Directory' : path}
         </div>
       </div>
+
+      <DirectoryToolbar 
+        onRefresh={refreshDir}
+        onUpload={handleUploadClick}
+        onNewFolder={() => setIsNewFolderDialogOpen(true)}
+        onRename={() => setIsRenameDialogOpen(true)}
+        onDelete={() => setIsDeleteDialogOpen(true)}
+        canModify={true}
+        hasSelection={!!selectedFile}
+      />
       
       <div className="flex-1 overflow-hidden relative">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          onChange={handleFileChange}
+        />
+
         {isLoading && (
           <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -256,7 +385,10 @@ export function DirectoryBrowser() {
                       <tr 
                         key={`${file.name}-${i}`}
                         className={`border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer select-none`}
-                        onDoubleClick={() => handleNavigate(file)}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                          handleNavigate(file)
+                        }}
                       >
                         <td className="p-2 pl-4 flex items-center gap-2 font-medium">
                           <CornerLeftUp className="h-4 w-4 text-muted-foreground" />
@@ -270,12 +402,21 @@ export function DirectoryBrowser() {
                     )
                   }
 
+                  const isSelected = selectedFile?.name === file.name
+
                   return (
                     <ContextMenu key={`${file.name}-${i}`}>
                       <ContextMenuTrigger render={
                         <tr 
-                          className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${file.isDir ? 'cursor-pointer' : ''} select-none`}
-                          onDoubleClick={() => handleNavigate(file)}
+                          className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${file.isDir ? 'cursor-pointer' : ''} select-none ${isSelected ? 'bg-accent text-accent-foreground' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedFile(file)
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            handleNavigate(file)
+                          }}
                           draggable
                           onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, file)}
                         />
@@ -296,12 +437,26 @@ export function DirectoryBrowser() {
                         </td>
                       </ContextMenuTrigger>
                       <ContextMenuContent className="w-48">
+                        {!file.isDir && (
+                          <>
+                            <ContextMenuItem onClick={() => handleDownload(file)}>
+                              <Download className="h-4 w-4 mr-2" /> Download
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                          </>
+                        )}
                         <ContextMenuItem onClick={() => handleAction('cut', file)}>Cut</ContextMenuItem>
                         <ContextMenuItem onClick={() => handleAction('copy', file)}>Copy</ContextMenuItem>
                         <ContextMenuItem disabled={!sftpClipboard} onClick={handlePaste}>Paste Here</ContextMenuItem>
                         <ContextMenuSeparator />
-                        <ContextMenuItem onClick={() => handleRename(file)}>Rename</ContextMenuItem>
-                        <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(file)}>Delete</ContextMenuItem>
+                        <ContextMenuItem onClick={() => {
+                          setSelectedFile(file)
+                          setIsRenameDialogOpen(true)
+                        }}>Rename</ContextMenuItem>
+                        <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => {
+                          setSelectedFile(file)
+                          setIsDeleteDialogOpen(true)
+                        }}>Delete</ContextMenuItem>
                       </ContextMenuContent>
                     </ContextMenu>
                   )
@@ -311,6 +466,31 @@ export function DirectoryBrowser() {
           </ScrollArea>
         )}
       </div>
+
+      <RenameDialog 
+        open={isRenameDialogOpen} 
+        onOpenChange={setIsRenameDialogOpen} 
+        oldName={selectedFile?.name || ''} 
+        onConfirm={handleRenameConfirm} 
+      />
+      <NewFolderDialog 
+        open={isNewFolderDialogOpen} 
+        onOpenChange={setIsNewFolderDialogOpen} 
+        onConfirm={handleMkdirConfirm} 
+      />
+      <DeleteConfirmDialog 
+        open={isDeleteDialogOpen} 
+        onOpenChange={setIsDeleteDialogOpen} 
+        fileName={selectedFile?.name || ''} 
+        onConfirm={handleDeleteConfirm} 
+      />
+      <OverwriteDialog 
+        open={isOverwriteDialogOpen} 
+        onOpenChange={setIsOverwriteDialogOpen} 
+        fileName={pendingUpload?.name || pendingTransfer?.data.fileName || ''} 
+        onConfirm={handleOverwriteConfirm} 
+      />
     </div>
   )
 }
+
