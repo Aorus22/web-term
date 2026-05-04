@@ -196,7 +196,7 @@ export const sftpApi = {
       }),
   downloadUrl: (connectionId: string, path: string): string =>
     `${getSftpApiBase()}/download?connectionId=${connectionId}&path=${encodeURIComponent(path)}`,
-  upload: (connectionId: string, path: string, file: File): Promise<void> => {
+  upload: (connectionId: string, path: string, file: File): Promise<{ transferId: string }> => {
     const formData = new FormData()
     formData.append('file', file)
     return fetch(`${getSftpApiBase()}/upload?connectionId=${connectionId}&path=${encodeURIComponent(path)}`, {
@@ -204,6 +204,7 @@ export const sftpApi = {
       body: formData,
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
     })
   },
   remove: (connectionId: string, path: string): Promise<void> =>
@@ -224,10 +225,11 @@ export const sftpApi = {
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
     }),
-  transfer: (srcConnId: string, srcPath: string, dstConnId: string, dstPath: string): Promise<void> =>
+  transfer: (srcConnId: string, srcPath: string, dstConnId: string, dstPath: string): Promise<{ transferId: string }> =>
     fetch(`${getSftpApiBase()}/transfer?srcConnectionId=${srcConnId}&srcPath=${encodeURIComponent(srcPath)}&dstConnectionId=${dstConnId}&dstPath=${encodeURIComponent(dstPath)}`, {
       method: 'POST',
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
     }),
 }
