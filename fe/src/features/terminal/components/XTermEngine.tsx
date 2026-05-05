@@ -1,10 +1,6 @@
 import { forwardRef, useEffect, useRef, useImperativeHandle } from 'react'
 import { Terminal } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { TerminalHandle } from '../types'
-
-// xterm.js CSS - loaded via global stylesheet
 
 interface XTermEngineProps {
   sendData: (data: string) => void
@@ -36,16 +32,19 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
   ) => {
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRefInternal = useRef<Terminal | null>(null)
-    const fitAddonRef = useRef<FitAddon | null>(null)
 
     useImperativeHandle(
       ref,
       () => ({
         write: (data: Uint8Array | string) => {
-          terminalRefInternal.current?.write(data)
+          if (terminalRefInternal.current) {
+            terminalRefInternal.current.write(data)
+          }
         },
         focus: () => {
-          terminalRefInternal.current?.focus()
+          if (terminalRefInternal.current) {
+            terminalRefInternal.current.focus()
+          }
         },
       }),
       [],
@@ -55,35 +54,22 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       if (!containerRef.current) return
 
       let terminal: Terminal | null = null
-      let fitAddon: FitAddon | null = null
 
       try {
         terminal = new Terminal({
           fontFamily: `'${fontFamily}', monospace`,
           fontSize: parseInt(fontSize, 10),
           cursorBlink,
-          allowProposedApi: true,
           theme: {
             background: '#1e1e1e',
             foreground: '#d4d4d4',
-            cursor: '#ffffff',
+            cursor: '#cccccc',
             cursorAccent: '#000000',
             selectionBackground: '#264f78',
           },
         })
 
-        fitAddon = new FitAddon()
-        const webLinksAddon = new WebLinksAddon()
-
-        terminal.loadAddon(fitAddon)
-        terminal.loadAddon(webLinksAddon)
-
         terminal.open(containerRef.current)
-
-        // Fit after a short delay to ensure container has dimensions
-        setTimeout(() => {
-          fitAddon?.fit()
-        }, 10)
 
         terminalRefInternal.current = terminal
 
@@ -104,31 +90,17 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           },
         }
 
-        fitAddonRef.current = fitAddon
-
         onReady?.()
       } catch (err) {
-        console.error('XTermEngine: Failed to initialize:', err)
+        console.error('[XTermEngine] Failed to initialize:', err)
       }
 
       return () => {
-        try {
-          terminal?.dispose()
-        } catch (e) {
-          // Ignore disposal errors
-        }
+        terminal?.dispose()
         terminalRefInternal.current = null
         terminalRef.current = null
       }
-    }, [fontFamily, fontSize, cursorBlink, sendData, sendResize, onReady])
-
-    useEffect(() => {
-      const handleResize = () => {
-        fitAddonRef.current?.fit()
-      }
-      window.addEventListener('resize', handleResize)
-      return () => window.removeEventListener('resize', handleResize)
-    }, [])
+    }, [fontFamily, fontSize, cursorBlink, sendData, sendResize, onReady, terminalRef])
 
     return (
       <div
