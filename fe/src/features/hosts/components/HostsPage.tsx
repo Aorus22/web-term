@@ -170,7 +170,7 @@ export const HostsPage = () => {
                     }`}
                     onClick={() => handleConnect(conn)}
                   >
-                    <div className="flex items-center py-4 gap-4">
+                    <div className="flex items-center py-6 gap-3">
                       {/* Left: Icon */}
                       <div className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center ${
                         isActive ? 'bg-primary/10' : 'bg-muted/50'
