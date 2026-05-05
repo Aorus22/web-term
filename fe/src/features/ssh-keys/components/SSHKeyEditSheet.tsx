@@ -32,6 +32,7 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
   const [error, setError] = React.useState<string | null>(null)
   
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = React.useState(false)
 
   React.useEffect(() => {
     if (open && sshKey) {
@@ -53,6 +54,32 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
       setHasNewKey(true)
     }
     reader.readAsText(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const content = event.target?.result as string
+        setKeyContent(content)
+        setHasNewKey(true)
+      }
+      reader.readAsText(file)
+    }
   }
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -140,10 +167,13 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
             ) : (
               <div 
                 className={cn(
-                  "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-accent/50 transition-colors",
-                  keyContent ? "border-primary/50" : "border-muted"
+                  "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+                  keyContent ? "border-primary/50" : isDragging ? "border-primary bg-primary/5" : "border-muted hover:bg-accent/50"
                 )}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 <input
                   type="file"
@@ -173,8 +203,8 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Click to select file</p>
-                    <p className="text-xs text-muted-foreground">Upload a new key to replace the existing one</p>
+                    <p className="text-sm font-medium">Drag & drop file here</p>
+                    <p className="text-xs text-muted-foreground">or click to browse</p>
                   </div>
                 )}
               </div>

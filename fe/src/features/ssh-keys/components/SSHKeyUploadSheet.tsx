@@ -28,6 +28,14 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
   const [error, setError] = React.useState<string | null>(null)
   
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = React.useState(false)
+
+  const handleFileContent = (content: string, fileName?: string) => {
+    setKeyContent(content)
+    if (!name && fileName) {
+      setName(fileName.replace(/\.[^/.]+$/, ""))
+    }
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -36,13 +44,34 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
     const reader = new FileReader()
     reader.onload = (event) => {
       const content = event.target?.result as string
-      setKeyContent(content)
-      if (!name) {
-        // Default name to filename if not set
-        setName(file.name.replace(/\.[^/.]+$/, ""))
-      }
+      handleFileContent(content, file.name)
     }
     reader.readAsText(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const content = event.target?.result as string
+        handleFileContent(content, file.name)
+      }
+      reader.readAsText(file)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,15 +154,18 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
                 placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
                 className="text-xs min-h-[300px] resize-none"
               />
-            ) : (
+) : (
               <div 
                 className={cn(
-                  "border-2 border-dashed rounded-lg p-12 text-center cursor-pointer hover:bg-accent/50 transition-colors",
-                  keyContent ? "border-primary/50" : "border-muted"
+                  "border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors",
+                  keyContent ? "border-primary/50" : isDragging ? "border-primary bg-primary/5" : "border-muted hover:bg-accent/50"
                 )}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
-<input
+                <input
                     type="file"
                     ref={fileInputRef}
                     className="hidden"
@@ -160,8 +192,8 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Click to select file</p>
-                    <p className="text-xs text-muted-foreground">Any file type supported</p>
+                    <p className="text-sm font-medium">Drag & drop file here</p>
+                    <p className="text-xs text-muted-foreground">or click to browse</p>
                   </div>
                 )}
               </div>
