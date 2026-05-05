@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { useUpdateSSHKey } from '../hooks/useSSHKeys'
 import { cn } from '@/lib/utils'
 import type { SSHKey } from '@/lib/api'
@@ -122,30 +121,6 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-          {sshKey && (
-            <div className="p-4 rounded-lg bg-muted/50 border space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Current Key</span>
-                <div className="flex items-center gap-1.5">
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal bg-muted border-none">
-                    {sshKey.key_type}
-                  </Badge>
-                  {sshKey.has_passphrase && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 font-normal text-primary border-primary/20">
-                      Encrypted
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground font-mono truncate" title={sshKey.fingerprint}>
-                {sshKey.fingerprint}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Upload a new key below to replace this one
-              </p>
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="key-name">Key Name</Label>
             <Input
