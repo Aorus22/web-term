@@ -11,27 +11,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useSSHKeys, useDeleteSSHKey, useUpdateSSHKey } from '../hooks/useSSHKeys'
+import { useSSHKeys, useDeleteSSHKey } from '../hooks/useSSHKeys'
 import { SSHKeyCard } from './SSHKeyCard'
 import { SSHKeyUploadSheet } from './SSHKeyUploadSheet'
+import { SSHKeyEditSheet } from './SSHKeyEditSheet'
 import type { SSHKey } from '@/lib/api'
 
 export const SSHKeysPage = () => {
   const { data: sshKeys = [], isLoading } = useSSHKeys()
   const deleteMutation = useDeleteSSHKey()
-  const updateMutation = useUpdateSSHKey()
 
   const [uploadOpen, setUploadOpen] = React.useState(false)
+  const [editKey, setEditKey] = React.useState<SSHKey | null>(null)
   const [deleteKey, setDeleteKey] = React.useState<SSHKey | null>(null)
   const [deleteWarning, setDeleteWarning] = React.useState<string | null>(null)
   const [affectedCount, setAffectedCount] = React.useState<number>(0)
 
-  const handleRename = async (id: string, name: string) => {
-    try {
-      await updateMutation.mutateAsync({ id, data: { name } })
-    } catch (err) {
-      console.error('Rename failed:', err)
-    }
+  const handleEdit = (key: SSHKey) => {
+    setEditKey(key)
   }
 
   const handleDeleteRequest = async (key: SSHKey) => {
@@ -80,7 +77,7 @@ export const SSHKeysPage = () => {
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight">SSH Keys</h1>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold opacity-50">Secure Storage</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">Secure Storage</p>
         </div>
         <Button size="sm" onClick={() => setUploadOpen(true)} className="h-8 shadow-sm">
           <Plus className="mr-2 h-4 w-4" /> Upload Key
@@ -105,7 +102,7 @@ export const SSHKeysPage = () => {
                 <SSHKeyCard 
                   key={key.id} 
                   sshKey={key} 
-                  onRename={handleRename} 
+                  onEdit={handleEdit}
                   onDelete={handleDeleteRequest}
                 />
               ))}
@@ -115,6 +112,12 @@ export const SSHKeysPage = () => {
       </div>
 
       <SSHKeyUploadSheet open={uploadOpen} onOpenChange={setUploadOpen} />
+
+      <SSHKeyEditSheet
+        open={!!editKey}
+        onOpenChange={(open) => !open && setEditKey(null)}
+        sshKey={editKey}
+      />
 
       <AlertDialog open={!!deleteKey} onOpenChange={(open) => !open && setDeleteKey(null)}>
         <AlertDialogContent>

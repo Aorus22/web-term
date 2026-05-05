@@ -2,6 +2,7 @@
 
 - ✅ **v0.2.0 — MVP** (shipped 2026-04-28)
 - ✅ **v0.3.0 — SSH Key Auth & UI Redesign** (shipped 2026-04-29)
+- ✅ **v0.4.0 — Local Terminal & SFTP** (shipped 2026-05-18)
 
 ---
 

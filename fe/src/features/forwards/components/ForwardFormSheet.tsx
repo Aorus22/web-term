@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useCreateForward } from '../hooks/useForwards'
+import { useCreateForward, useUpdateForward } from '../hooks/useForwards'
 import { useConnections } from '@/features/connections/hooks/useConnections'
 import type { PortForward } from '@/lib/api'
 
@@ -34,6 +34,7 @@ const isValidPort = (value: number): boolean => {
 
 export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFormSheetProps) => {
   const createMutation = useCreateForward()
+  const updateMutation = useUpdateForward()
   const { data: connections = [] } = useConnections()
 
   const isEditMode = !!editForward
@@ -104,23 +105,36 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
     }
 
     try {
-      await createMutation.mutateAsync({
-        name: name.trim(),
-        connection_id: connectionId,
-        local_port: lp,
-        remote_port: rp,
-      })
-      toast.success('Port forward created')
+      if (isEditMode && editForward) {
+        await updateMutation.mutateAsync({
+          id: editForward.id,
+          data: {
+            name: name.trim(),
+            connection_id: connectionId,
+            local_port: lp,
+            remote_port: rp,
+          },
+        })
+        toast.success('Port forward updated')
+      } else {
+        await createMutation.mutateAsync({
+          name: name.trim(),
+          connection_id: connectionId,
+          local_port: lp,
+          remote_port: rp,
+        })
+        toast.success('Port forward created')
+      }
       onOpenChange(false)
     } catch (err: any) {
-      const errorMsg = err?.error || err?.message || 'Failed to create forward'
-      toast.error('Port conflict', { description: errorMsg })
-      // Keep sheet open so user can adjust
+      const errorMsg = err?.error || err?.message || (isEditMode ? 'Failed to update forward' : 'Failed to create forward')
+      toast.error(isEditMode ? 'Update failed' : 'Port conflict', { description: errorMsg })
     }
   }
 
   const isSubmitDisabled =
     createMutation.isPending ||
+    updateMutation.isPending ||
     !name.trim() ||
     !connectionId ||
     !localPort ||
@@ -213,8 +227,8 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
             Cancel
           </Button>
           <Button onClick={() => handleSubmit()} disabled={isSubmitDisabled}>
-            {createMutation.isPending
-              ? 'Creating...'
+            {createMutation.isPending || updateMutation.isPending
+              ? isEditMode ? 'Saving...' : 'Creating...'
               : isEditMode
                 ? 'Save Changes'
                 : 'Create Forward'}

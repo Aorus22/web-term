@@ -36,6 +36,8 @@ export const QuickConnect = () => {
         label: savedConn.label,
         status: 'connecting',
         isQuickConnect: false,
+        ...(savedConn.auth_method && { auth_method: savedConn.auth_method }),
+        ...(savedConn.ssh_key_id && { ssh_key_id: savedConn.ssh_key_id }),
       }
       addSession(session)
       setValue('')

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -6,8 +6,15 @@ const fs = require('fs');
 let mainWindow;
 let backendProcess;
 
-// Remove the default menu (File, Edit, etc.)
-Menu.setApplicationMenu(null);
+// Minimal menu with DevTools
+const template = [
+    {
+        label: 'DevTools',
+        accelerator: 'CmdOrCtrl+Shift+I',
+        click: () => mainWindow?.webContents.toggleDevTools()
+    }
+];
+Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 
 let backendPort = 0;
 
@@ -91,13 +98,14 @@ function createWindow() {
             symbolColor: '#94a3b8',
             height: 48 
         } : false,
-        autoHideMenuBar: true,
+        autoHideMenuBar: false,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        title: "WebTerm Desktop"
+        title: "WebTerm Desktop",
+        icon: path.join(__dirname, 'assets', 'logo.svg')
     });
 
     const isDev = process.env.NODE_ENV === 'development';

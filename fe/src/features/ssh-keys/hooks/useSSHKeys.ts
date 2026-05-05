@@ -21,7 +21,7 @@ export const useCreateSSHKey = () => {
 export const useUpdateSSHKey = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { name: string; key_base64?: string } }) =>
       keysApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ssh-keys'] })

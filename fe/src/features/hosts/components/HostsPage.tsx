@@ -126,12 +126,12 @@ export const HostsPage = () => {
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight">Hosts</h1>
-          <div className="h-4 w-[1px] bg-border" />
+          <div className="h-6 w-[1px] bg-border" />
           <TagFilter />
         </div>
         <div className="flex items-center gap-2">
           <ExportImport />
-          <Button size="sm" onClick={() => useAppStore.getState().setCreatingConnection(true)} className="h-8 shadow-sm">
+          <Button size="sm" onClick={() => useAppStore.getState().setCreatingConnection(true)} className="h-9 shadow-sm px-4">
             <Plus className="mr-2 h-4 w-4" /> New Host
           </Button>
         </div>
@@ -156,7 +156,7 @@ export const HostsPage = () => {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredConnections.map((conn) => {
                 const connSessions = sessions.filter(s => s.connectionId === conn.id)
                 const sessionCount = connSessions.length
@@ -170,7 +170,7 @@ export const HostsPage = () => {
                     }`}
                     onClick={() => handleConnect(conn)}
                   >
-                    <div className="flex items-center p-3 gap-3">
+                    <div className="flex items-center py-6 pl-4 pr-2 gap-3">
                       {/* Left: Icon */}
                       <div className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center ${
                         isActive ? 'bg-primary/10' : 'bg-muted/50'
@@ -180,16 +180,16 @@ export const HostsPage = () => {
 
                       {/* Middle: Info */}
                       <div className="flex-1 min-w-0 py-0">
-                        <h3 className="text-sm font-bold truncate leading-tight">
+                        <h3 className="text-base font-bold truncate leading-tight">
                           {conn.label || conn.host}
                         </h3>
-                        <p className="text-[10px] font-mono opacity-50 truncate leading-none mt-0.5">
+                        <p className="text-xs text-muted-foreground truncate leading-none mt-1">
                           {conn.username}@{conn.host}
                         </p>
                         {conn.tags && conn.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
+                          <div className="flex flex-wrap gap-1 mt-1.5">
                             {conn.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal bg-muted/40 border-none leading-none">
+                              <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal bg-muted border-none leading-none">
                                 {tag}
                               </Badge>
                             ))}

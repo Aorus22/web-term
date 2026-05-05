@@ -1,9 +1,10 @@
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { DirectoryBrowser } from "./DirectoryBrowser"
+import { TransferManager } from "./TransferManager"
 
 export function SFTPView() {
   return (
-    <div className="flex-1 p-4 overflow-hidden">
+    <div className="flex-1 p-4 overflow-hidden relative">
       <ResizablePanelGroup orientation="horizontal" className="h-full gap-2">
         <ResizablePanel defaultSize={50} minSize={20}>
           <DirectoryBrowser />
@@ -15,6 +16,8 @@ export function SFTPView() {
           <DirectoryBrowser />
         </ResizablePanel>
       </ResizablePanelGroup>
+      
+      <TransferManager />
     </div>
   )
 }

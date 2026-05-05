@@ -12,15 +12,16 @@ Milestone v0.4.0 introduces local terminal access and a dual-pane SFTP file mana
 Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ## Progress
-**Execution Order:** Phases 12 → 13 → 14 → 15 → 16
+**Execution Order:** Phases 12 → 13 → 14 → 15 → 16 → 17
 
 | Phase | Milestone | Description | Status | Target |
 |-------|-----------|-------------|--------|--------|
 | **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | ✅ Shipped | 2026-05-03 |
 | **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | ✅ Shipped | 2026-05-03 |
 | **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | ✅ Shipped | 2026-05-04 |
-| **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | 🏗️ Planned | 2026-05-05 |
-| **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | 🏗️ Planned | 2026-05-05 |
+| **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | ✅ Shipped | 2026-05-05 |
+| **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | ✅ Shipped | 2026-05-05 |
+| **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | 🏗️ In Progress | 2026-05-05 |
 
 ## Phase Details
 
@@ -67,9 +68,29 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
     - Handle large file transfers with chunked/streamed backend processing.
 
 ### Phase 16: Polish & UI Cohesion
-- **Goal:** Finalize the UX and visual design.
+- **Goal:** Finalize the UX and visual design of the SFTP manager with breadcrumbs, shortcuts, and progress tracking.
+- **Plans:** 3 plans
+- **Plan list:**
+    - [ ] 16-01-PLAN.md — Implement interactive breadcrumbs and file-type icons.
+    - [ ] 16-02-PLAN.md — Implement keyboard shortcuts (Enter, Backspace, Delete, etc.).
+    - [ ] 16-03-PLAN.md — Create a centralized Transfer Manager for progress tracking.
+- **Requirements:** [SFTP-01, SFTP-04]
 - **Tasks:**
     - Add interactive breadcrumbs for path navigation.
     - Implement keyboard shortcuts (Delete, F5, Ctrl+C/V).
     - Add a "Transfer Queue" or toast-based progress indicators.
     - Visual polish: high-quality icons, row highlighting, and transition animations.
+
+### Phase 17: Terminal Theme Sync
+- **Goal:** Synchronize the application's visual theme (sidebar, tabs, panels) with the user's selected terminal theme.
+- **Plans:** 3 plans
+- **Plan list:**
+    - [x] 17-01-PLAN.md — Implement core theme mapping logic and AppThemeProvider.
+    - [x] 17-02-PLAN.md — UI refinement, sidebar/tab adaptation, and accessibility verification.
+    - [ ] 17-03-PLAN.md — Gap closure: replace hardcoded colors with theme-responsive CSS variables.
+- **Requirements:** [THEME-01, THEME-02, THEME-03, THEME-04, THEME-05]
+- **Tasks:**
+    - Map terminal theme palettes to app-level CSS variables.
+    - Update settings UI to trigger app theme change on terminal theme selection.
+    - Ensure all app components (sidebar, tabs, panels) respond to the synced theme.
+    - Handle edge cases (custom themes, fallback colors).

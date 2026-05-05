@@ -27,6 +27,8 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	// Create tunnel manager for port forwarding
 	tunnelMgr := ssh.NewTunnelManager(database, cfg)
 
+	tm := ssh.NewTransferManager()
+
 	sm, err := ssh.NewStagingManager(filepath.Join("storage", "staging"))
 	if err != nil {
 		log.Printf("Failed to init staging: %v", err)
@@ -47,6 +49,7 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 		DB:  database,
 		Cfg: cfg,
 		SM:  sm,
+		TM:  tm,
 	}
 
 	// Go 1.22+ method routing
@@ -84,6 +87,7 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	mux.HandleFunc("POST /api/sftp/rename", sfh.Rename)
 	mux.HandleFunc("POST /api/sftp/mkdir", sfh.Mkdir)
 	mux.HandleFunc("POST /api/sftp/transfer", sfh.Transfer)
+	mux.HandleFunc("GET /api/sftp/transfer/{id}/progress", sfh.Progress)
 
 	// Session endpoints
 	mux.HandleFunc("GET /api/sessions", ListSessions())

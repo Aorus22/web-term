@@ -118,9 +118,18 @@ export const forwardsApi = {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
       return r.json()
     }),
-  stop: (id: string): Promise<PortForward> =>
+stop: (id: string): Promise<PortForward> =>
     fetch(`${getForwardsApiBase()}/${id}/stop`, { method: 'POST' }).then(r => {
-      if (!r.ok) throw new Error('Failed to stop forward')
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
+    }),
+  update: (id: string, data: { name: string; connection_id: string; local_port: number; remote_port: number }): Promise<PortForward> =>
+    fetch(`${getForwardsApiBase()}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
       return r.json()
     }),
 }
@@ -134,7 +143,7 @@ export const keysApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(r => r.json()),
-  update: (id: string, data: { name: string }): Promise<SSHKey> =>
+  update: (id: string, data: { name: string; key_base64?: string }): Promise<SSHKey> =>
     fetch(`${getKeysApiBase()}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -196,7 +205,7 @@ export const sftpApi = {
       }),
   downloadUrl: (connectionId: string, path: string): string =>
     `${getSftpApiBase()}/download?connectionId=${connectionId}&path=${encodeURIComponent(path)}`,
-  upload: (connectionId: string, path: string, file: File): Promise<void> => {
+  upload: (connectionId: string, path: string, file: File): Promise<{ transferId: string }> => {
     const formData = new FormData()
     formData.append('file', file)
     return fetch(`${getSftpApiBase()}/upload?connectionId=${connectionId}&path=${encodeURIComponent(path)}`, {
@@ -204,6 +213,7 @@ export const sftpApi = {
       body: formData,
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
     })
   },
   remove: (connectionId: string, path: string): Promise<void> =>
@@ -224,10 +234,11 @@ export const sftpApi = {
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
     }),
-  transfer: (srcConnId: string, srcPath: string, dstConnId: string, dstPath: string): Promise<void> =>
+  transfer: (srcConnId: string, srcPath: string, dstConnId: string, dstPath: string): Promise<{ transferId: string }> =>
     fetch(`${getSftpApiBase()}/transfer?srcConnectionId=${srcConnId}&srcPath=${encodeURIComponent(srcPath)}&dstConnectionId=${dstConnId}&dstPath=${encodeURIComponent(dstPath)}`, {
       method: 'POST',
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
     }),
 }

@@ -104,7 +104,7 @@ export function FontDialog({ open, onOpenChange, currentFont, currentSize, onSav
           <div className="mt-4 min-w-0">
             <Label>Preview</Label>
             <div 
-              className="mt-2 p-4 rounded bg-muted border font-mono whitespace-pre overflow-x-auto w-full h-32"
+              className="mt-2 p-4 rounded bg-muted border whitespace-pre overflow-x-auto w-full h-32"
               style={{ fontFamily: font, fontSize: `${size}px`, lineHeight: '1.2' }}
             >
               $ ls -la /home/user{'\n'}

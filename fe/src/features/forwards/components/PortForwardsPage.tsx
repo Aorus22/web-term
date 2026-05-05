@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Plus, ArrowLeftRight, Loader2, MoreVertical, Trash2 } from 'lucide-react'
+import { Plus, ArrowLeftRight, Loader2, MoreVertical, Trash2, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ export const PortForwardsPage = () => {
   const stopMutation = useStopForward()
 
   const [formOpen, setFormOpen] = React.useState(false)
+  const [editForward, setEditForward] = React.useState<PortForward | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<PortForward | null>(null)
 
   // Build connection lookup map
@@ -88,11 +89,11 @@ export const PortForwardsPage = () => {
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight">Port Forwards</h1>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold opacity-50">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
             SSH Tunneling
           </p>
         </div>
-        <Button size="sm" onClick={() => setFormOpen(true)} className="h-8 shadow-sm">
+        <Button size="sm" onClick={() => setFormOpen(true)} className="h-9 shadow-sm px-4">
           <Plus className="mr-2 h-4 w-4" /> Create Forward
         </Button>
       </header>
@@ -135,7 +136,7 @@ export const PortForwardsPage = () => {
                       {/* Middle: Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold truncate leading-tight">
+                          <h3 className="text-base font-bold truncate leading-tight">
                             {forward.name}
                           </h3>
                           {forward.active && (
@@ -147,7 +148,7 @@ export const PortForwardsPage = () => {
                         <p className="text-xs text-muted-foreground truncate leading-none mt-0.5">
                           {connLabel}
                         </p>
-                        <p className="text-[11px] font-mono opacity-60 truncate leading-none mt-1">
+                        <p className="text-xs text-muted-foreground truncate leading-none mt-1">
                           localhost:{forward.local_port} → :{forward.remote_port}
                         </p>
                         {forward.error && (
@@ -172,6 +173,9 @@ export const PortForwardsPage = () => {
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditForward(forward); setFormOpen(true) }}>
+                              <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive focus:bg-destructive/10"
                               onClick={() => setDeleteTarget(forward)}
@@ -190,7 +194,14 @@ export const PortForwardsPage = () => {
         </div>
       </div>
 
-      <ForwardFormSheet open={formOpen} onOpenChange={setFormOpen} />
+      <ForwardFormSheet
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open)
+          if (!open) setEditForward(null)
+        }}
+        editForward={editForward}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
