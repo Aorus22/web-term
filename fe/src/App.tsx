@@ -174,7 +174,7 @@ function AppContent() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col border-r bg-sidebar transition-all duration-300 ease-in-out",
+          "flex flex-col border-r bg-background transition-all duration-300 ease-in-out",
           sidebarOpen ? "w-[200px]" : "w-0 overflow-hidden border-none"
         )}
       >
@@ -192,7 +192,7 @@ function AppContent() {
             }} 
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
-              sidebarPage === 'hosts' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+              sidebarPage === 'hosts' ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
             )}
           >
             <Server className="h-4 w-4" /> Hosts
@@ -204,7 +204,7 @@ function AppContent() {
             }} 
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
-              sidebarPage === 'keys' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+              sidebarPage === 'keys' ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
             )}
           >
             <Key className="h-4 w-4" /> SSH Keys
@@ -216,7 +216,7 @@ function AppContent() {
             }} 
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
-              sidebarPage === 'forwards' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+              sidebarPage === 'forwards' ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
             )}
           >
             <ArrowLeftRight className="h-4 w-4" /> Port Forwards
@@ -228,7 +228,7 @@ function AppContent() {
             }} 
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
-              sidebarPage === 'sftp' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+              sidebarPage === 'sftp' ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
             )}
           >
             <Files className="h-4 w-4" /> SFTP
@@ -245,7 +245,7 @@ function AppContent() {
             }} 
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
-              sidebarPage === 'settings' ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+              sidebarPage === 'settings' ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
             )}
           >
             <Settings className="h-4 w-4" /> Settings
