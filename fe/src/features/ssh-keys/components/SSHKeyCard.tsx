@@ -1,8 +1,6 @@
-import React, { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -14,46 +12,17 @@ import type { SSHKey } from '@/lib/api'
 
 interface SSHKeyCardProps {
   sshKey: SSHKey
-  onRename: (id: string, name: string) => Promise<void>
+  onEdit: (sshKey: SSHKey) => void
   onDelete: (sshKey: SSHKey) => void
 }
 
-export const SSHKeyCard = ({ sshKey, onRename, onDelete }: SSHKeyCardProps) => {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editName, setEditName] = useState(sshKey.name)
-
-  const handleRename = async () => {
-    if (editName.trim() && editName !== sshKey.name) {
-      await onRename(sshKey.id, editName)
-    }
-    setIsEditing(false)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleRename()
-    if (e.key === 'Escape') {
-      setEditName(sshKey.name)
-      setIsEditing(false)
-    }
-  }
-
+export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
   return (
     <Card className="group relative overflow-hidden transition-all border-border/50 hover:border-primary/50 hover:shadow-sm">
       <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-        {isEditing ? (
-          <Input
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            onBlur={handleRename}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            className="h-6 text-sm font-bold py-0 bg-transparent border-none focus-visible:ring-0 px-0"
-          />
-        ) : (
-          <CardTitle className="text-sm font-bold truncate pr-8" title={sshKey.name}>
-            {sshKey.name}
-          </CardTitle>
-        )}
+        <CardTitle className="text-sm font-bold truncate pr-8" title={sshKey.name}>
+          {sshKey.name}
+        </CardTitle>
         
         <div className="absolute right-2 top-2">
           <DropdownMenu>
@@ -65,11 +34,11 @@ export const SSHKeyCard = ({ sshKey, onRename, onDelete }: SSHKeyCardProps) => {
               }
             />
             <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                <Edit2 className="mr-2 h-3.5 w-3.5" /> Rename Key
+              <DropdownMenuItem onClick={() => onEdit(sshKey)}>
+                <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDelete(sshKey)} className="text-destructive focus:bg-destructive/10">
-                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete Key
+                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

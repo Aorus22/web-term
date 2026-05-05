@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Plus, ArrowLeftRight, Loader2, MoreVertical, Trash2 } from 'lucide-react'
+import { Plus, ArrowLeftRight, Loader2, MoreVertical, Trash2, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ export const PortForwardsPage = () => {
   const stopMutation = useStopForward()
 
   const [formOpen, setFormOpen] = React.useState(false)
+  const [editForward, setEditForward] = React.useState<PortForward | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<PortForward | null>(null)
 
   // Build connection lookup map
@@ -172,6 +173,9 @@ export const PortForwardsPage = () => {
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditForward(forward); setFormOpen(true) }}>
+                              <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive focus:bg-destructive/10"
                               onClick={() => setDeleteTarget(forward)}
@@ -190,7 +194,14 @@ export const PortForwardsPage = () => {
         </div>
       </div>
 
-      <ForwardFormSheet open={formOpen} onOpenChange={setFormOpen} />
+      <ForwardFormSheet
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open)
+          if (!open) setEditForward(null)
+        }}
+        editForward={editForward}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

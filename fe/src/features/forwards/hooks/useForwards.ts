@@ -47,3 +47,14 @@ export const useStopForward = () => {
     },
   })
 }
+
+export const useUpdateForward = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name: string; connection_id: string; local_port: number; remote_port: number } }) =>
+      forwardsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forwards'] })
+    },
+  })
+}

@@ -118,9 +118,18 @@ export const forwardsApi = {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
       return r.json()
     }),
-  stop: (id: string): Promise<PortForward> =>
+stop: (id: string): Promise<PortForward> =>
     fetch(`${getForwardsApiBase()}/${id}/stop`, { method: 'POST' }).then(r => {
-      if (!r.ok) throw new Error('Failed to stop forward')
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
+      return r.json()
+    }),
+  update: (id: string, data: { name: string; connection_id: string; local_port: number; remote_port: number }): Promise<PortForward> =>
+    fetch(`${getForwardsApiBase()}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => Promise.reject(e))
       return r.json()
     }),
 }
