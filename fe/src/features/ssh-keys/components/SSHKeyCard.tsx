@@ -18,7 +18,7 @@ interface SSHKeyCardProps {
 export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
   return (
     <Card className="group relative overflow-hidden transition-all border-border/40 hover:border-primary/40 hover:shadow-md py-0 gap-0">
-      <div className="flex items-center p-3 gap-4">
+      <div className="flex items-center py-4 gap-4">
         {/* Left: Icon */}
         <div className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center bg-muted/50">
           <Key className="h-4 w-4 text-muted-foreground/70" />
