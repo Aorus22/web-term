@@ -134,7 +134,7 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Replace Key File (optional)</Label>
+              <Label>Replace Key File</Label>
               <div className="flex bg-muted rounded-md p-0.5">
                 <Button
                   type="button"
