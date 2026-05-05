@@ -54,44 +54,36 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
     useEffect(() => {
       if (!containerRef.current) return
 
+      let terminal: Terminal | null = null
+      let fitAddon: FitAddon | null = null
+
       try {
-        const terminal = new Terminal({
+        terminal = new Terminal({
           fontFamily: `'${fontFamily}', monospace`,
           fontSize: parseInt(fontSize, 10),
           cursorBlink,
+          allowProposedApi: true,
           theme: {
-            background: '#000000',
-            foreground: '#cccccc',
+            background: '#1e1e1e',
+            foreground: '#d4d4d4',
             cursor: '#ffffff',
             cursorAccent: '#000000',
             selectionBackground: '#264f78',
-            black: '#000000',
-            red: '#cd3131',
-            green: '#0dbc79',
-            yellow: '#e5e510',
-            blue: '#2472c8',
-            magenta: '#bc3fbc',
-            cyan: '#11a8cd',
-            white: '#e5e5e5',
-            brightBlack: '#666666',
-            brightRed: '#f14c4c',
-            brightGreen: '#23d18b',
-            brightYellow: '#f5f543',
-            brightBlue: '#3b8eea',
-            brightMagenta: '#d670d6',
-            brightCyan: '#29b8db',
-            brightWhite: '#ffffff',
           },
         })
 
-        const fitAddon = new FitAddon()
+        fitAddon = new FitAddon()
         const webLinksAddon = new WebLinksAddon()
 
         terminal.loadAddon(fitAddon)
         terminal.loadAddon(webLinksAddon)
 
         terminal.open(containerRef.current)
-        fitAddon.fit()
+
+        // Fit after a short delay to ensure container has dimensions
+        setTimeout(() => {
+          fitAddon?.fit()
+        }, 10)
 
         terminalRefInternal.current = terminal
 
@@ -105,10 +97,10 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
 
         terminalRef.current = {
           write: (data: Uint8Array | string) => {
-            terminal.write(data)
+            terminal?.write(data)
           },
           focus: () => {
-            terminal.focus()
+            terminal?.focus()
           },
         }
 
@@ -120,7 +112,11 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       }
 
       return () => {
-        terminalRefInternal.current?.dispose()
+        try {
+          terminal?.dispose()
+        } catch (e) {
+          // Ignore disposal errors
+        }
         terminalRefInternal.current = null
         terminalRef.current = null
       }
@@ -137,10 +133,15 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
     return (
       <div
         ref={containerRef}
-        className={className}
+        className={`xterm-container ${className || ''}`}
         style={{
           height: '100%',
           width: '100%',
+          minHeight: '200px',
+          minWidth: '100px',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#1e1e1e',
           ...style,
         }}
       />
