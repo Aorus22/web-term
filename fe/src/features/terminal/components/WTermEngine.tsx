@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { Terminal } from '@wterm/react'
 import '@wterm/react/css'
-import { TerminalHandle } from '../types'
+import type { TerminalHandle } from '../types'
 import { useTerminalMouse } from '../useTerminalMouse'
 
 interface WTermEngineProps {

@@ -18,7 +18,7 @@ interface TerminalPaneProps {
   initialConnect?: ConnectOptions
 }
 
-export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPaneProps) {
+export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   const { ref, connect, attach, sendData, sendResize, signalReady } = useSSHSession(sessionId)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const { data: settings } = useSettings()
@@ -139,18 +139,6 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
       setShowSaveBanner(true)
     }
   }, [session?.status, session?.isQuickConnect])
-
-  // Scroll to bottom when tab becomes active
-  useEffect(() => {
-    if (!isActive) return
-    const handle = ref.current
-    if (!handle?.instance) return
-    const el = handle.instance.element
-    const maxScroll = el.scrollHeight - el.clientHeight
-    if (maxScroll <= 0) return
-    const rh = (handle.instance as any)._rowHeight || 17
-    el.scrollTop = Math.floor(maxScroll / rh) * rh
-  }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRetry = () => {
     if (lastOptionsRef.current) {

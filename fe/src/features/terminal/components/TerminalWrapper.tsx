@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle } from 'react'
 import { WTermEngine } from './WTermEngine'
 import { XTermEngine } from './XTermEngine'
-import { TerminalHandle } from '../types'
+import type { TerminalHandle } from '../types'
 import { cn } from '@/lib/utils'
 
 interface TerminalWrapperProps {

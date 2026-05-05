@@ -3,8 +3,9 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
-import '@xterm/xterm/css'
-import { TerminalHandle } from '../types'
+import type { TerminalHandle } from '../types'
+
+// xterm.js CSS - loaded via global stylesheet
 
 interface XTermEngineProps {
   sendData: (data: string) => void

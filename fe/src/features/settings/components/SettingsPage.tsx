@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Monitor, Moon, Sun, Type, MousePointer2, History, Terminal, Check, Cog } from 'lucide-react'
+import { Type, MousePointer2, History, Terminal, Check, Cog } from 'lucide-react'
 import { useSettings, useUpdateSettings } from '../hooks/useSettings'
 import type { AppSettings } from '../hooks/useSettings'
 import { terminalThemes } from '../data/terminal-themes'
-import { useTheme } from '@/hooks/use-theme'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -18,7 +17,6 @@ import { FontDialog } from './FontDialog'
 export function SettingsPage() {
   const { data: settings, isLoading } = useSettings()
   const { mutate: updateSettings } = useUpdateSettings()
-  const { theme: appTheme, setTheme: setAppTheme } = useTheme()
   const [fontDialogOpen, setFontDialogOpen] = useState(false)
 
   if (isLoading || !settings) {
