@@ -143,7 +143,7 @@ export const keysApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(r => r.json()),
-  update: (id: string, data: { name: string }): Promise<SSHKey> =>
+  update: (id: string, data: { name: string; key_base64?: string }): Promise<SSHKey> =>
     fetch(`${getKeysApiBase()}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

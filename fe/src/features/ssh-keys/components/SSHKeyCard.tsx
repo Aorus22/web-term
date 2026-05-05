@@ -20,11 +20,11 @@ export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
   return (
     <Card className="group relative overflow-hidden transition-all border-border/50 hover:border-primary/50 hover:shadow-sm">
       <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-bold truncate pr-8" title={sshKey.name}>
+        <CardTitle className="text-sm font-bold truncate" title={sshKey.name}>
           {sshKey.name}
         </CardTitle>
         
-        <div className="absolute right-2 top-2">
+        <div className="flex items-center pr-2 flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
