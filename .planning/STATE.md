@@ -25,6 +25,7 @@ performance_metrics:
 
 quick_tasks:
   completed:
+    - { slug: "20260505-fix-wterm-full-size", date: "2026-05-05", description: "Fixed wterm sizing and tmux status bar visibility issues." }
     - { slug: "20260503-sftp-context-dnd", date: "2026-05-03", description: "Context Menu & Drag-and-Drop" }
 
 accumulated_context:

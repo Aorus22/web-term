@@ -55,9 +55,11 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   )
 
   const terminalStyle = {
+    width: '100%',
     height: '100%',
     fontFamily: `'${fontFamily}', monospace`,
     fontSize: `${fontSize}px`,
+    backgroundColor: 'var(--theme-bg-actual)',
   }
 
   // Auto-connect on mount (or as soon as settings are available)
@@ -261,23 +263,25 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   // Connected — render terminal
   if (session.status === 'connected') {
     return (
-      <div className="h-full w-full">
-        <TerminalErrorBoundary>
-          <TerminalWrapper
-            ref={ref}
-            engine={settings?.terminal_engine || 'wterm'}
-            sendData={sendData}
-            sendResize={sendResize}
-            onReady={handleTerminalReady}
-            theme={terminalTheme}
-            cursorBlink={cursorBlinkSetting}
-            fontFamily={fontFamily}
-            fontSize={fontSize}
-            cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
-            className={terminalClassName}
-            style={terminalStyle}
-          />
-        </TerminalErrorBoundary>
+      <div className={cn("h-full w-full flex flex-col overflow-hidden", terminalClassName)}>
+        <div className="flex-1 relative overflow-hidden">
+          <TerminalErrorBoundary>
+            <TerminalWrapper
+              ref={ref}
+              engine={settings?.terminal_engine || 'wterm'}
+              sendData={sendData}
+              sendResize={sendResize}
+              onReady={handleTerminalReady}
+              theme={terminalTheme}
+              cursorBlink={cursorBlinkSetting}
+              fontFamily={fontFamily}
+              fontSize={fontSize}
+              cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
+              className={terminalClassName}
+              style={terminalStyle}
+            />
+          </TerminalErrorBoundary>
+        </div>
       </div>
     )
   }
@@ -305,7 +309,7 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   // Disconnected state — show frozen terminal + reconnect overlay + save banner (UI-04, D-06)
   if (session.status === 'disconnected') {
     return (
-      <div className="h-full w-full relative flex flex-col">
+      <div className={cn("h-full w-full relative flex flex-col overflow-hidden", terminalClassName)}>
         {/* Save connection banner for quick-connect sessions (D-06) */}
         {showSaveBanner && session.isQuickConnect && (
           <SaveConnectionBanner

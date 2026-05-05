@@ -65,7 +65,7 @@ export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
         onData={sendData}
         onResize={sendResize}
         onReady={handleReady}
-        style={style}
+        style={{ width: '100%', height: '100%', ...style }}
       />
     )
   }

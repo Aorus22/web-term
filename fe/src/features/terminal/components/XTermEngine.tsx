@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useRef, useImperativeHandle } from 'react'
 import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
 import type { TerminalHandle } from '../types'
 
 interface XTermEngineProps {
@@ -32,6 +33,7 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
   ) => {
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRefInternal = useRef<Terminal | null>(null)
+    const fitAddonRef = useRef<FitAddon | null>(null)
 
     useImperativeHandle(
       ref,
@@ -60,8 +62,9 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           fontFamily: `'${fontFamily}', monospace`,
           fontSize: parseInt(fontSize, 10),
           cursorBlink,
+          allowProposedApi: true,
           theme: {
-            background: '#1e1e1e',
+            background: 'transparent',
             foreground: '#d4d4d4',
             cursor: '#cccccc',
             cursorAccent: '#000000',
@@ -69,7 +72,16 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           },
         })
 
+        const fitAddon = new FitAddon()
+        terminal.loadAddon(fitAddon)
+        fitAddonRef.current = fitAddon
+
         terminal.open(containerRef.current)
+        
+        // Initial fit
+        setTimeout(() => {
+          fitAddon.fit()
+        }, 50)
 
         terminalRefInternal.current = terminal
 
@@ -90,15 +102,31 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           },
         }
 
+        // Setup ResizeObserver
+        const resizeObserver = new ResizeObserver(() => {
+          if (terminal && fitAddon) {
+            // Small timeout to let layout settle
+            setTimeout(() => {
+              try {
+                fitAddon.fit()
+              } catch (e) {
+                // ignore fit errors during transitions
+              }
+            }, 10)
+          }
+        })
+        resizeObserver.observe(containerRef.current)
+
         onReady?.()
+
+        return () => {
+          resizeObserver.disconnect()
+          terminal?.dispose()
+          terminalRefInternal.current = null
+          terminalRef.current = null
+        }
       } catch (err) {
         console.error('[XTermEngine] Failed to initialize:', err)
-      }
-
-      return () => {
-        terminal?.dispose()
-        terminalRefInternal.current = null
-        terminalRef.current = null
       }
     }, [fontFamily, fontSize, cursorBlink, sendData, sendResize, onReady, terminalRef])
 
@@ -109,11 +137,9 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
         style={{
           height: '100%',
           width: '100%',
-          minHeight: '200px',
-          minWidth: '100px',
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: '#1e1e1e',
+          backgroundColor: 'transparent',
           ...style,
         }}
       />
