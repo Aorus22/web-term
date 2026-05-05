@@ -54,12 +54,7 @@ export function useSFTPTransfer() {
           error: status.error,
         })
 
-        if (status.status === 'active') {
-          toast.loading(`${label} ${fileName}...`, {
-            id: toastId,
-            description: `Progress: ${progress}%`,
-          })
-        } else if (status.status === 'completed') {
+        if (status.status === 'completed') {
           toast.success(`Successfully ${successLabel.toLowerCase()} ${fileName}`, {
             id: toastId,
             description: 'Complete',
