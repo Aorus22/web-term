@@ -1,6 +1,7 @@
-import { forwardRef, useEffect, useRef, useImperativeHandle } from 'react'
+import { forwardRef, useEffect, useRef, useImperativeHandle, useCallback } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { terminalThemes } from '@/features/settings/data/terminal-themes'
 import type { TerminalHandle } from '../types'
 
 interface XTermEngineProps {
@@ -25,6 +26,7 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       terminalRef,
       fontFamily = 'Geist Mono',
       fontSize = '14',
+      theme = 'default',
       cursorBlink = true,
       className,
       style,
@@ -52,6 +54,39 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       [],
     )
 
+    // Helper to get ITheme object from preset name
+    const getXTermTheme = useCallback((themeName: string) => {
+      const preset = terminalThemes.find((t) => t.name === themeName) || terminalThemes[0]
+      return {
+        background: preset.colors.background,
+        foreground: preset.colors.foreground,
+        cursor: preset.colors.cursor,
+        black: preset.colors.black,
+        red: preset.colors.red,
+        green: preset.colors.green,
+        yellow: preset.colors.yellow,
+        blue: preset.colors.blue,
+        magenta: preset.colors.magenta,
+        cyan: preset.colors.cyan,
+        white: preset.colors.white,
+        brightBlack: preset.colors.brightBlack,
+        brightRed: preset.colors.brightRed,
+        brightGreen: preset.colors.brightGreen,
+        brightYellow: preset.colors.brightYellow,
+        brightBlue: preset.colors.brightBlue,
+        brightMagenta: preset.colors.brightMagenta,
+        brightCyan: preset.colors.brightCyan,
+        brightWhite: preset.colors.brightWhite,
+      }
+    }, [])
+
+    // Update theme when it changes without recreating the terminal
+    useEffect(() => {
+      if (terminalRefInternal.current) {
+        terminalRefInternal.current.options.theme = getXTermTheme(theme)
+      }
+    }, [theme, getXTermTheme])
+
     useEffect(() => {
       if (!containerRef.current) return
 
@@ -63,13 +98,8 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           fontSize: parseInt(fontSize, 10),
           cursorBlink,
           allowProposedApi: true,
-          theme: {
-            background: 'transparent',
-            foreground: '#d4d4d4',
-            cursor: '#cccccc',
-            cursorAccent: '#000000',
-            selectionBackground: '#264f78',
-          },
+          allowTransparency: true,
+          theme: getXTermTheme(theme),
         })
 
         const fitAddon = new FitAddon()
@@ -128,7 +158,10 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       } catch (err) {
         console.error('[XTermEngine] Failed to initialize:', err)
       }
-    }, [fontFamily, fontSize, cursorBlink, sendData, sendResize, onReady, terminalRef])
+      // We intentionally exclude 'theme' from this dependency array to avoid
+      // full terminal re-initialization when the theme changes.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fontFamily, fontSize, cursorBlink, sendData, sendResize, onReady, terminalRef, getXTermTheme])
 
     return (
       <div

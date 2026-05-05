@@ -92,6 +92,7 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
           terminalRef={terminalRef as any}
           fontFamily={fontFamily}
           fontSize={fontSize}
+          theme={theme}
           cursorBlink={cursorBlink !== false}
           className={terminalClassName}
           style={{ ...baseStyle, ...style }}
