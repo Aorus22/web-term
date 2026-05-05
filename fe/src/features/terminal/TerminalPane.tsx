@@ -9,6 +9,7 @@ import { PassphrasePrompt } from './PassphrasePrompt'
 import { ReconnectOverlay } from './ReconnectOverlay'
 import { SaveConnectionBanner } from './SaveConnectionBanner'
 import { TerminalWrapper } from './components/TerminalWrapper'
+import { TerminalErrorBoundary } from './components/TerminalErrorBoundary'
 import type { ConnectOptions } from './types'
 
 interface TerminalPaneProps {
@@ -261,20 +262,22 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   if (session.status === 'connected') {
     return (
       <div className="h-full w-full">
-        <TerminalWrapper
-          ref={ref}
-          engine={settings?.terminal_engine || 'wterm'}
-          sendData={sendData}
-          sendResize={sendResize}
-          onReady={handleTerminalReady}
-          theme={terminalTheme}
-          cursorBlink={cursorBlinkSetting}
-          fontFamily={fontFamily}
-          fontSize={fontSize}
-          cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
-          className={terminalClassName}
-          style={terminalStyle}
-        />
+        <TerminalErrorBoundary>
+          <TerminalWrapper
+            ref={ref}
+            engine={settings?.terminal_engine || 'wterm'}
+            sendData={sendData}
+            sendResize={sendResize}
+            onReady={handleTerminalReady}
+            theme={terminalTheme}
+            cursorBlink={cursorBlinkSetting}
+            fontFamily={fontFamily}
+            fontSize={fontSize}
+            cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
+            className={terminalClassName}
+            style={terminalStyle}
+          />
+        </TerminalErrorBoundary>
       </div>
     )
   }
@@ -314,19 +317,21 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
         )}
         {/* Frozen terminal content underneath */}
         <div className="flex-1 relative">
-          <TerminalWrapper
-            ref={ref}
-            engine={settings?.terminal_engine || 'wterm'}
-            sendData={() => {}}
-            sendResize={sendResize}
-            theme={terminalTheme}
-            cursorBlink={false}
-            fontFamily={fontFamily}
-            fontSize={fontSize}
-            cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
-            className={terminalClassName}
-            style={terminalStyle}
-          />
+          <TerminalErrorBoundary>
+            <TerminalWrapper
+              ref={ref}
+              engine={settings?.terminal_engine || 'wterm'}
+              sendData={() => {}}
+              sendResize={sendResize}
+              theme={terminalTheme}
+              cursorBlink={false}
+              fontFamily={fontFamily}
+              fontSize={fontSize}
+              cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
+              className={terminalClassName}
+              style={terminalStyle}
+            />
+          </TerminalErrorBoundary>
           {/* Reconnect overlay on top (UI-04) */}
           <ReconnectOverlay
             host={session.host}
