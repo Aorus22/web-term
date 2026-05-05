@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from 'react'
+import { forwardRef, useImperativeHandle, useState, useEffect } from 'react'
 import { WTermEngine } from './WTermEngine'
 import { XTermEngine } from './XTermEngine'
 import type { TerminalHandle } from '../types'
@@ -35,7 +35,20 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
     },
     ref
   ) => {
+    const [currentEngine, setCurrentEngine] = useState(engine)
     const terminalRef: React.MutableRefObject<TerminalHandle | null> = { current: null }
+
+    // Debounce engine changes to prevent rapid switching issues
+    useEffect(() => {
+      if (engine === currentEngine) return
+      
+      const timer = setTimeout(() => {
+        console.log('[TerminalWrapper] Switching engine:', engine)
+        setCurrentEngine(engine)
+      }, 100)
+      
+      return () => clearTimeout(timer)
+    }, [engine, currentEngine])
 
     useImperativeHandle(
       ref,
@@ -47,7 +60,7 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
           terminalRef.current?.focus()
         },
       }),
-      [],
+      [currentEngine],
     )
 
     const baseStyle: React.CSSProperties = {
@@ -63,14 +76,14 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
         : undefined
 
     const terminalClassName = cn(
-      engine === 'wterm' ? 'wterm' : 'xterm',
-      engine === 'wterm' && `theme-${theme}`,
-      engine === 'wterm' && cursorStyleClass,
-      engine === 'wterm' && 'has-scrollback',
+      currentEngine === 'wterm' ? 'wterm' : 'xterm',
+      currentEngine === 'wterm' && `theme-${theme}`,
+      currentEngine === 'wterm' && cursorStyleClass,
+      currentEngine === 'wterm' && 'has-scrollback',
       className
     )
 
-    if (engine === 'xterm') {
+    if (currentEngine === 'xterm') {
       return (
         <XTermEngine
           sendData={sendData}
