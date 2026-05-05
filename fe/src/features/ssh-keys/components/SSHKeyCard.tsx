@@ -1,5 +1,4 @@
-import { Card, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
   DropdownMenu, 
@@ -7,7 +6,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu'
-import { MoreVertical, Edit2, Trash2 } from 'lucide-react'
+import { Key, MoreVertical, Edit2, Trash2 } from 'lucide-react'
 import type { SSHKey } from '@/lib/api'
 
 interface SSHKeyCardProps {
@@ -19,21 +18,30 @@ interface SSHKeyCardProps {
 export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
   return (
     <Card className="group relative overflow-hidden transition-all border-border/50 hover:border-primary/50 hover:shadow-sm">
-      <div className="p-4 flex flex-row items-center gap-4">
+      <div className="p-3 flex flex-row items-center gap-4">
+        {/* Left: Icon */}
+        <div className="flex-shrink-0 w-9 h-9 rounded-md flex items-center justify-center bg-muted/50">
+          <Key className="h-4 w-4 text-muted-foreground/70" />
+        </div>
+
+        {/* Middle: Info */}
         <div className="flex-1 min-w-0">
-          <CardTitle className="text-sm font-bold truncate" title={sshKey.name}>
-            {sshKey.name}
-          </CardTitle>
-          {sshKey.has_passphrase && (
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-normal text-primary border-primary/20 mt-1.5">
-              Encrypted
-            </Badge>
-          )}
-          <p className="text-[10px] text-muted-foreground truncate mt-1" title={sshKey.fingerprint}>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold truncate leading-tight" title={sshKey.name}>
+              {sshKey.name}
+            </h3>
+            {sshKey.has_passphrase && (
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary">
+                Encrypted
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground truncate leading-none mt-0.5" title={sshKey.fingerprint}>
             {sshKey.fingerprint}
           </p>
         </div>
-        
+
+        {/* Right: Kebab */}
         <div className="flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger
