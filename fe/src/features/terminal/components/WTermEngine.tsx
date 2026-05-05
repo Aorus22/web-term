@@ -2,7 +2,6 @@ import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { Terminal } from '@wterm/react'
 import '@wterm/react/css'
 import type { TerminalHandle } from '../types'
-import { useTerminalMouse } from '../useTerminalMouse'
 
 interface WTermEngineProps {
   sendData: (data: string) => void
@@ -17,7 +16,6 @@ interface WTermEngineProps {
 export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
   ({ sendData, sendResize, onReady, terminalRef, theme, className, style }, ref) => {
     const internalRef = useRef<any>(null)
-    const { onReady: onTerminalMouseReady } = useTerminalMouse(sendData)
 
     useImperativeHandle(
       ref,
@@ -49,7 +47,6 @@ export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
           }
         },
       }
-      onTerminalMouseReady(wt)
       onReady?.()
     }
 
@@ -57,7 +54,7 @@ export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
       <Terminal
         ref={(el) => {
           internalRef.current = el
-          if (el && terminalRef.current === null) {
+          if (el) {
             handleReady(el)
           }
         }}
