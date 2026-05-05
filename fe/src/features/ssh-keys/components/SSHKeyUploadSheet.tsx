@@ -133,13 +133,12 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
                 )}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={handleFileChange}
-                  accept=".pem,.key,id_rsa,id_ed25519"
-                />
+<input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
                 {keyContent ? (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-primary">File Selected</p>
@@ -162,7 +161,7 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
                 ) : (
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Click to select file</p>
-                    <p className="text-xs text-muted-foreground">.pem, .key, id_rsa, etc.</p>
+                    <p className="text-xs text-muted-foreground">Any file type supported</p>
                   </div>
                 )}
               </div>

@@ -146,7 +146,13 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 						return
 					}
 
-					if connectMsg.AuthMethod == "key" && dbConn.AuthMethod == "key" && dbConn.SSHKeyID != nil {
+					// Use auth_method from database when connection_id is provided
+					authMethod := dbConn.AuthMethod
+					if authMethod == "" {
+						authMethod = "password"
+					}
+
+					if authMethod == "key" && dbConn.SSHKeyID != nil {
 						var key db.SSHKey
 						if err := database.First(&key, "id = ?", *dbConn.SSHKeyID).Error; err != nil {
 							sendWSError(conn, "SSH key not found")
@@ -180,8 +186,8 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 						connectMsg.Host = dbConn.Host
 						connectMsg.Port = dbConn.Port
 						connectMsg.User = dbConn.Username
-					} else if connectMsg.AuthMethod == "key" || dbConn.AuthMethod == "key" {
-						sendWSError(conn, "Authentication method mismatch")
+					} else if authMethod == "key" {
+						sendWSError(conn, "Connection has auth_method=key but no ssh_key_id configured")
 						return
 					} else {
 						decrypted, err := config.Decrypt(dbConn.Encrypted, cfg.EncryptionKey)
