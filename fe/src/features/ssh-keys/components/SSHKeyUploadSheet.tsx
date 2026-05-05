@@ -123,7 +123,7 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
                 value={keyContent}
                 onChange={(e) => setKeyContent(e.target.value)}
                 placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
-                className="font-mono text-xs min-h-[300px] resize-none"
+                className="text-xs min-h-[300px] resize-none"
               />
             ) : (
               <div 

@@ -147,7 +147,7 @@ export const PortForwardsPage = () => {
                         <p className="text-xs text-muted-foreground truncate leading-none mt-0.5">
                           {connLabel}
                         </p>
-                        <p className="text-[11px] font-mono text-muted-foreground truncate leading-none mt-1">
+                        <p className="text-[11px] text-muted-foreground truncate leading-none mt-1">
                           localhost:{forward.local_port} → :{forward.remote_port}
                         </p>
                         {forward.error && (

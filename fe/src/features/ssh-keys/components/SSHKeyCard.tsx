@@ -88,7 +88,7 @@ export const SSHKeyCard = ({ sshKey, onRename, onDelete }: SSHKeyCardProps) => {
               </Badge>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground font-mono truncate" title={sshKey.fingerprint}>
+          <p className="text-[10px] text-muted-foreground truncate" title={sshKey.fingerprint}>
             {sshKey.fingerprint}
           </p>
         </div>

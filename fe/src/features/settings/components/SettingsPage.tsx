@@ -121,7 +121,7 @@ export function SettingsPage() {
               </div>
               <button 
                 onClick={() => setFontDialogOpen(true)}
-                className="text-xs font-mono bg-muted px-2 py-1 rounded border hover:bg-muted/80 transition-colors"
+                className="text-xs bg-muted px-2 py-1 rounded border hover:bg-muted/80 transition-colors"
               >
                 {settings.font_family} {settings.font_size}px
               </button>

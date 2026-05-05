@@ -9,7 +9,7 @@ export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
   // If path is '.', treat it as "Home/Current"
   if (path === '.') {
     return (
-      <div className="flex items-center text-xs font-mono">
+      <div className="flex items-center text-xs">
         <button 
           onClick={() => onNavigate('.')}
           className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-accent hover:text-accent-foreground transition-colors"
@@ -49,7 +49,7 @@ export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
   })
 
   return (
-    <div className="flex items-center text-xs font-mono overflow-hidden">
+    <div className="flex items-center text-xs overflow-hidden">
       {segments.map((segment, i) => (
         <div key={segment.path} className="flex items-center shrink-0">
           {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5 shrink-0" />}

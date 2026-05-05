@@ -156,7 +156,7 @@ export const HostsPage = () => {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredConnections.map((conn) => {
                 const connSessions = sessions.filter(s => s.connectionId === conn.id)
                 const sessionCount = connSessions.length
@@ -170,7 +170,7 @@ export const HostsPage = () => {
                     }`}
                     onClick={() => handleConnect(conn)}
                   >
-                    <div className="flex items-center p-3 gap-3">
+                    <div className="flex items-center p-4 gap-4">
                       {/* Left: Icon */}
                       <div className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center ${
                         isActive ? 'bg-primary/10' : 'bg-muted/50'
@@ -183,7 +183,7 @@ export const HostsPage = () => {
                         <h3 className="text-sm font-bold truncate leading-tight">
                           {conn.label || conn.host}
                         </h3>
-                        <p className="text-[10px] font-mono text-muted-foreground truncate leading-none mt-0.5">
+                        <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
                           {conn.username}@{conn.host}
                         </p>
                         {conn.tags && conn.tags.length > 0 && (
