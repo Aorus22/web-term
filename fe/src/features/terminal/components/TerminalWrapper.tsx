@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState, useEffect } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react'
 import { WTermEngine } from './WTermEngine'
 import { XTermEngine } from './XTermEngine'
 import type { TerminalHandle } from '../types'
@@ -36,14 +36,14 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
     ref
   ) => {
     const [currentEngine, setCurrentEngine] = useState(engine)
-    const terminalRef: React.MutableRefObject<TerminalHandle | null> = { current: null }
+    // Use useRef for terminalRef so it persists across renders
+    const terminalRef = useRef<TerminalHandle | null>(null)
 
-    // Debounce engine changes to prevent rapid switching issues
+    // Debounce engine changes
     useEffect(() => {
       if (engine === currentEngine) return
       
       const timer = setTimeout(() => {
-        console.log('[TerminalWrapper] Switching engine:', engine)
         setCurrentEngine(engine)
       }, 100)
       
@@ -89,7 +89,7 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
           sendData={sendData}
           sendResize={sendResize}
           onReady={onReady}
-          terminalRef={terminalRef}
+          terminalRef={terminalRef as any}
           fontFamily={fontFamily}
           fontSize={fontSize}
           cursorBlink={cursorBlink !== false}
@@ -104,7 +104,7 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
         sendData={sendData}
         sendResize={sendResize}
         onReady={onReady}
-        terminalRef={terminalRef}
+        terminalRef={terminalRef as any}
         theme={theme}
         className={terminalClassName}
         style={{ ...baseStyle, ...style }}
