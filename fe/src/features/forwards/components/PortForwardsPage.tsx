@@ -87,12 +87,12 @@ export const PortForwardsPage = () => {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold tracking-tight">Port Forwards</h1>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">
+          <h1 className="text-3xl font-bold tracking-tight">Port Forwards</h1>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
             SSH Tunneling
           </p>
         </div>
-        <Button size="sm" onClick={() => setFormOpen(true)} className="h-8 shadow-sm">
+        <Button size="sm" onClick={() => setFormOpen(true)} className="h-9 shadow-sm px-4">
           <Plus className="mr-2 h-4 w-4" /> Create Forward
         </Button>
       </header>
@@ -135,7 +135,7 @@ export const PortForwardsPage = () => {
                       {/* Middle: Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold truncate leading-tight">
+                          <h3 className="text-base font-bold truncate leading-tight">
                             {forward.name}
                           </h3>
                           {forward.active && (

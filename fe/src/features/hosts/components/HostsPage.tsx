@@ -125,13 +125,13 @@ export const HostsPage = () => {
       {/* Termius-style Header */}
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold tracking-tight">Hosts</h1>
-          <div className="h-4 w-[1px] bg-border" />
+          <h1 className="text-3xl font-bold tracking-tight">Hosts</h1>
+          <div className="h-6 w-[1px] bg-border" />
           <TagFilter />
         </div>
         <div className="flex items-center gap-2">
           <ExportImport />
-          <Button size="sm" onClick={() => useAppStore.getState().setCreatingConnection(true)} className="h-8 shadow-sm">
+          <Button size="sm" onClick={() => useAppStore.getState().setCreatingConnection(true)} className="h-9 shadow-sm px-4">
             <Plus className="mr-2 h-4 w-4" /> New Host
           </Button>
         </div>
@@ -180,16 +180,16 @@ export const HostsPage = () => {
 
                       {/* Middle: Info */}
                       <div className="flex-1 min-w-0 py-0">
-                        <h3 className="text-sm font-bold truncate leading-tight">
+                        <h3 className="text-base font-bold truncate leading-tight">
                           {conn.label || conn.host}
                         </h3>
-                        <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
+                        <p className="text-xs text-muted-foreground truncate leading-none mt-1">
                           {conn.username}@{conn.host}
                         </p>
                         {conn.tags && conn.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
+                          <div className="flex flex-wrap gap-1 mt-1.5">
                             {conn.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal bg-muted border-none leading-none">
+                              <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal bg-muted border-none leading-none">
                                 {tag}
                               </Badge>
                             ))}
