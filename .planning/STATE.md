@@ -2,18 +2,18 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
 status: active
-stopped_at: Phase 16 completed
-last_updated: "2026-05-18T01:30:00.000Z"
-last_activity: 2026-05-18 — Completed Phase 16: Polish & UI Cohesion.
+stopped_at: Milestone v0.4.0 completed
+last_updated: "2026-05-18T02:00:00.000Z"
+last_activity: 2026-05-18 — Completed Phase 17: Terminal Theme Sync and finalized Milestone v0.4.0.
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
+  completed_phases: 6
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 performance_metrics:
   velocity:
-    total_plans_completed: 35
+    total_plans_completed: 38
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -21,6 +21,7 @@ performance_metrics:
     - { phase: "14-sftp-frontend-ui", plans: 2, total_min: 4, avg_min: 2 }
     - { phase: "15-sftp-operations-dnd", plans: 2, total_min: 20, avg_min: 10 }
     - { phase: "16-polish-ui-themes", plans: 3, total_min: 30, avg_min: 10 }
+    - { phase: "17-terminal-theme-sync", plans: 3, total_min: 45, avg_min: 15 }
 
 quick_tasks:
   completed:

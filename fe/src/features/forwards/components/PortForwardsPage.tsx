@@ -88,7 +88,7 @@ export const PortForwardsPage = () => {
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight">Port Forwards</h1>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold opacity-50">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">
             SSH Tunneling
           </p>
         </div>
@@ -147,7 +147,7 @@ export const PortForwardsPage = () => {
                         <p className="text-xs text-muted-foreground truncate leading-none mt-0.5">
                           {connLabel}
                         </p>
-                        <p className="text-[11px] font-mono opacity-60 truncate leading-none mt-1">
+                        <p className="text-[11px] font-mono text-muted-foreground truncate leading-none mt-1">
                           localhost:{forward.local_port} → :{forward.remote_port}
                         </p>
                         {forward.error && (

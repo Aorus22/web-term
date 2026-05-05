@@ -36,7 +36,7 @@ export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
   }
 
   let currentPath = isAbsolute ? '' : ''
-  parts.forEach((part, index) => {
+  parts.forEach((part) => {
     currentPath = isAbsolute 
       ? (currentPath === '' ? '/' + part : currentPath + '/' + part)
       : (currentPath === '' ? part : currentPath + '/' + part)

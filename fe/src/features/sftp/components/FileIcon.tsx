@@ -8,7 +8,7 @@ import {
   FileAudio,
   FileVideo,
   FileJson,
-  LucideIcon
+  type LucideIcon
 } from 'lucide-react'
 
 interface FileIconProps {

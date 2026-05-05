@@ -183,13 +183,13 @@ export const HostsPage = () => {
                         <h3 className="text-sm font-bold truncate leading-tight">
                           {conn.label || conn.host}
                         </h3>
-                        <p className="text-[10px] font-mono opacity-50 truncate leading-none mt-0.5">
+                        <p className="text-[10px] font-mono text-muted-foreground truncate leading-none mt-0.5">
                           {conn.username}@{conn.host}
                         </p>
                         {conn.tags && conn.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {conn.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal bg-muted/40 border-none leading-none">
+                              <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal bg-muted border-none leading-none">
                                 {tag}
                               </Badge>
                             ))}

@@ -80,7 +80,7 @@ export const SSHKeysPage = () => {
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight">SSH Keys</h1>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold opacity-50">Secure Storage</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">Secure Storage</p>
         </div>
         <Button size="sm" onClick={() => setUploadOpen(true)} className="h-8 shadow-sm">
           <Plus className="mr-2 h-4 w-4" /> Upload Key

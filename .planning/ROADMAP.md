@@ -19,9 +19,9 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 | **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | ✅ Shipped | 2026-05-03 |
 | **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | ✅ Shipped | 2026-05-03 |
 | **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | ✅ Shipped | 2026-05-04 |
-| **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | 🏗️ Planned | 2026-05-05 |
-| **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | 🏗️ Planned | 2026-05-05 |
-| **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | 🏗️ Planned | 2026-05-05 |
+| **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | ✅ Shipped | 2026-05-05 |
+| **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | ✅ Shipped | 2026-05-05 |
+| **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | 🏗️ In Progress | 2026-05-05 |
 
 ## Phase Details
 
@@ -83,11 +83,12 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ### Phase 17: Terminal Theme Sync
 - **Goal:** Synchronize the application's visual theme (sidebar, tabs, panels) with the user's selected terminal theme.
-- **Plans:** 2 plans
+- **Plans:** 3 plans
 - **Plan list:**
-    - [ ] 17-01-PLAN.md — Implement core theme mapping logic and AppThemeProvider.
-    - [ ] 17-02-PLAN.md — UI refinement, sidebar/tab adaptation, and accessibility verification.
-- **Requirements:** [THEME-01, THEME-02, THEME-03, THEME-04]
+    - [x] 17-01-PLAN.md — Implement core theme mapping logic and AppThemeProvider.
+    - [x] 17-02-PLAN.md — UI refinement, sidebar/tab adaptation, and accessibility verification.
+    - [ ] 17-03-PLAN.md — Gap closure: replace hardcoded colors with theme-responsive CSS variables.
+- **Requirements:** [THEME-01, THEME-02, THEME-03, THEME-04, THEME-05]
 - **Tasks:**
     - Map terminal theme palettes to app-level CSS variables.
     - Update settings UI to trigger app theme change on terminal theme selection.

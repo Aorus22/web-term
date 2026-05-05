@@ -42,42 +42,6 @@ export function SettingsPage() {
         <div className="space-y-4">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Appearance</h2>
           <div className="bg-card rounded-lg border divide-y overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">Theme Mode</span>
-                <span className="text-xs text-muted-foreground">App color scheme</span>
-              </div>
-              <div className="flex bg-muted p-1 rounded-md">
-                <button
-                  onClick={() => setAppTheme('light')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-medium transition-all",
-                    appTheme === 'light' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Sun className="h-3.5 w-3.5" /> Light
-                </button>
-                <button
-                  onClick={() => setAppTheme('dark')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-medium transition-all",
-                    appTheme === 'dark' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Moon className="h-3.5 w-3.5" /> Dark
-                </button>
-                <button
-                  onClick={() => setAppTheme('system')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-medium transition-all",
-                    appTheme === 'system' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Monitor className="h-3.5 w-3.5" /> System
-                </button>
-              </div>
-            </div>
-
             <div className="px-4 py-4 space-y-4">
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-medium">Terminal Color Theme</span>
@@ -91,8 +55,8 @@ export function SettingsPage() {
                     className={cn(
                       "group relative flex flex-col gap-2 p-2 rounded-lg border-2 transition-all text-left",
                       settings.terminal_color_theme === theme.name
-                        ? "border-primary/40 bg-accent/20"
-                        : "border-border/50 bg-secondary/30 hover:bg-secondary/50"
+                        ? "border-primary/40 bg-accent"
+                        : "border-border/50 bg-secondary hover:bg-secondary/80"
                     )}
                   >
                     <div 

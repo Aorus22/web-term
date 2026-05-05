@@ -1,4 +1,4 @@
-import { useEffect, RefObject } from 'react'
+import { useEffect, type RefObject } from 'react'
 
 interface SFTPShortcutHandlers {
   onEnter?: () => void
@@ -11,7 +11,7 @@ interface SFTPShortcutHandlers {
 }
 
 export function useSFTPShortcuts(
-  ref: RefObject<HTMLElement>,
+  ref: RefObject<HTMLElement | null>,
   handlers: SFTPShortcutHandlers,
   enabled: boolean = true
 ) {

@@ -79,7 +79,7 @@ export const SSHKeyCard = ({ sshKey, onRename, onDelete }: SSHKeyCardProps) => {
       <CardContent className="p-4 pt-0">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
-            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-normal bg-muted/50 border-none">
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-normal bg-muted border-none">
               {sshKey.key_type}
             </Badge>
             {sshKey.has_passphrase && (
@@ -88,7 +88,7 @@ export const SSHKeyCard = ({ sshKey, onRename, onDelete }: SSHKeyCardProps) => {
               </Badge>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground/60 font-mono truncate opacity-80" title={sshKey.fingerprint}>
+          <p className="text-[10px] text-muted-foreground font-mono truncate" title={sshKey.fingerprint}>
             {sshKey.fingerprint}
           </p>
         </div>

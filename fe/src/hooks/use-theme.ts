@@ -25,7 +25,7 @@ export function useTheme() {
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : currentTheme as ResolvedTheme
       setResolvedTheme(effective)
-      root.classList.toggle('dark', effective === 'dark')
+      // root.classList.toggle('dark', effective === 'dark') // DISABLED: AppThemeProvider handles this now
     }
     applyTheme(theme)
     localStorage.setItem('webterm-theme', theme) // keep as fallback

@@ -86,6 +86,22 @@ export function DirectoryBrowser() {
     queryClient.invalidateQueries({ queryKey: ['sftp', selectedConnection, path] })
   }, [queryClient, selectedConnection, path])
 
+  const executeTransfer = useCallback(async (data: any, targetPath: string) => {
+    try {
+      const { transferId } = await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
+      trackTransfer(transferId, data.fileName, 'transfer')
+      
+      if (data.action === 'cut') {
+         await sftpApi.remove(data.connectionId, data.path)
+         setSftpClipboard(null)
+      }
+      refreshDir()
+    } catch (e) {
+      console.error('Transfer error:', e)
+      toast.error('Failed to transfer file')
+    }
+  }, [selectedConnection, trackTransfer, setSftpClipboard, refreshDir])
+
   const handleAction = useCallback((action: 'cut' | 'copy', file: FileInfo) => {
     const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
     setSftpClipboard({
@@ -110,22 +126,6 @@ export function DirectoryBrowser() {
 
     executeTransfer(sftpClipboard, targetPath)
   }, [sftpClipboard, path, files, executeTransfer])
-
-  const executeTransfer = useCallback(async (data: any, targetPath: string) => {
-    try {
-      const { transferId } = await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
-      trackTransfer(transferId, data.fileName, 'transfer')
-      
-      if (data.action === 'cut') {
-         await sftpApi.remove(data.connectionId, data.path)
-         setSftpClipboard(null)
-      }
-      refreshDir()
-    } catch (e) {
-      console.error('Transfer error:', e)
-      toast.error('Failed to transfer file')
-    }
-  }, [selectedConnection, trackTransfer, setSftpClipboard, refreshDir])
 
   const handleRenameConfirm = async (newName: string) => {
     if (!selectedFile || !newName || newName === selectedFile.name) return
