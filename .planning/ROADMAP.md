@@ -82,7 +82,12 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
     - Visual polish: high-quality icons, row highlighting, and transition animations.
 
 ### Phase 17: Terminal Theme Sync
-- **Goal:** When user selects a terminal theme in settings, apply the corresponding theme colors to the overall application UI for a cohesive visual experience.
+- **Goal:** Synchronize the application's visual theme (sidebar, tabs, panels) with the user's selected terminal theme.
+- **Plans:** 2 plans
+- **Plan list:**
+    - [ ] 17-01-PLAN.md — Implement core theme mapping logic and AppThemeProvider.
+    - [ ] 17-02-PLAN.md — UI refinement, sidebar/tab adaptation, and accessibility verification.
+- **Requirements:** [THEME-01, THEME-02, THEME-03, THEME-04]
 - **Tasks:**
     - Map terminal theme palettes to app-level CSS variables.
     - Update settings UI to trigger app theme change on terminal theme selection.

@@ -2,23 +2,25 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
 status: active
-stopped_at: Phase 15 context gathered
-last_updated: "2026-05-18T00:35:00.000Z"
-last_activity: 2026-05-18 — Gathered Phase 15 context: SFTP Operations & DND.
+stopped_at: Phase 16 completed
+last_updated: "2026-05-18T01:30:00.000Z"
+last_activity: 2026-05-18 — Completed Phase 16: Polish & UI Cohesion.
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
-  percent: 60
+  completed_phases: 5
+  total_plans: 10
+  completed_plans: 10
+  percent: 100
 performance_metrics:
   velocity:
-    total_plans_completed: 30
+    total_plans_completed: 35
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
     - { phase: "13-sftp-backend-core", plans: 1, total_min: 15, avg_min: 15 }
     - { phase: "14-sftp-frontend-ui", plans: 2, total_min: 4, avg_min: 2 }
+    - { phase: "15-sftp-operations-dnd", plans: 2, total_min: 20, avg_min: 10 }
+    - { phase: "16-polish-ui-themes", plans: 3, total_min: 30, avg_min: 10 }
 
 quick_tasks:
   completed:

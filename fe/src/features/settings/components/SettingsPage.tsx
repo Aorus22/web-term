@@ -91,8 +91,8 @@ export function SettingsPage() {
                     className={cn(
                       "group relative flex flex-col gap-2 p-2 rounded-lg border-2 transition-all text-left",
                       settings.terminal_color_theme === theme.name
-                        ? "border-primary/20 bg-accent/40"
-                        : "border-transparent bg-muted/30 hover:bg-muted/50"
+                        ? "border-primary/40 bg-accent/20"
+                        : "border-border/50 bg-secondary/30 hover:bg-secondary/50"
                     )}
                   >
                     <div 
