@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Monitor, Moon, Sun, Type, MousePointer2, History, Terminal, Check } from 'lucide-react'
+import { Monitor, Moon, Sun, Type, MousePointer2, History, Terminal, Check, Cog } from 'lucide-react'
 import { useSettings, useUpdateSettings } from '../hooks/useSettings'
 import type { AppSettings } from '../hooks/useSettings'
 import { terminalThemes } from '../data/terminal-themes'
@@ -110,6 +110,28 @@ export function SettingsPage() {
                   <SelectItem value="ansi">ansi</SelectItem>
                   <SelectItem value="linux">linux</SelectItem>
                   <SelectItem value="screen-256color">screen-256color</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Cog className="h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Terminal Engine</span>
+                  <span className="text-xs text-muted-foreground">Choose terminal implementation</span>
+                </div>
+              </div>
+              <Select 
+                value={settings.terminal_engine} 
+                onValueChange={(v) => handleUpdate('terminal_engine', v ?? 'wterm')}
+              >
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="wterm">wterm (Experimental)</SelectItem>
+                  <SelectItem value="xterm">xterm.js (Stable)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal } from '@wterm/react'
-import '@wterm/react/css'
 import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useSSHSession } from './useSSHSession'
 import { useAppStore } from '@/stores/app-store'
@@ -10,7 +8,7 @@ import { PasswordPrompt } from './PasswordPrompt'
 import { PassphrasePrompt } from './PassphrasePrompt'
 import { ReconnectOverlay } from './ReconnectOverlay'
 import { SaveConnectionBanner } from './SaveConnectionBanner'
-import { useTerminalMouse } from './useTerminalMouse'
+import { TerminalWrapper } from './components/TerminalWrapper'
 import type { ConnectOptions } from './types'
 
 interface TerminalPaneProps {
@@ -22,12 +20,10 @@ interface TerminalPaneProps {
 
 export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPaneProps) {
   const { ref, connect, attach, sendData, sendResize, signalReady } = useSSHSession(sessionId)
-  const { onReady: onTerminalMouseReady } = useTerminalMouse(sendData)
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const { data: settings } = useSettings()
 
-  const handleTerminalReady = (wt: any) => {
-    onTerminalMouseReady(wt)
+  const handleTerminalReady = () => {
     signalReady()
   }
 
@@ -277,15 +273,18 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
   if (session.status === 'connected') {
     return (
       <div className="h-full w-full">
-        <Terminal
+        <TerminalWrapper
           ref={ref}
-          autoResize
-          cursorBlink={cursorBlinkSetting}
-          theme={terminalTheme}
-          className={terminalClassName}
-          onData={sendData}
-          onResize={sendResize}
+          engine={settings?.terminal_engine || 'wterm'}
+          sendData={sendData}
+          sendResize={sendResize}
           onReady={handleTerminalReady}
+          theme={terminalTheme}
+          cursorBlink={cursorBlinkSetting}
+          fontFamily={fontFamily}
+          fontSize={fontSize}
+          cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
+          className={terminalClassName}
           style={terminalStyle}
         />
       </div>
@@ -327,14 +326,17 @@ export function TerminalPane({ sessionId, isActive, initialConnect }: TerminalPa
         )}
         {/* Frozen terminal content underneath */}
         <div className="flex-1 relative">
-          <Terminal
+          <TerminalWrapper
             ref={ref}
-            autoResize
-            cursorBlink={false}
+            engine={settings?.terminal_engine || 'wterm'}
+            sendData={() => {}}
+            sendResize={sendResize}
             theme={terminalTheme}
+            cursorBlink={false}
+            fontFamily={fontFamily}
+            fontSize={fontSize}
+            cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
             className={terminalClassName}
-            onData={() => {}}
-            onResize={sendResize}
             style={terminalStyle}
           />
           {/* Reconnect overlay on top (UI-04) */}
