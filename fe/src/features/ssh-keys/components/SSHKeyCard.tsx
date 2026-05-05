@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
@@ -19,12 +19,14 @@ interface SSHKeyCardProps {
 export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
   return (
     <Card className="group relative overflow-hidden transition-all border-border/50 hover:border-primary/50 hover:shadow-sm">
-      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-bold truncate" title={sshKey.name}>
-          {sshKey.name}
-        </CardTitle>
+      <div className="p-4 flex flex-row items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <CardTitle className="text-sm font-bold truncate" title={sshKey.name}>
+            {sshKey.name}
+          </CardTitle>
+        </div>
         
-        <div className="flex items-center pr-2 flex-shrink-0">
+        <div className="flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -43,9 +45,9 @@ export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </CardHeader>
+      </div>
       
-      <CardContent className="p-4 pt-0">
+      <CardContent className="p-4 pt-2">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-normal bg-muted border-none">
