@@ -2,7 +2,6 @@ import { forwardRef, useEffect, useRef, useImperativeHandle } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { WebglAddon } from '@xterm/addon-webgl'
 import type { TerminalHandle } from '../types'
 
 // xterm.js CSS - loaded via global stylesheet
@@ -55,71 +54,73 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
     useEffect(() => {
       if (!containerRef.current) return
 
-      const terminal = new Terminal({
-        fontFamily: `'${fontFamily}', monospace`,
-        fontSize: parseInt(fontSize, 10),
-        cursorBlink,
-        theme: {
-          background: '#000000',
-          foreground: '#cccccc',
-          cursor: '#ffffff',
-          cursorAccent: '#000000',
-          selectionBackground: '#264f78',
-          black: '#000000',
-          red: '#cd3131',
-          green: '#0dbc79',
-          yellow: '#e5e510',
-          blue: '#2472c8',
-          magenta: '#bc3fbc',
-          cyan: '#11a8cd',
-          white: '#e5e5e5',
-          brightBlack: '#666666',
-          brightRed: '#f14c4c',
-          brightGreen: '#23d18b',
-          brightYellow: '#f5f543',
-          brightBlue: '#3b8eea',
-          brightMagenta: '#d670d6',
-          brightCyan: '#29b8db',
-          brightWhite: '#ffffff',
-        },
-      })
+      try {
+        const terminal = new Terminal({
+          fontFamily: `'${fontFamily}', monospace`,
+          fontSize: parseInt(fontSize, 10),
+          cursorBlink,
+          theme: {
+            background: '#000000',
+            foreground: '#cccccc',
+            cursor: '#ffffff',
+            cursorAccent: '#000000',
+            selectionBackground: '#264f78',
+            black: '#000000',
+            red: '#cd3131',
+            green: '#0dbc79',
+            yellow: '#e5e510',
+            blue: '#2472c8',
+            magenta: '#bc3fbc',
+            cyan: '#11a8cd',
+            white: '#e5e5e5',
+            brightBlack: '#666666',
+            brightRed: '#f14c4c',
+            brightGreen: '#23d18b',
+            brightYellow: '#f5f543',
+            brightBlue: '#3b8eea',
+            brightMagenta: '#d670d6',
+            brightCyan: '#29b8db',
+            brightWhite: '#ffffff',
+          },
+        })
 
-      const fitAddon = new FitAddon()
-      const webLinksAddon = new WebLinksAddon()
-      const webglAddon = new WebglAddon()
+        const fitAddon = new FitAddon()
+        const webLinksAddon = new WebLinksAddon()
 
-      terminal.loadAddon(fitAddon)
-      terminal.loadAddon(webLinksAddon)
-      terminal.loadAddon(webglAddon)
+        terminal.loadAddon(fitAddon)
+        terminal.loadAddon(webLinksAddon)
 
-      terminal.open(containerRef.current)
-      fitAddon.fit()
+        terminal.open(containerRef.current)
+        fitAddon.fit()
 
-      terminalRefInternal.current = terminal
+        terminalRefInternal.current = terminal
 
-      terminal.onData((data) => {
-        sendData(data)
-      })
+        terminal.onData((data) => {
+          sendData(data)
+        })
 
-      terminal.onResize(({ cols, rows }) => {
-        sendResize?.(cols, rows)
-      })
+        terminal.onResize(({ cols, rows }) => {
+          sendResize?.(cols, rows)
+        })
 
-      terminalRef.current = {
-        write: (data: Uint8Array | string) => {
-          terminal.write(data)
-        },
-        focus: () => {
-          terminal.focus()
-        },
+        terminalRef.current = {
+          write: (data: Uint8Array | string) => {
+            terminal.write(data)
+          },
+          focus: () => {
+            terminal.focus()
+          },
+        }
+
+        fitAddonRef.current = fitAddon
+
+        onReady?.()
+      } catch (err) {
+        console.error('XTermEngine: Failed to initialize:', err)
       }
 
-      fitAddonRef.current = fitAddon
-
-      onReady?.()
-
       return () => {
-        terminal.dispose()
+        terminalRefInternal.current?.dispose()
         terminalRefInternal.current = null
         terminalRef.current = null
       }
