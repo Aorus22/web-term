@@ -18,6 +18,7 @@ var defaultSettings = map[string]string{
 	"theme_mode":           "system",
 	"terminal_color_theme": "default",
 	"terminal_type":        "xterm-256color",
+	"terminal_engine":      "wterm",
 	"font_family":          "Geist Mono",
 	"font_size":            "14",
 	"cursor_style":         "block",
@@ -70,6 +71,11 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		// Mitigation T-09-02: Basic value validation
 		if k == "theme_mode" && v != "light" && v != "dark" && v != "system" {
 			sendError(w, "Invalid theme_mode: "+v, http.StatusBadRequest)
+			return
+		}
+
+		if k == "terminal_engine" && v != "wterm" && v != "xterm" {
+			sendError(w, "Invalid terminal_engine: "+v, http.StatusBadRequest)
 			return
 		}
 

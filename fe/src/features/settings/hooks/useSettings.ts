@@ -5,6 +5,7 @@ export interface AppSettings {
   theme_mode: 'light' | 'dark' | 'system'
   terminal_color_theme: string
   terminal_type: string
+  terminal_engine: 'wterm' | 'xterm'
   font_family: string
   font_size: string
   cursor_style: 'block' | 'underline' | 'bar'
@@ -16,6 +17,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme_mode: 'system',
   terminal_color_theme: 'default',
   terminal_type: 'xterm-256color',
+  terminal_engine: 'wterm',
   font_family: 'Geist Mono',
   font_size: '14',
   cursor_style: 'block',

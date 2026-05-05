@@ -1,5 +1,10 @@
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error' | 'needs-passphrase' | 'detached'
 
+export interface TerminalHandle {
+  write: (data: Uint8Array | string) => void
+  focus: () => void
+}
+
 export interface SSHSession {
   id: string                     // unique session ID (stable for UI)
   type: 'ssh' | 'local'          // session type

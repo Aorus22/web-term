@@ -1,8 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react'
-import { useTerminal } from '@wterm/react'
 import { useAppStore } from '@/stores/app-store'
 import { isDesktop } from '@/lib/desktop-ipc'
-import type { ConnectOptions } from './types'
+import type { ConnectOptions, TerminalHandle } from './types'
 
 // Global map for WebSocket references so TabBar can access them for get-cwd
 const wsMap = new Map<string, WebSocket>()
@@ -40,7 +39,13 @@ const getWsBaseUrl = () => {
  * Integrates with @wterm/react terminal and Zustand store for session state.
  */
 export function useSSHSession(sessionId: string) {
-  const { ref, write, focus } = useTerminal()
+  const terminalRef = useRef<TerminalHandle | null>(null)
+  const write = useCallback((data: Uint8Array | string) => {
+    terminalRef.current?.write(data)
+  }, [])
+  const focus = useCallback(() => {
+    terminalRef.current?.focus()
+  }, [])
   const wsRef = useRef<WebSocket | null>(null)
   const lastOptionsRef = useRef<ConnectOptions | null>(null)
   const binaryBufferRef = useRef<Uint8Array[]>([])
@@ -445,7 +450,7 @@ export function useSSHSession(sessionId: string) {
   }, [])
 
   return {
-    ref,
+    ref: terminalRef,
     connect,
     attach,
     sendData,
