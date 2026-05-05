@@ -94,6 +94,7 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
           fontSize={fontSize}
           theme={theme}
           cursorBlink={cursorBlink !== false}
+          cursorStyle={cursorStyle}
           className={terminalClassName}
           style={{ ...baseStyle, ...style }}
         />
@@ -107,6 +108,7 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
         onReady={onReady}
         terminalRef={terminalRef as any}
         theme={theme}
+        cursorBlink={cursorBlink}
         className={terminalClassName}
         style={{ ...baseStyle, ...style }}
       />

@@ -31,12 +31,15 @@ SSH ke server dari browser dengan pengalaman terminal yang smooth dan reliable �
 - ✓ Per-connection auth method selection (password vs key) — v0.3.0
 - ✓ SSH local port forwarding (bind remote port to localhost) — v0.3.0
 - ✓ Backend session persistence (survive reloads and re-attach) — v0.3.0
+- ✓ Local terminal support (spawn shell on backend host) — v0.4.0
+- ✓ Dual-pane SFTP file manager UI — v0.4.0
+- ✓ SFTP file operations (list, upload, download, delete, rename) — v0.4.0
 
 ### Active
 
-- [ ] Local terminal support (spawn shell on backend host)
-- [ ] Dual-pane SFTP file manager UI
-- [ ] SFTP file operations (list, upload, download, delete, rename)
+- [ ] S3 / Object Storage integration in SFTP manager
+- [ ] SSH Agent forwarding support
+- [ ] Bulk connection edit/management
 
 ### Out of Scope
 

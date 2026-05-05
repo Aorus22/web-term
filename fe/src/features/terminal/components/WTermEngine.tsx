@@ -9,13 +9,19 @@ interface WTermEngineProps {
   onReady?: () => void
   terminalRef: React.MutableRefObject<TerminalHandle | null>
   theme?: string
+  cursorBlink?: boolean
   className?: string
   style?: React.CSSProperties
 }
 
+interface WTermInstance {
+  write: (data: Uint8Array | string) => void
+  focus: () => void
+}
+
 export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
-  ({ sendData, sendResize, onReady, terminalRef, theme, className, style }, ref) => {
-    const internalRef = useRef<any>(null)
+  ({ sendData, sendResize, onReady, terminalRef, theme, cursorBlink = true, className, style }, ref) => {
+    const internalRef = useRef<WTermInstance | null>(null)
 
     useImperativeHandle(
       ref,
@@ -34,7 +40,8 @@ export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
       [],
     )
 
-    const handleReady = (wt: any) => {
+    const handleReady = (wt: WTermInstance) => {
+      if (!wt) return
       terminalRef.current = {
         write: (data: Uint8Array | string) => {
           if (wt.write) {
@@ -59,7 +66,7 @@ export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
           }
         }}
         autoResize
-        cursorBlink={true}
+        cursorBlink={cursorBlink}
         theme={theme}
         className={className}
         onData={sendData}

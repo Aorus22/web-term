@@ -36,7 +36,7 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
 
   const hasConnectedRef = useRef(false)
 
-  console.log(`[TerminalPane:${sessionId}] Render. Status: ${session?.status}, HasAttach: ${!!attach}`)
+  // console.log(`[TerminalPane:${sessionId}] Render. Status: ${session?.status}, HasAttach: ${!!attach}`)
 
   // Derive Terminal props from settings
   const terminalTheme = settings?.terminal_color_theme || 'default'
@@ -126,15 +126,15 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
       lastOptionsRef.current = opts
       connect(opts)
     }
-  }, [settings, initialConnect, session?.status, connect]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settings, initialConnect, session, connect])
 
-  // Auto-attach for recovered sessions
-  useEffect(() => {
-    if (session?.status === 'detached' && attach) {
-      console.log(`[TerminalPane:${sessionId}] Triggering auto-attach...`)
-      attach()
-    }
-  }, [session?.status, attach, sessionId])
+    // Auto-attach for recovered sessions
+    useEffect(() => {
+      if (session?.status === 'detached' && attach) {
+        attach()
+      }
+    }, [session?.status, attach])
+
 
   // Show save banner when quick-connect session disconnects (D-06)
   useEffect(() => {
@@ -157,12 +157,13 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   }
 
   const handlePasswordConnect = (password: string) => {
+    if (!session) return
     setPasswordProvided(true)
     const opts: ConnectOptions = {
       type: 'ssh',
-      host: session!.host,
-      port: session!.port,
-      username: session!.username,
+      host: session.host,
+      port: session.port,
+      username: session.username,
       password,
       term: settings?.terminal_type || 'screen-256color',
     }
@@ -176,15 +177,16 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   }
 
   const handlePassphraseConnect = (passphrase: string) => {
+    if (!session) return
     passphraseRef.current = passphrase
     const opts: ConnectOptions = {
       type: 'ssh',
-      connectionId: session!.connectionId,
-      host: session!.host,
-      port: session!.port,
-      username: session!.username,
+      connectionId: session.connectionId,
+      host: session.host,
+      port: session.port,
+      username: session.username,
       auth_method: 'key',
-      ssh_key_id: session!.ssh_key_id,
+      ssh_key_id: session.ssh_key_id,
       passphrase,
       rows: 24,
       cols: 80,

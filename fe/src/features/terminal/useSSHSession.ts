@@ -62,7 +62,9 @@ export function useSSHSession(sessionId: string) {
         // Re-check status inside timer
         const currentStatus = useAppStore.getState().sessions.find((s) => s.id === sessionId)?.status
         if (currentStatus === 'connected' && binaryBufferRef.current.length > 0) {
-          console.log(`[WS:${sessionId}] Flushing ${binaryBufferRef.current.length} buffered binary chunks to terminal`)
+          if (import.meta.env.DEV) {
+            console.log(`[WS:${sessionId}] Flushing ${binaryBufferRef.current.length} buffered binary chunks to terminal`)
+          }
           binaryBufferRef.current.forEach(chunk => write(chunk))
           binaryBufferRef.current = []
         }
@@ -248,10 +250,12 @@ export function useSSHSession(sessionId: string) {
           
           const session = useAppStore.getState().sessions.find((s) => s.id === sessionId)
           if (session?.status === 'connected') {
-            // console.log(`[WS:${sessionId}] Binary data received, writing to terminal (${data.length} bytes)`)
+            // if (import.meta.env.DEV) console.log(`[WS:${sessionId}] Binary data received, writing to terminal (${data.length} bytes)`)
             write(data)
           } else {
-            console.log(`[WS:${sessionId}] Binary data received while status is ${session?.status}, buffering (${data.length} bytes)`)
+            if (import.meta.env.DEV) {
+              console.log(`[WS:${sessionId}] Binary data received while status is ${session?.status}, buffering (${data.length} bytes)`)
+            }
             binaryBufferRef.current.push(data)
           }
         }
@@ -295,7 +299,9 @@ export function useSSHSession(sessionId: string) {
   const signalReady = useCallback(() => {
     const socket = wsRef.current
     if (socket && socket.readyState === WebSocket.OPEN) {
-      console.log(`[WS:${sessionId}] Sending 'ready' signal (terminal initialized)`)
+      if (import.meta.env.DEV) {
+        console.log(`[WS:${sessionId}] Sending 'ready' signal (terminal initialized)`)
+      }
       socket.send(JSON.stringify({ type: 'ready' }))
     }
   }, [sessionId])
@@ -332,7 +338,9 @@ export function useSSHSession(sessionId: string) {
     const wsBase = getWsBaseUrl()
 
     const connectWithRetry = (retryCount = 0) => {
-      console.log(`[WS-Attach] Connecting to ${wsBase}/ws (attempt ${retryCount + 1})...`)
+      if (import.meta.env.DEV) {
+        console.log(`[WS-Attach] Connecting to ${wsBase}/ws (attempt ${retryCount + 1})...`)
+      }
       const socket = new WebSocket(`${wsBase}/ws`)
       wsRef.current = socket
       wsMap.set(sessionId, socket)
@@ -341,7 +349,9 @@ export function useSSHSession(sessionId: string) {
       socket.onopen = () => {
         const session = useAppStore.getState().sessions.find((s) => s.id === sessionId)
         const bId = session?.backendId || sessionId
-        console.log(`[WS-Attach] WebSocket opened, sending attach message for session: ${bId}`)
+        if (import.meta.env.DEV) {
+          console.log(`[WS-Attach] WebSocket opened, sending attach message for session: ${bId}`)
+        }
         socket.send(
           JSON.stringify({
             type: 'attach',
@@ -355,7 +365,9 @@ export function useSSHSession(sessionId: string) {
           try {
             const msg = JSON.parse(event.data)
             if (msg.type === 'connected') {
-              console.log(`[WS-Attach:${sessionId}] Successfully attached to session`)
+              if (import.meta.env.DEV) {
+                console.log(`[WS-Attach:${sessionId}] Successfully attached to session`)
+              }
               updateSession(sessionId, { status: 'connected' })
               setTimeout(() => {
                 focus()
@@ -363,14 +375,18 @@ export function useSSHSession(sessionId: string) {
                 getCwd().then(path => updateSession(sessionId, { cwd: path })).catch(() => {})
               }, 200)
             } else if (msg.type === 'error') {
-              console.error(`[WS-Attach:${sessionId}] Received error:`, msg.message)
+              if (import.meta.env.DEV) {
+                console.error(`[WS-Attach:${sessionId}] Received error:`, msg.message)
+              }
               updateSession(sessionId, {
                 status: 'error',
                 error: msg.message || 'Attach failed',
               })
               socket.close()
             } else if (msg.type === 'disconnected') {
-              console.log(`[WS-Attach:${sessionId}] Received disconnected message`)
+              if (import.meta.env.DEV) {
+                console.log(`[WS-Attach:${sessionId}] Received disconnected message`)
+              }
               updateSession(sessionId, { status: 'disconnected' })
             }
           } catch {
@@ -393,13 +409,17 @@ export function useSSHSession(sessionId: string) {
       }
 
       socket.onclose = () => {
-        console.log(`[WS-Attach] WebSocket closed (sessionId: ${sessionId}, retryCount: ${retryCount})`)
+        if (import.meta.env.DEV) {
+          console.log(`[WS-Attach] WebSocket closed (sessionId: ${sessionId}, retryCount: ${retryCount})`)
+        }
         wsRef.current = null
         wsMap.delete(sessionId)
         
         const session = useAppStore.getState().sessions.find((s) => s.id === sessionId)
         if (session && session.status === 'connecting' && retryCount < 3) {
-          console.warn(`[WS-Attach] Unexpected close during attachment, retrying in 2s...`)
+          if (import.meta.env.DEV) {
+            console.warn(`[WS-Attach] Unexpected close during attachment, retrying in 2s...`)
+          }
           setTimeout(() => connectWithRetry(retryCount + 1), 2000)
         } else if (session && session.status !== 'error' && session.status !== 'disconnected' && session.status !== 'connecting') {
           updateSession(sessionId, { status: 'disconnected' })
@@ -407,7 +427,9 @@ export function useSSHSession(sessionId: string) {
       }
 
       socket.onerror = (err) => {
-        console.error(`[WS-Attach] WebSocket error:`, err)
+        if (import.meta.env.DEV) {
+          console.error(`[WS-Attach] WebSocket error:`, err)
+        }
         wsRef.current = null
       }
     }

@@ -13,6 +13,7 @@ interface XTermEngineProps {
   fontSize?: string
   theme?: string
   cursorBlink?: boolean
+  cursorStyle?: 'block' | 'underline' | 'bar'
   className?: string
   style?: React.CSSProperties
 }
@@ -28,6 +29,7 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       fontSize = '14',
       theme = 'default',
       cursorBlink = true,
+      cursorStyle = 'block',
       className,
       style,
     },
@@ -87,6 +89,14 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       }
     }, [theme, getXTermTheme])
 
+    // Update cursor settings when they change
+    useEffect(() => {
+      if (terminalRefInternal.current) {
+        terminalRefInternal.current.options.cursorBlink = cursorBlink
+        terminalRefInternal.current.options.cursorStyle = cursorStyle
+      }
+    }, [cursorBlink, cursorStyle])
+
     useEffect(() => {
       if (!containerRef.current) return
 
@@ -97,6 +107,7 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           fontFamily: `'${fontFamily}', monospace`,
           fontSize: parseInt(fontSize, 10),
           cursorBlink,
+          cursorStyle,
           allowProposedApi: true,
           allowTransparency: true,
           theme: getXTermTheme(theme),
@@ -161,7 +172,7 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       // We intentionally exclude 'theme' from this dependency array to avoid
       // full terminal re-initialization when the theme changes.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fontFamily, fontSize, cursorBlink, sendData, sendResize, onReady, terminalRef, getXTermTheme])
+    }, [fontFamily, fontSize, cursorBlink, cursorStyle, sendData, sendResize, onReady, terminalRef, getXTermTheme])
 
     return (
       <div

@@ -21,8 +21,9 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 | **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | ✅ Shipped | 2026-05-04 |
 | **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | ✅ Shipped | 2026-05-05 |
 | **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | ✅ Shipped | 2026-05-05 |
-| **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | 🏗️ In Progress | 2026-05-05 |
-| **18. Terminal Engine Selector** | v0.4.0 | Allow users to switch between @wterm/react and xterm.js in settings. | ⏳ Todo | 2026-05-06 |
+| **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | ✅ Shipped | 2026-05-05 |
+| **18. Terminal Engine Selector** | v0.4.0 | Allow users to switch between @wterm/react and xterm.js in settings. | ✅ Shipped | 2026-05-06 |
+| **19. Polish & Review Fixes** | v0.4.0 | Address code review findings from Phase 18 and finalize milestone. | ✅ Shipped | 2026-05-06 |
 
 ## Phase Details
 
