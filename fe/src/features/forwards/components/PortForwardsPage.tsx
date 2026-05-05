@@ -88,7 +88,7 @@ export const PortForwardsPage = () => {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold tracking-tight">Port Forwards</h1>
+          <h1 className="text-lg font-semibold tracking-tight">Port Forwards</h1>
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
             SSH Tunneling
           </p>
