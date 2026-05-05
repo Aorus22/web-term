@@ -19,7 +19,6 @@ export function useTheme() {
 
   // Apply theme to DOM
   useEffect(() => {
-    const root = window.document.documentElement
     const applyTheme = (currentTheme: Theme) => {
       const effective: ResolvedTheme = currentTheme === 'system'
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

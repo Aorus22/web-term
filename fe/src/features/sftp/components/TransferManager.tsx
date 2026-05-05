@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useSFTPStore, type TransferStatus } from '../stores/sftp-store'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'

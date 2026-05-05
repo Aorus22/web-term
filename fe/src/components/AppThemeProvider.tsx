@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSettings } from '@/features/settings/hooks/useSettings';
-import { useTheme } from '@/hooks/use-theme';
 import { terminalThemes } from '@/features/settings/data/terminal-themes';
 
 interface AppThemeProviderProps {
@@ -41,7 +40,6 @@ function hexToRgba(hex: string, opacity: number) {
 
 export const AppThemeProvider: React.FC<AppThemeProviderProps> = ({ children }) => {
   const { data: settings } = useSettings();
-  const { theme: themeMode } = useTheme();
 
   const activeTerminalTheme = useMemo(() => {
     const themeName = settings?.terminal_color_theme || 'default';
