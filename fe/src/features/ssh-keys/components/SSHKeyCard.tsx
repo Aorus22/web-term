@@ -24,22 +24,17 @@ export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
           <CardTitle className="text-sm font-bold truncate" title={sshKey.name}>
             {sshKey.name}
           </CardTitle>
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-normal bg-muted border-none">
-              {sshKey.key_type}
+          {sshKey.has_passphrase && (
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-normal text-primary border-primary/20 mt-1.5">
+              Encrypted
             </Badge>
-            {sshKey.has_passphrase && (
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-normal text-primary border-primary/20">
-                Encrypted
-              </Badge>
-            )}
-          </div>
+          )}
           <p className="text-[10px] text-muted-foreground truncate mt-1" title={sshKey.fingerprint}>
             {sshKey.fingerprint}
           </p>
         </div>
         
-        <div className="flex-shrink-0 self-start">
+        <div className="flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
