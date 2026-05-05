@@ -17,15 +17,15 @@ interface SSHKeyCardProps {
 
 export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
   return (
-    <Card className="group relative overflow-hidden transition-all border-border/50 hover:border-primary/50 hover:shadow-sm">
-      <div className="p-3 flex flex-row items-center gap-4">
+    <Card className="group relative overflow-hidden transition-all border-border/40 hover:border-primary/40 hover:shadow-md py-0 gap-0">
+      <div className="flex items-center p-4 gap-4">
         {/* Left: Icon */}
-        <div className="flex-shrink-0 w-9 h-9 rounded-md flex items-center justify-center bg-muted/50">
+        <div className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center bg-muted/50">
           <Key className="h-4 w-4 text-muted-foreground/70" />
         </div>
 
         {/* Middle: Info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 py-0">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-bold truncate leading-tight" title={sshKey.name}>
               {sshKey.name}
@@ -36,7 +36,7 @@ export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground truncate leading-none mt-0.5" title={sshKey.fingerprint}>
+          <p className="text-xs text-muted-foreground truncate leading-none mt-1" title={sshKey.fingerprint}>
             {sshKey.fingerprint}
           </p>
         </div>
