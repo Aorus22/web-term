@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useSSHSession } from './useSSHSession'
 import { useAppStore } from '@/stores/app-store'
@@ -24,9 +24,9 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   const session = useAppStore((s) => s.sessions.find((s) => s.id === sessionId))
   const { data: settings } = useSettings()
 
-  const handleTerminalReady = () => {
+  const handleTerminalReady = useCallback(() => {
     signalReady()
-  }
+  }, [signalReady])
 
   const removeSession = useAppStore((s) => s.removeSession)
   const lastOptionsRef = useRef<ConnectOptions | null>(initialConnect ?? null)
