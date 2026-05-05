@@ -47,15 +47,15 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": null
+      "icon": "assets/icon.png"
     },
     "mac": {
       "target": "dmg",
-      "icon": null
+      "icon": "assets/icon.png"
     },
     "linux": {
       "target": "AppImage",
-      "icon": null
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,

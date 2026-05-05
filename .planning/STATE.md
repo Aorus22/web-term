@@ -46,6 +46,7 @@ accumulated_context:
     - "v0.3.0: SSH Key Auth & UI Redesign"
     - "v0.4.0: Local Terminal & SFTP"
     - "Phase 17 added: Sync terminal theme selection to overall application theme"
+    - "Phase 18 added: Terminal Engine Selector: Allow users to switch between @wterm/react and xterm.js in settings"
   pending_todos: []
   blockers_concerns: []
 deferred_items: []

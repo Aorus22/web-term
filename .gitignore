@@ -31,3 +31,4 @@ Thumbs.db
 .env
 *.db
 .serenabe/storage/
+squashfs-root/

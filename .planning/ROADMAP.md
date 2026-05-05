@@ -12,7 +12,7 @@ Milestone v0.4.0 introduces local terminal access and a dual-pane SFTP file mana
 Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 
 ## Progress
-**Execution Order:** Phases 12 → 13 → 14 → 15 → 16 → 17
+**Execution Order:** Phases 12 → 13 → 14 → 15 → 16 → 17 → 18
 
 | Phase | Milestone | Description | Status | Target |
 |-------|-----------|-------------|--------|--------|
@@ -22,6 +22,7 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 | **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | ✅ Shipped | 2026-05-05 |
 | **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | ✅ Shipped | 2026-05-05 |
 | **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | 🏗️ In Progress | 2026-05-05 |
+| **18. Terminal Engine Selector** | v0.4.0 | Allow users to switch between @wterm/react and xterm.js in settings. | ⏳ Todo | 2026-05-06 |
 
 ## Phase Details
 
@@ -94,3 +95,21 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
     - Update settings UI to trigger app theme change on terminal theme selection.
     - Ensure all app components (sidebar, tabs, panels) respond to the synced theme.
     - Handle edge cases (custom themes, fallback colors).
+
+### Phase 18: Terminal Engine Selector
+- **Goal:** Provide an alternative terminal engine (xterm.js) for users who prefer it or need specific xterm features.
+- **Plans:** 3 plans
+- **Plan list:**
+    - [ ] 18-01-PLAN.md — Foundation, Backend Settings, and Dependency Setup.
+    - [ ] 18-02-PLAN.md — Terminal Engine Abstraction (WTerm & XTerm components).
+    - [ ] 18-03-PLAN.md — UI Integration into TerminalPane and Settings page.
+- **Requirements:** [ENGINE-01, ENGINE-02, ENGINE-03]
+- **Tasks:**
+    - Add "Terminal Engine" selection to Settings page.
+    - Integrate `xterm.js` and `@xterm/addon-fit`.
+    - Create a wrapper component to toggle between `@wterm/react` and `xterm.js`.
+    - Ensure input/output and resizing work correctly for both engines.
+
+---
+
+*Last updated: 2026-05-06 after planning Phase 18*

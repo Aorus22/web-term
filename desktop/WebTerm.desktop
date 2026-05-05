@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=WebTerm
+Exec=/home/programer/Projects/web-term/desktop/node_modules/.bin/electron /home/programer/Projects/web-term/desktop
+Icon=/home/programer/Projects/web-term/desktop/assets/icon.png
+Type=Application
+Categories=Terminal;

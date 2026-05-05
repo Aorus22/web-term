@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, globalShortcut, nativeImage } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -105,7 +105,7 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         title: "WebTerm Desktop",
-        icon: path.join(__dirname, 'assets', 'logo.svg')
+        icon: nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')),
     });
 
     const isDev = process.env.NODE_ENV === 'development';
