@@ -342,6 +342,9 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 				}
 				connectedJSON, _ := json.Marshal(connectedMsg)
 				_ = session.WriteWS(websocket.TextMessage, connectedJSON)
+
+				// Register for local clipboard (system-wide clipboard on backend machine)
+				GlobalClipboardManager.RegisterLocalClient(conn)
 			}
 		} else {
 
@@ -404,6 +407,9 @@ func wsMessageLoop(conn *websocket.Conn, session *ManagedSession) {
 			session.LastSeen = time.Now()
 		}
 		session.mu.Unlock()
+
+		// Unregister from local clipboard
+		GlobalClipboardManager.UnregisterLocalClient(conn)
 	}()
 
 	for {
@@ -453,6 +459,19 @@ func wsMessageLoop(conn *websocket.Conn, session *ManagedSession) {
 				case "disconnect":
 					GlobalSessionManager.RemoveSession(session.ID)
 					return
+				case "clipboard_write":
+					var clipboardMsg struct {
+						Content string `json:"content"`
+					}
+					if err := json.Unmarshal(msgData, &clipboardMsg); err == nil && clipboardMsg.Content != "" {
+						if session.Type == SessionTypeSSH {
+							go func() {
+								if err := GlobalClipboardManager.WriteToClipboard(session.ID, clipboardMsg.Content); err != nil {
+									log.Printf("[WS:%s] clipboard write error: %v", session.ID, err)
+								}
+							}()
+						}
+					}
 				}
 			}
 		} else if msgType == websocket.BinaryMessage {

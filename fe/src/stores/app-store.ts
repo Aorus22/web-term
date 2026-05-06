@@ -11,11 +11,18 @@ export interface SFTPClipboard {
   isDir: boolean;
 }
 
+export interface ClipboardEntry {
+  id: string
+  content: string
+  timestamp: number
+  sessionId: string
+}
+
 interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
-  sidebarPage: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp'
-  setSidebarPage: (page: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp') => void
+  sidebarPage: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp' | 'clipboard'
+  setSidebarPage: (page: 'hosts' | 'keys' | 'forwards' | 'settings' | 'new-tab' | 'sftp' | 'clipboard') => void
   editingConnection: Connection | null
   setEditingConnection: (c: Connection | null) => void
   creatingConnection: boolean
@@ -38,6 +45,10 @@ interface AppState {
   // SFTP Clipboard
   sftpClipboard: SFTPClipboard | null
   setSftpClipboard: (clipboard: SFTPClipboard | null) => void
+  // Clipboard history
+  clipboardHistory: ClipboardEntry[]
+  addClipboardEntry: (entry: ClipboardEntry) => void
+  clearClipboardHistory: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -132,4 +143,9 @@ export const useAppStore = create<AppState>((set) => ({
   setBackendPort: (port) => set({ backendPort: port }),
   sftpClipboard: null,
   setSftpClipboard: (clipboard) => set({ sftpClipboard: clipboard }),
+  clipboardHistory: [],
+  addClipboardEntry: (entry) => set((state) => ({
+    clipboardHistory: [entry, ...state.clipboardHistory].slice(0, 100),
+  })),
+  clearClipboardHistory: () => set({ clipboardHistory: [] }),
 }))

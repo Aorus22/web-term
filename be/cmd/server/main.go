@@ -14,6 +14,7 @@ import (
 	"webterm/internal/api"
 	"webterm/internal/config"
 	"webterm/internal/db"
+	"webterm/internal/ssh"
 )
 
 func corsMux(next http.Handler, origins []string) http.Handler {
@@ -72,6 +73,13 @@ func main() {
 	database, err := db.Init(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Start local clipboard helper (system-wide clipboard on backend machine)
+	if err := ssh.GlobalClipboardManager.StartLocalClipboard(); err != nil {
+		log.Printf("Warning: Failed to start local clipboard helper: %v", err)
+	} else {
+		log.Println("Local clipboard helper started")
 	}
 
 	mux := http.NewServeMux()

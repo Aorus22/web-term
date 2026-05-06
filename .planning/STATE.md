@@ -2,9 +2,9 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
 status: active
-stopped_at: Phase 19 completed
+stopped_at: Phase 20 completed
 last_updated: "2026-05-06T00:00:00.000Z"
-last_activity: 2026-05-06 — Completed Phase 19: Polish & Review Fixes and addressed Phase 18 review findings.
+last_activity: 2026-05-05 — Completed Phase 20: Clipboard View - real-time clipboard monitoring for SSH.
 progress:
   total_phases: 8
   completed_phases: 8

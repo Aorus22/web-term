@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { PanelLeft, Server, Key, ArrowLeftRight, Settings, Files } from 'lucide-react'
+import { PanelLeft, Server, Key, ArrowLeftRight, Settings, Files, Clipboard } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -16,6 +16,7 @@ import { SSHKeysPage } from '@/features/ssh-keys/components/SSHKeysPage'
 import { PortForwardsPage } from '@/features/forwards/components/PortForwardsPage'
 import { SettingsPage } from '@/features/settings/components/SettingsPage'
 import { SFTPView } from '@/features/sftp/components/SFTPView'
+import { ClipboardView } from '@/features/clipboard/components/ClipboardView'
 import { NewTabView } from '@/components/NewTabView'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import { AppThemeProvider } from '@/components/AppThemeProvider'
@@ -233,6 +234,18 @@ function AppContent() {
           >
             <Files className="h-4 w-4" /> SFTP
           </button>
+          <button 
+            onClick={() => {
+              setSidebarPage('clipboard')
+              setActiveSession(null)
+            }} 
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", 
+              sidebarPage === 'clipboard' ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
+            )}
+          >
+            <Clipboard className="h-4 w-4" /> Clipboard
+          </button>
         </nav>
 
         <div className="flex-1" />
@@ -312,6 +325,9 @@ function AppContent() {
           )}
           {!activeSessionId && sidebarPage === 'sftp' && (
             <SFTPView />
+          )}
+          {!activeSessionId && sidebarPage === 'clipboard' && (
+            <ClipboardView />
           )}
         </div>
       </main>

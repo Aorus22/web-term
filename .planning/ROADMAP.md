@@ -24,6 +24,7 @@ Implement local shell support and a Termius-inspired dual-pane SFTP manager.
 | **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | ✅ Shipped | 2026-05-05 |
 | **18. Terminal Engine Selector** | v0.4.0 | Allow users to switch between @wterm/react and xterm.js in settings. | ✅ Shipped | 2026-05-06 |
 | **19. Polish & Review Fixes** | v0.4.0 | Address code review findings from Phase 18 and finalize milestone. | ✅ Shipped | 2026-05-06 |
+| **20. Clipboard View** | v0.4.0 | Real-time clipboard monitoring for SSH target machines with searchable history. | ✅ Shipped | |
 
 ## Phase Details
 
