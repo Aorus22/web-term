@@ -17,6 +17,14 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+func getExeDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	return filepath.Dir(exe)
+}
+
 type ClipboardManager struct {
 	sessions      map[string]*ClipboardSession
 	mu            sync.RWMutex
@@ -49,9 +57,11 @@ func init() {
 }
 
 func NewClipboardManager() *ClipboardManager {
+	exeDir := getExeDir()
 	return &ClipboardManager{
-		sessions:       make(map[string]*ClipboardSession),
-		localHelperPath: "be/cmd/clip-helper",
+		sessions:        make(map[string]*ClipboardSession),
+		localHelperPath: filepath.Join(exeDir, "cmd", "clip-helper"),
+		localClients:    make(map[*websocket.Conn]bool),
 	}
 }
 
@@ -267,7 +277,8 @@ func (cm *ClipboardManager) StartLocalClipboard() error {
 		return nil
 	}
 
-	cmd := exec.Command("be/cmd/clip-local")
+	exeDir := getExeDir()
+	cmd := exec.Command(filepath.Join(exeDir, "cmd", "clip-local"))
 	cmd.Stdout = pipe{cm, true}
 	cmd.Stderr = os.Stderr
 

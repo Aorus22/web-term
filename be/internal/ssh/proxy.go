@@ -1,6 +1,8 @@
 package ssh
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +19,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
 )
@@ -486,4 +490,397 @@ func sendWSError(conn *websocket.Conn, message string) {
 		"message": message,
 	})
 	_ = conn.WriteMessage(websocket.TextMessage, resp)
+}
+
+type ClipboardConnectMessage struct {
+	Host         string `json:"host"`
+	Port         int    `json:"port"`
+	User         string `json:"user"`
+	Password     string `json:"password"`
+	AuthMethod   string `json:"auth_method,omitempty"`
+	SSHKeyID     string `json:"ssh_key_id,omitempty"`
+	Passphrase   string `json:"passphrase,omitempty"`
+	ConnectionID string `json:"connection_id,omitempty"`
+}
+
+func HandleClipboardWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("[ClipboardWS] WebSocket upgrade error: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		_, msgData, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("[ClipboardWS] Failed to read initial message: %v", err)
+			return
+		}
+
+		var connectMsg ClipboardConnectMessage
+		if err := json.Unmarshal(msgData, &connectMsg); err != nil {
+			sendWSError(conn, "Invalid JSON message")
+			return
+		}
+
+		// Resolve connection credentials
+		var host, user, password string
+		var port int
+		var keySigner ssh.Signer
+
+		if connectMsg.ConnectionID != "" {
+			var dbConn db.Connection
+			if err := database.First(&dbConn, "id = ?", connectMsg.ConnectionID).Error; err != nil {
+				sendWSError(conn, "Connection not found")
+				return
+			}
+
+			authMethod := dbConn.AuthMethod
+			if authMethod == "" {
+				authMethod = "password"
+			}
+
+			host = dbConn.Host
+			port = dbConn.Port
+			user = dbConn.Username
+
+			if authMethod == "key" && dbConn.SSHKeyID != nil {
+				var key db.SSHKey
+				if err := database.First(&key, "id = ?", *dbConn.SSHKeyID).Error; err != nil {
+					sendWSError(conn, "SSH key not found")
+					return
+				}
+
+				decryptedKey, err := config.DecryptWithAAD(key.EncryptedKey, cfg.EncryptionKey, []byte(config.SSHKeyAAD))
+				if err != nil {
+					sendWSError(conn, "Failed to decrypt SSH key")
+					return
+				}
+
+				var parsedKey interface{}
+				if connectMsg.Passphrase != "" {
+					parsedKey, err = ssh.ParseRawPrivateKeyWithPassphrase([]byte(decryptedKey), []byte(connectMsg.Passphrase))
+				} else {
+					parsedKey, err = ssh.ParseRawPrivateKey([]byte(decryptedKey))
+				}
+
+				if err != nil {
+					sendWSError(conn, "Failed to parse SSH key: invalid passphrase or corrupted key")
+					return
+				}
+
+				keySigner, err = ssh.NewSignerFromKey(parsedKey)
+				if err != nil {
+					sendWSError(conn, "Failed to create SSH signer from key")
+					return
+				}
+			} else if authMethod == "key" {
+				sendWSError(conn, "Connection has auth_method=key but no ssh_key_id configured")
+				return
+			} else {
+				decrypted, err := config.Decrypt(dbConn.Encrypted, cfg.EncryptionKey)
+				if err != nil {
+					sendWSError(conn, "Failed to decrypt connection credentials")
+					return
+				}
+				password = decrypted
+			}
+		} else {
+			host = connectMsg.Host
+			port = connectMsg.Port
+			user = connectMsg.User
+			password = connectMsg.Password
+		}
+
+		// SSH client config
+		config := &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{},
+		}
+
+		if keySigner != nil {
+			config.Auth = append(config.Auth, ssh.PublicKeys(keySigner))
+		} else if password != "" {
+			config.Auth = append(config.Auth, ssh.Password(password))
+		}
+
+		config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+
+		// Connect to SSH
+		client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), config)
+		if err != nil {
+			sendWSError(conn, fmt.Sprintf("SSH connection failed: %v", err))
+			return
+		}
+		defer client.Close()
+
+		// Create a session specifically for clipboard monitoring (no PTY)
+		session, err := client.NewSession()
+		if err != nil {
+			sendWSError(conn, "Failed to create SSH session for clipboard")
+			return
+		}
+		defer session.Close()
+
+		// Detect remote OS
+		var remoteOS string
+		if stdout, err := session.Output("uname -s"); err == nil {
+			os := strings.TrimSpace(string(stdout))
+			if strings.Contains(os, "Linux") {
+				remoteOS = "Linux"
+			} else if strings.Contains(os, "MINGW") || strings.Contains(os, "MSYS") || strings.Contains(os, "CYGWIN") || strings.Contains(os, "Windows") {
+				remoteOS = "Windows"
+			} else {
+				remoteOS = os
+			}
+		} else {
+			if _, err := session.Output("powershell -Command Get-Date"); err == nil {
+				remoteOS = "Windows"
+			} else {
+				remoteOS = "Unknown"
+			}
+		}
+
+		// Upload and run clip-helper binary on remote
+		binName := "web-term-clip.exe"
+		vbsStart := "run-clipper.vbs"
+		vbsStop := "stop-clipper.vbs"
+
+		// Upload via SFTP
+		log.Printf("[ClipboardWS] Uploading clip-helper files via SFTP...")
+
+		sftpClient, err := sftp.NewClient(client)
+		if err != nil {
+			log.Printf("[ClipboardWS] SFTP creation failed: %v", err)
+		} else {
+			defer sftpClient.Close()
+
+			// Get remote home path via new session
+			var remoteHome string
+			homeSession, homeErr := client.NewSession()
+			if homeErr == nil {
+				homeOut, _ := homeSession.Output("powershell -NoProfile -Command \"[Environment]::GetFolderPath('UserProfile')\"")
+				remoteHome = strings.TrimSpace(string(homeOut))
+				homeSession.Close()
+			}
+			if remoteHome == "" {
+				sendWSError(conn, "Failed to determine user home directory")
+				return
+			}
+
+			// Use backslash for Windows
+			remotePath := remoteHome + "\\testing-clip"
+			log.Printf("[ClipboardWS] Remote path: %s", remotePath)
+
+			// Create directory
+			if err := sftpClient.Mkdir(remotePath); err != nil {
+				log.Printf("[ClipboardWS] Mkdir: %v (may already exist)", err)
+			}
+
+			// Upload binary
+			localBin := filepath.Join(getExeDir(), "cmd", "clip-helper", binName)
+			data, err := os.ReadFile(localBin)
+			if err != nil {
+				log.Printf("[ClipboardWS] Read binary: %v", err)
+			} else {
+				dst, err := sftpClient.Create(remotePath + "/" + binName)
+				if err != nil {
+					log.Printf("[ClipboardWS] Create binary: %v", err)
+				} else {
+					if _, err := dst.Write(data); err != nil {
+						log.Printf("[ClipboardWS] Write binary: %v", err)
+					} else {
+						log.Printf("[ClipboardWS] Binary uploaded")
+					}
+					dst.Close()
+				}
+			}
+
+			// Upload VBS start
+			localVBS := filepath.Join(getExeDir(), "cmd", "clip-helper", vbsStart)
+			vbsData, err := os.ReadFile(localVBS)
+			if err != nil {
+				log.Printf("[ClipboardWS] Read VBS: %v", err)
+			} else {
+				dst, err := sftpClient.Create(remotePath + "/" + vbsStart)
+				if err != nil {
+					log.Printf("[ClipboardWS] Create VBS: %v", err)
+				} else {
+					if _, err := dst.Write(vbsData); err != nil {
+						log.Printf("[ClipboardWS] Write VBS: %v", err)
+					} else {
+						log.Printf("[ClipboardWS] VBS uploaded")
+					}
+					dst.Close()
+				}
+			}
+
+			// Upload VBS stop
+			localVBSStop := filepath.Join(getExeDir(), "cmd", "clip-helper", vbsStop)
+			vbsStopData, err := os.ReadFile(localVBSStop)
+			if err != nil {
+				log.Printf("[ClipboardWS] Read VBS stop: %v", err)
+			} else {
+				dst, err := sftpClient.Create(remotePath + "/" + vbsStop)
+				if err != nil {
+					log.Printf("[ClipboardWS] Create VBS stop: %v", err)
+				} else {
+					if _, err := dst.Write(vbsStopData); err != nil {
+						log.Printf("[ClipboardWS] Write VBS stop: %v", err)
+					} else {
+						log.Printf("[ClipboardWS] VBS stop uploaded")
+					}
+					dst.Close()
+				}
+			}
+
+			log.Printf("[ClipboardWS] All files uploaded via SFTP")
+
+			// Run clipboard monitor via PowerShell Start-Process (more reliable than VBS)
+			log.Printf("[ClipboardWS] Starting clip-helper via PowerShell...")
+			runSession, _ := client.NewSession()
+			if runSession != nil {
+				exePath := remotePath + "\\web-term-clip.exe"
+				outputPath := remoteHome + "\\clipboard-output.log"
+				cmd := fmt.Sprintf("Start-Process -FilePath '%s' -WindowStyle Hidden -RedirectStandardOutput '%s' -RedirectStandardError '%s'", exePath, outputPath, strings.Replace(outputPath, ".log", "-err.log", 1))
+				log.Printf("[ClipboardWS] Running: %s", cmd)
+				out, err := runSession.Output("powershell -NoProfile -Command \"" + cmd + "\"")
+				log.Printf("[ClipboardWS] Start-Process result: err=%v, out=%s", err, string(out))
+				runSession.Close()
+			}
+			
+			// Wait a bit and check if binary is running
+			time.Sleep(3 * time.Second)
+			checkSession, _ := client.NewSession()
+			if checkSession != nil {
+				taskOut, _ := checkSession.Output("powershell -NoProfile -Command \"Get-Process web-term-clip -ErrorAction SilentlyContinue | Select-Object Name,Id\"")
+				log.Printf("[ClipboardWS] Process check: %s", string(taskOut))
+				checkSession.Close()
+			}
+
+			// Start polling output file
+			go func() {
+				lastContent := ""
+				ticker := time.NewTicker(1 * time.Second)
+				defer ticker.Stop()
+
+				for range ticker.C {
+					var out bytes.Buffer
+					readSession, err := client.NewSession()
+					if err != nil {
+						continue
+					}
+
+					if remoteOS == "Windows" {
+						outputPath := remoteHome + "\\clipboard-output.log"
+						readSession.Stdout = &out
+						readSession.Run("powershell -NoProfile -Command \"Get-Content '" + outputPath + "'\"")
+					}
+					readSession.Close()
+
+					content := strings.TrimSpace(out.String())
+					if content != "" && content != lastContent {
+						lastContent = content
+
+						// Parse CLIP: lines
+						lines := strings.Split(content, "\n")
+						for _, line := range lines {
+							line = strings.TrimSpace(line)
+							if strings.HasPrefix(line, "CLIP:") {
+								clipData := strings.TrimPrefix(line, "CLIP:")
+								if decoded, err := base64.StdEncoding.DecodeString(clipData); err == nil {
+									clipMsg := ClipboardMessage{
+										Type:    "text",
+										Content: string(decoded),
+									}
+									if err := conn.WriteJSON(clipMsg); err != nil {
+										log.Printf("[ClipboardWS] Send error: %v", err)
+										return
+									}
+								}
+							}
+						}
+					}
+				}
+			}()
+		}
+
+		// Keep connection alive and handle incoming messages (e.g., write to remote clipboard)
+		// Cleanup on disconnect
+		defer func() {
+			log.Printf("[ClipboardWS] Connection closing, stopping clipper...")
+			if remoteOS == "Windows" {
+				_, _ = session.Output("cscript //B stop-clipper.vbs")
+			}
+		}()
+
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+
+			// Handle incoming messages - e.g., client wants to set remote clipboard
+			var clientMsg map[string]interface{}
+			if err := json.Unmarshal(msg, &clientMsg); err != nil {
+				continue
+			}
+
+			if clientMsg["type"] == "set_clipboard" {
+				content, ok := clientMsg["content"].(string)
+				if ok && content != "" {
+					// Create a new session for writing clipboard
+					writeSession, err := client.NewSession()
+					if err != nil {
+						log.Printf("[ClipboardWS] Set clipboard session error: %v", err)
+						continue
+					}
+
+					var stdout, stderr bytes.Buffer
+					writeSession.Stdout = &stdout
+					writeSession.Stderr = &stderr
+
+					if remoteOS == "Windows" {
+						escaped := strings.ReplaceAll(content, "\"", "`\"")
+						_ = writeSession.Run(fmt.Sprintf("powershell -Command Set-Clipboard -Value \"%s\"", escaped))
+					} else {
+						escaped := strings.ReplaceAll(content, "'", "'\\''")
+						_ = writeSession.Run(fmt.Sprintf("echo '%s' | xclip -i -selection clipboard 2>/dev/null || echo '%s' | pbcopy 2>/dev/null", escaped, escaped))
+					}
+					writeSession.Close()
+				}
+			} else if clientMsg["type"] == "get_clipboard" {
+				// Get clipboard from remote and send it back
+				readSession, err := client.NewSession()
+				if err != nil {
+					continue
+				}
+
+				var stdout, stderr bytes.Buffer
+				readSession.Stdout = &stdout
+				readSession.Stderr = &stderr
+
+				var cmd string
+				if remoteOS == "Windows" {
+					cmd = "powershell -NoProfile -Command Get-Clipboard"
+				} else {
+					cmd = "xclip -o -selection clipboard 2>/dev/null || pbpaste 2>/dev/null"
+				}
+
+				_ = readSession.Run(cmd)
+				readSession.Close()
+
+				clipContent := strings.TrimSpace(stdout.String())
+				if clipContent != "" {
+					msg := ClipboardMessage{
+						Type:    "clipboard_update",
+						Content: clipContent,
+					}
+					data, _ := json.Marshal(msg)
+					_ = conn.WriteMessage(websocket.TextMessage, data)
+				}
+			}
+		}
+	}
 }

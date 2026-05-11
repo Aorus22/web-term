@@ -13,17 +13,31 @@ import (
 
 var lastContent string
 
+// Simple debug logging to file
+func debugLog(format string, args ...interface{}) {
+	f, _ := os.OpenFile("clip-helper.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if f != nil {
+		fmt.Fprintf(f, format+"\n", args...)
+		f.Close()
+	}
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
+}
+
 func main() {
+	debugLog("[DEBUG] Starting clip-helper...")
+
 	osName := detectOS()
+	debugLog("[DEBUG] Detected OS: %s", osName)
 
 	var readCmd []string
 	var writeCmd func(string) *exec.Cmd
 
 	switch osName {
 	case "windows":
-		readCmd = []string{"powershell", "-Command", "Get-Clipboard -Raw"}
+		readCmd = []string{"powershell", "-NoProfile", "-Command", "Get-Clipboard -Raw"}
+		fmt.Fprintf(os.Stderr, "[DEBUG] Windows read cmd: %v\n", readCmd)
 		writeCmd = func(content string) *exec.Cmd {
-			cmd := exec.Command("powershell", "-Command", fmt.Sprintf("Set-Clipboard -Value '%s'", escapePowerShell(content)))
+			cmd := exec.Command("powershell", "-NoProfile", "-Command", fmt.Sprintf("Set-Clipboard -Value '%s'", escapePowerShell(content)))
 			return cmd
 		}
 	case "linux":
@@ -50,6 +64,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unsupported OS: %s\n", osName)
 		os.Exit(1)
 	}
+
+	debugLog("[DEBUG] Read cmd: %v", readCmd)
 
 	// Channel to handle writes from stdin
 	writeChan := make(chan string, 10)
@@ -83,21 +99,33 @@ func main() {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
+	debugLog("[DEBUG] Starting poll loop...")
+
 	for range ticker.C {
 		// Check for pending writes first
 		select {
 		case content := <-writeChan:
 			lastContent = content
+			debugLog("[DEBUG] Got write: %d chars", len(content))
 		default:
 		}
 
 		content := getClipboard(readCmd)
+		debugLog("[DEBUG] getClipboard result: len=%d, lastLen=%d", len(content), len(lastContent))
+
 		if content == "" || content == lastContent {
 			continue
 		}
 
 		lastContent = content
 		encoded := base64.StdEncoding.EncodeToString([]byte(content))
+		debugLog("[DEBUG] Sending CLIP: %d chars", len(content))
+		// Also write to log file
+		f, _ := os.OpenFile("clipboard-output.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if f != nil {
+			fmt.Fprintf(f, "CLIP:%s\n", encoded)
+			f.Close()
+		}
 		fmt.Printf("CLIP:%s\n", encoded)
 	}
 }

@@ -11,6 +11,11 @@ cd be
 GOOS=linux GOARCH=amd64 go build -o web-term-clip ./cmd/clip-helper
 GOOS=windows GOARCH=amd64 go build -o web-term-clip.exe ./cmd/clip-helper
 echo "Created: web-term-clip (Linux), web-term-clip.exe (Windows)"
+
+# Build local clipboard helper (for backend local clipboard monitoring)
+GOOS=linux GOARCH=amd64 go build -o clip-local ./cmd/clip-local
+GOOS=darwin GOARCH=amd64 go build -o clip-local ./cmd/clip-local
+echo "Created: clip-local"
 cd ..
 
 # Build frontend

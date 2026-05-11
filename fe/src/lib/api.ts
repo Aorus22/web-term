@@ -242,3 +242,84 @@ export const sftpApi = {
       return r.json()
     }),
 }
+
+export interface ClipboardMessage {
+  type: 'clipboard_update' | 'connected' | 'error'
+  content?: string
+  message?: string
+}
+
+type ClipboardMessageHandler = (message: ClipboardMessage) => void
+
+class ClipboardWSManager {
+  private ws: WebSocket | null = null
+  private handlers: Set<ClipboardMessageHandler> = new Set()
+
+  connect(connectionId: string, credentials?: { host: string; port: number; user: string; password: string }): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const baseUrl = getBaseUrl().replace('http', 'ws')
+      const wsUrl = `${baseUrl}/api/clipboard/ws`
+
+      const message = credentials
+        ? {
+            host: credentials.host,
+            port: credentials.port,
+            user: credentials.user,
+            password: credentials.password,
+          }
+        : { connection_id: connectionId }
+
+      this.ws = new WebSocket(wsUrl)
+
+      this.ws.onopen = () => {
+        this.ws?.send(JSON.stringify(message))
+        resolve()
+      }
+
+      this.ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data) as ClipboardMessage
+          this.handlers.forEach((handler) => handler(msg))
+        } catch (e) {
+          console.error('Failed to parse clipboard message:', e)
+        }
+      }
+
+      this.ws.onerror = (error) => {
+        reject(error)
+      }
+
+      this.ws.onclose = () => {
+        this.handlers.forEach((handler) =>
+          handler({ type: 'error', message: 'Connection closed' })
+        )
+      }
+    })
+  }
+
+  send(message: object) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message))
+    }
+  }
+
+  setClipboard(content: string) {
+    this.send({ type: 'set_clipboard', content })
+  }
+
+  disconnect() {
+    this.ws?.close()
+    this.ws = null
+  }
+
+  onMessage(handler: ClipboardMessageHandler) {
+    this.handlers.add(handler)
+    return () => this.handlers.delete(handler)
+  }
+
+  get isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN
+  }
+}
+
+export const clipboardWS = new ClipboardWSManager()

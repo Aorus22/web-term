@@ -93,8 +93,9 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	mux.HandleFunc("GET /api/sessions", ListSessions())
 	mux.HandleFunc("DELETE /api/sessions/{id}", RemoveSession())
 
-	// WebSocket handler
+	// WebSocket handlers
 	mux.HandleFunc("GET /ws", ssh.HandleWebSocket(database, cfg))
+	mux.HandleFunc("GET /api/clipboard/ws", ssh.HandleClipboardWebSocket(database, cfg))
 
 	// Static file serving for the frontend (Web mode)
 	// Priority: fe/dist (local build) -> current directory (production bundle)

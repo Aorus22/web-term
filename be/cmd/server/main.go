@@ -77,7 +77,7 @@ func main() {
 
 	// Start local clipboard helper (system-wide clipboard on backend machine)
 	if err := ssh.GlobalClipboardManager.StartLocalClipboard(); err != nil {
-		log.Printf("Warning: Failed to start local clipboard helper: %v", err)
+		log.Printf("Note: Local clipboard helper not available (optional): %v", err)
 	} else {
 		log.Println("Local clipboard helper started")
 	}

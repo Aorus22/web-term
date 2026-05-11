@@ -3,8 +3,9 @@ package ssh
 type SessionType string
 
 const (
-	SessionTypeSSH   SessionType = "ssh"
-	SessionTypeLocal SessionType = "local"
+	SessionTypeSSH     SessionType = "ssh"
+	SessionTypeLocal   SessionType = "local"
+	SessionTypeClipboard SessionType = "clipboard"
 )
 
 // ConnectMessage is the initial JSON message from client with SSH connection params.
