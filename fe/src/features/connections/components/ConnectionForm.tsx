@@ -10,6 +10,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAppStore } from '@/stores/app-store'
 import { useCreateConnection, useUpdateConnection } from '../hooks/useConnections'
 import { useSSHKeys } from '@/features/ssh-keys/hooks/useSSHKeys'
@@ -195,28 +202,29 @@ export const ConnectionForm = () => {
           {/* SSH Key Selector — per D-19, D-20: both fields always visible */}
           <div className="space-y-2">
             <Label htmlFor="ssh-key">SSH Key (optional)</Label>
-            <div className="flex gap-2">
-              <select
-                id="ssh-key"
-                value={formData.ssh_key_id || ''}
-                onChange={(e) => {
-                  const keyId = e.target.value || null
-                  setFormData({
-                    ...formData,
-                    ssh_key_id: keyId,
-                    auth_method: keyId ? 'key' : 'password',
-                  })
-                }}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">None</option>
+            <Select
+              value={formData.ssh_key_id || 'none'}
+              onValueChange={(value) => {
+                const keyId = value === 'none' ? null : value
+                setFormData({
+                  ...formData,
+                  ssh_key_id: keyId,
+                  auth_method: keyId ? 'key' : 'password',
+                })
+              }}
+            >
+              <SelectTrigger id="ssh-key" className="w-full">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
                 {sshKeys.map((key) => (
-                  <option key={key.id} value={key.id}>
+                  <SelectItem key={key.id} value={key.id}>
                     {key.name} ({key.key_type})
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
+              </SelectContent>
+            </Select>
             {sshKeys.length === 0 && (
               <p className="text-[10px] text-muted-foreground">
                 No SSH keys uploaded yet.
