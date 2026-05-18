@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Menu, globalShortcut, nativeImage } = requi
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 
 let mainWindow;
 let backendProcess;
@@ -17,6 +18,18 @@ const template = [
 Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 
 let backendPort = 0;
+
+function getOrCreateEncryptionKey(userDataPath) {
+    const keyPath = path.join(userDataPath, '.encryption_key');
+    try {
+        const existing = fs.readFileSync(keyPath, 'utf8').trim();
+        if (existing.length === 64) return existing;
+    } catch {}
+    const key = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(keyPath, key, 'utf8');
+    console.log(`Generated new encryption key: ${keyPath}`);
+    return key;
+}
 
 function startBackend() {
     const isDev = process.env.NODE_ENV === 'development';
@@ -41,11 +54,14 @@ function startBackend() {
     console.log(`Starting backend: ${backendPath}`);
     console.log(`DB Path: ${dbPath}`);
 
+    const encryptionKey = getOrCreateEncryptionKey(userDataPath);
+
     const env = {
         ...process.env,
         WEBTERM_PORT: ':0', // Request dynamic port
         WEBTERM_DB_PATH: dbPath,
-        WEBTERM_ALLOWED_ORIGINS: '*', 
+        WEBTERM_ALLOWED_ORIGINS: '*',
+        WEBTERM_ENCRYPTION_KEY: encryptionKey,
     };
 
     backendProcess = spawn(backendPath, [], { env });
