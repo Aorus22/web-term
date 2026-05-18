@@ -38,6 +38,19 @@ function hexToRgba(hex: string, opacity: number) {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
+/**
+ * Blends two hex colors by a weight (0 = all color1, 1 = all color2).
+ * Used to derive readable muted colors from foreground + background.
+ */
+function blendColor(color1: string, color2: string, weight: number) {
+  const c1 = { r: parseInt(color1.slice(1, 3), 16), g: parseInt(color1.slice(3, 5), 16), b: parseInt(color1.slice(5, 7), 16) };
+  const c2 = { r: parseInt(color2.slice(1, 3), 16), g: parseInt(color2.slice(3, 5), 16), b: parseInt(color2.slice(5, 7), 16) };
+  const r = Math.round(c1.r * weight + c2.r * (1 - weight));
+  const g = Math.round(c1.g * weight + c2.g * (1 - weight));
+  const b = Math.round(c1.b * weight + c2.b * (1 - weight));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 export const AppThemeProvider: React.FC<AppThemeProviderProps> = ({ children }) => {
   const { data: settings } = useSettings();
 
@@ -82,7 +95,7 @@ export const AppThemeProvider: React.FC<AppThemeProviderProps> = ({ children }) 
     setVar('--secondary-foreground', colors.foreground);
     
     setVar('--muted', subtleAccent);
-    setVar('--muted-foreground', colors.brightBlack);
+    setVar('--muted-foreground', blendColor(colors.foreground, colors.background, 0.4));
     
     setVar('--accent', subtleAccent);
     setVar('--accent-foreground', colors.foreground);
