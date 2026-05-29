@@ -359,6 +359,12 @@ func spawnLocalPTY(connectMsg ConnectMessage) (*os.File, int, error) {
 		shell = "/bin/bash"
 	}
 	c := exec.Command(shell)
+	// Set TERM environment variable
+	term := connectMsg.Term
+	if term == "" {
+		term = "xterm-256color"
+	}
+	c.Env = append(os.Environ(), "TERM="+term)
 	f, err := pty.Start(c)
 	if err != nil {
 		return nil, 0, err
