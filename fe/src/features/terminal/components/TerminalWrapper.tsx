@@ -79,7 +79,6 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
       currentEngine === 'wterm' ? 'wterm' : 'xterm',
       currentEngine === 'wterm' && `theme-${theme}`,
       currentEngine === 'wterm' && cursorStyleClass,
-      currentEngine === 'wterm' && 'has-scrollback',
       className
     )
 

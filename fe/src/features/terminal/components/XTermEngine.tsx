@@ -175,18 +175,21 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
     }, [fontFamily, fontSize, cursorBlink, cursorStyle, sendData, sendResize, onReady, terminalRef, getXTermTheme])
 
     return (
-      <div
-        ref={containerRef}
-        className={`xterm-container ${className || ''}`}
-        style={{
-          height: '100%',
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: 'transparent',
-          ...style,
-        }}
-      />
+      <div style={{ padding: '12px', height: '100%', width: '100%', boxSizing: 'border-box' }}>
+        <div
+          ref={containerRef}
+          className={`xterm-container ${className || ''}`}
+          style={{
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: 'transparent',
+            overflow: 'hidden',
+            ...style,
+          }}
+        />
+      </div>
     )
   }
 )
