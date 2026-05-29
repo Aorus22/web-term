@@ -118,7 +118,26 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
         fitAddonRef.current = fitAddon
 
         terminal.open(containerRef.current)
-        
+
+        // Handle clipboard copy: Ctrl+Shift+C always copies, Ctrl+C copies if selection exists
+        terminal.attachCustomKeyEventHandler((event) => {
+          if (event.type !== 'keydown') return true
+          const isCtrlC = event.ctrlKey && event.key === 'c' && !event.shiftKey
+          const isCtrlShiftC = event.ctrlKey && event.key === 'C' && event.shiftKey
+
+          if (isCtrlShiftC || isCtrlC) {
+            const selection = terminal?.getSelection()
+            if (selection) {
+              navigator.clipboard.writeText(selection)
+              return false // consume the event
+            }
+            // No selection + Ctrl+C → let it through as interrupt
+            if (isCtrlC) return true
+            return false
+          }
+          return true
+        })
+
         // Initial fit
         setTimeout(() => {
           fitAddon.fit()

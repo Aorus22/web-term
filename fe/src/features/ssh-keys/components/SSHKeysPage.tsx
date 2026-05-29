@@ -79,7 +79,7 @@ export const SSHKeysPage = () => {
           <h1 className="text-lg font-semibold tracking-tight">SSH Keys</h1>
           <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">Secure Storage</p>
         </div>
-        <Button size="sm" onClick={() => setUploadOpen(true)} className="h-8 shadow-sm">
+        <Button size="sm" onClick={() => setUploadOpen(true)} className="h-9 shadow-sm px-4">
           <Plus className="mr-2 h-4 w-4" /> Upload Key
         </Button>
       </header>
