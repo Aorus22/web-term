@@ -21,7 +21,7 @@ export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
       <div className="flex items-center py-6 pl-4 pr-2 gap-3">
         {/* Left: Icon */}
         <div className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center bg-muted/50">
-          <Key className="h-4 w-4 text-muted-foreground/70" />
+          <Key className="h-4 w-4 text-foreground/70" />
         </div>
 
         {/* Middle: Info */}
@@ -36,7 +36,7 @@ export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground truncate leading-none mt-1" title={sshKey.fingerprint}>
+          <p className="text-xs text-foreground/60 truncate leading-none mt-1" title={sshKey.fingerprint}>
             {sshKey.fingerprint}
           </p>
         </div>
@@ -47,7 +47,7 @@ export const SSHKeyCard = ({ sshKey, onEdit, onDelete }: SSHKeyCardProps) => {
             <DropdownMenuTrigger
               render={
                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                  <MoreVertical className="h-4 w-4 text-foreground/60" />
                 </Button>
               }
             />

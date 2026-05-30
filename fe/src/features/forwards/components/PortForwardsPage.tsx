@@ -77,8 +77,8 @@ export const PortForwardsPage = () => {
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-4" />
-        <p className="text-muted-foreground">Loading port forwards...</p>
+        <Loader2 className="h-8 w-8 text-foreground/60 animate-spin mb-4" />
+        <p className="text-foreground/60">Loading port forwards...</p>
       </div>
     )
   }
@@ -89,7 +89,7 @@ export const PortForwardsPage = () => {
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight">Port Forwards</h1>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
+          <p className="text-xs text-foreground/60 uppercase tracking-wider font-bold">
             SSH Tunneling
           </p>
         </div>
@@ -102,8 +102,8 @@ export const PortForwardsPage = () => {
         <div className="max-w-[1600px] mx-auto">
           {forwards.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 text-center border-2 border-dashed rounded-lg bg-muted/10">
-              <ArrowLeftRight className="h-10 w-10 text-muted-foreground/20 mb-3" />
-              <p className="text-sm text-muted-foreground">No port forwards yet.</p>
+              <ArrowLeftRight className="h-10 w-10 text-foreground/20 mb-3" />
+              <p className="text-sm text-foreground/60">No port forwards yet.</p>
               <Button variant="link" size="sm" onClick={() => setFormOpen(true)}>
                 Create your first forward
               </Button>
@@ -129,7 +129,7 @@ export const PortForwardsPage = () => {
                         }`}
                       >
                         <ArrowLeftRight
-                          className={`h-4 w-4 ${forward.active ? 'text-emerald-600' : 'text-muted-foreground/70'}`}
+                          className={`h-4 w-4 ${forward.active ? 'text-emerald-600' : 'text-foreground/70'}`}
                         />
                       </div>
 
@@ -145,10 +145,10 @@ export const PortForwardsPage = () => {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate leading-none mt-0.5">
+                        <p className="text-xs text-foreground/60 truncate leading-none mt-0.5">
                           {connLabel}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate leading-none mt-1">
+                        <p className="text-xs text-foreground/60 truncate leading-none mt-1">
                           localhost:{forward.local_port} → :{forward.remote_port}
                         </p>
                         {forward.error && (
@@ -170,7 +170,7 @@ export const PortForwardsPage = () => {
                           <DropdownMenuTrigger
                             className="h-7 w-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-all outline-none"
                           >
-                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            <MoreVertical className="h-4 w-4 text-foreground/60" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditForward(forward); setFormOpen(true) }}>

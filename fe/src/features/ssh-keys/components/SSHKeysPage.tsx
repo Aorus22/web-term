@@ -65,8 +65,8 @@ export const SSHKeysPage = () => {
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-4" />
-        <p className="text-muted-foreground">Loading SSH keys...</p>
+        <Loader2 className="h-8 w-8 text-foreground/60 animate-spin mb-4" />
+        <p className="text-foreground/60">Loading SSH keys...</p>
       </div>
     )
   }
@@ -77,7 +77,7 @@ export const SSHKeysPage = () => {
       <header className="flex items-center justify-between px-6 py-2 border-b bg-muted/5">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight">SSH Keys</h1>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">Secure Storage</p>
+          <p className="text-[11px] text-foreground/60 uppercase tracking-wider font-bold">Secure Storage</p>
         </div>
         <Button size="sm" onClick={() => setUploadOpen(true)} className="h-9 shadow-sm px-4">
           <Plus className="mr-2 h-4 w-4" /> Upload Key
@@ -88,8 +88,8 @@ export const SSHKeysPage = () => {
         <div className="max-w-[1600px] mx-auto">
           {sshKeys.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 text-center border-2 border-dashed rounded-lg bg-muted/10">
-              <Key className="h-10 w-10 text-muted-foreground/20 mb-3" />
-              <p className="text-sm text-muted-foreground">
+              <Key className="h-10 w-10 text-foreground/20 mb-3" />
+              <p className="text-sm text-foreground/60">
                 No private keys found.
               </p>
               <Button variant="link" size="sm" onClick={() => setUploadOpen(true)}>

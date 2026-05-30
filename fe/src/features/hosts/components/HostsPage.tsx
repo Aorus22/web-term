@@ -141,8 +141,8 @@ export const HostsPage = () => {
         <div className="max-w-[1600px] mx-auto">
           {filteredConnections.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 text-center border-2 border-dashed rounded-lg bg-muted/10">
-              <Server className="h-10 w-10 text-muted-foreground/20 mb-3" />
-              <p className="text-sm text-muted-foreground">
+              <Server className="h-10 w-10 text-foreground/20 mb-3" />
+              <p className="text-sm text-foreground/60">
                 {connections.length === 0 ? "No hosts saved yet." : "No hosts match your filters."}
               </p>
               {connections.length === 0 ? (
@@ -175,7 +175,7 @@ export const HostsPage = () => {
                       <div className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center ${
                         isActive ? 'bg-primary/10' : 'bg-muted/50'
                       }`}>
-                        <Server className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-muted-foreground/70'}`} />
+                        <Server className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-foreground/70'}`} />
                       </div>
 
                       {/* Middle: Info */}
@@ -183,7 +183,7 @@ export const HostsPage = () => {
                         <h3 className="text-base font-bold truncate leading-tight">
                           {conn.label || conn.host}
                         </h3>
-                        <p className="text-xs text-muted-foreground truncate leading-none mt-1">
+                        <p className="text-xs text-foreground/60 truncate leading-none mt-1">
                           {conn.username}@{conn.host}
                         </p>
                         {conn.tags && conn.tags.length > 0 && (
@@ -211,7 +211,7 @@ export const HostsPage = () => {
                             onClick={(e) => e.stopPropagation()}
                             className="h-7 w-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-all outline-none"
                           >
-                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            <MoreVertical className="h-4 w-4 text-foreground/60" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleConnect(conn) }}>

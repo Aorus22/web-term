@@ -91,7 +91,7 @@ export function TabBar() {
               "group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium whitespace-nowrap transition-colors border border-b-0 no-drag",
               session.id === activeSessionId
                 ? "bg-background border-border text-foreground"
-                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                : "bg-transparent border-transparent text-foreground/60 hover:text-foreground hover:bg-muted/50"
             )}
             style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             onClick={() => setActiveSession(session.id)}
@@ -240,7 +240,7 @@ export function TabBar() {
         <div className="flex items-center h-full">
           <button 
             onClick={() => minimizeWindow()}
-            className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
+            className="flex items-center justify-center h-9 w-11 text-foreground/70 hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
             style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title="Minimize"
           >
@@ -248,7 +248,7 @@ export function TabBar() {
           </button>
           <button 
             onClick={() => maximizeWindow()}
-            className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
+            className="flex items-center justify-center h-9 w-11 text-foreground/70 hover:bg-muted hover:text-foreground transition-all duration-200 ease-in-out"
             style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title={windowState === 'maximized' ? "Restore" : "Maximize"}
           >
@@ -260,7 +260,7 @@ export function TabBar() {
           </button>
           <button 
             onClick={() => closeWindow()}
-            className="flex items-center justify-center h-9 w-11 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 ease-in-out"
+            className="flex items-center justify-center h-9 w-11 text-foreground/70 hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 ease-in-out"
             style={isDesktop ? { WebkitAppRegion: 'no-drag' } as any : {}}
             title="Close"
           >
