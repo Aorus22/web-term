@@ -81,7 +81,6 @@ function AppContent() {
   } = useAppStore()
 
   const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
-  const [, setResizeKey] = useState(0)
 
   useEffect(() => {
     if (backendPort !== 0) {
@@ -101,17 +100,10 @@ function AppContent() {
         setBackendPort(port)
       })
       
-      // Force repaint on any resize to fix Linux WebKit bugs
-      const handleResize = () => {
-        setResizeKey(prev => prev + 1)
-      };
-      window.addEventListener('resize', handleResize);
-      
       // Manual drag fallback for Tauri on Linux
       const handleMouseDown = (e: MouseEvent) => {
         if (isTauri) {
           const target = e.target as HTMLElement;
-          // Check if the target or any parent has the drag attribute
           if (target.closest('[data-tauri-drag-region]') && e.button === 0) {
             startDragging();
           }
@@ -123,7 +115,6 @@ function AppContent() {
         unlistenWindow()
         unlistenBackend()
         window.removeEventListener('mousedown', handleMouseDown)
-        window.removeEventListener('resize', handleResize)
       }
     } else {
       setBackendPort(8080)
@@ -166,7 +157,7 @@ function AppContent() {
   return (
     <div 
       className={cn(
-        "flex h-screen w-full bg-background text-foreground transition-all duration-300 relative",
+        "flex h-screen w-full bg-background text-foreground relative",
         isDesktop && windowState !== 'maximized' && "rounded-xl border border-border shadow-2xl overflow-hidden"
       )}
     >
@@ -174,7 +165,7 @@ function AppContent() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col border-r bg-background transition-all duration-300 ease-in-out",
+          "flex flex-col border-r bg-background transition-[width] duration-300 ease-in-out",
           sidebarOpen ? "w-[200px]" : "w-0 overflow-hidden border-none"
         )}
       >

@@ -165,14 +165,11 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
         // Setup ResizeObserver
         const resizeObserver = new ResizeObserver(() => {
           if (terminal && fitAddon) {
-            // Small timeout to let layout settle
-            setTimeout(() => {
-              try {
-                fitAddon.fit()
-              } catch (e) {
-                // ignore fit errors during transitions
-              }
-            }, 10)
+            try {
+              fitAddon.fit()
+            } catch (e) {
+              // ignore fit errors during transitions
+            }
           }
         })
         resizeObserver.observe(containerRef.current)

@@ -104,10 +104,8 @@ function createWindow() {
         minWidth: 800,
         minHeight: 600,
         frame: false,
-        // Windows 11 handles rounding natively for frameless windows but ONLY if transparent is false.
-        // Linux/macOS need transparent: true to let the web-content's CSS rounding show through.
-        transparent: !isWin,
-        backgroundColor: isWin ? undefined : '#00000000',
+        transparent: false,
+        backgroundColor: '#1e1e1e',
         ...( (isWin || isMac) ? { titleBarStyle: 'hidden' } : {} ),
         titleBarOverlay: isWin ? {
             color: '#00000000', 
