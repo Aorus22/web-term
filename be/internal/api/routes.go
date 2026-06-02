@@ -80,6 +80,7 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	mux.HandleFunc("PUT /api/settings", sh.UpdateSettings)
 
 	// SFTP endpoints
+	mux.HandleFunc("GET /api/sftp/home", sfh.Home)
 	mux.HandleFunc("GET /api/sftp/ls", sfh.List)
 	mux.HandleFunc("GET /api/sftp/download", sfh.Download)
 	mux.HandleFunc("POST /api/sftp/upload", sfh.Upload)

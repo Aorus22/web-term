@@ -6,47 +6,54 @@ interface SftpBreadcrumbsProps {
 }
 
 export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
-  // If path is '.', treat it as "Home/Current"
-  if (path === '.') {
+  // Loading state – path not yet resolved
+  if (!path || path === '.') {
     return (
-      <div className="flex items-center text-xs">
-        <button 
-          onClick={() => onNavigate('.')}
-          className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          <Home className="h-3 w-3" />
-          <span>Current Directory</span>
-        </button>
+      <div className="flex items-center text-xs text-muted-foreground">
+        <Home className="h-3 w-3 mr-1" />
+        <span>Loading...</span>
       </div>
     )
   }
 
-  const isAbsolute = path.startsWith('/')
-  const parts = path.split('/').filter(Boolean)
-  
-  const segments = []
-  
-  // Add root if absolute
-  if (isAbsolute) {
-    segments.push({
-      name: '/',
-      path: '/',
-      isRoot: true
-    })
-  }
+  // Check if path starts with Windows drive like "C:" or "C:\"
+  const isWindowsPath = /^[A-Za-z]:/.test(path)
 
-  let currentPath = isAbsolute ? '' : ''
-  parts.forEach((part) => {
-    currentPath = isAbsolute 
-      ? (currentPath === '' ? '/' + part : currentPath + '/' + part)
-      : (currentPath === '' ? part : currentPath + '/' + part)
-    
-    segments.push({
-      name: part,
-      path: currentPath,
-      isRoot: false
-    })
-  })
+  const segments: { name: string; path: string }[] = []
+
+  if (isWindowsPath) {
+    // Windows path like "C:\Users\username"
+    const drive = path.substring(0, 2) // e.g. "C:"
+    const rest = path.substring(2).replace(/\\/g, '/') // normalize backslashes
+    const parts = rest.split('/').filter(Boolean)
+
+    // Drive segment
+    segments.push({ name: drive, path: drive + '\\' })
+
+    let currentPath = drive + '\\'
+    for (const part of parts) {
+      currentPath = currentPath + part + '\\'
+      segments.push({ name: part, path: currentPath })
+    }
+  } else if (path.startsWith('/')) {
+    // Unix absolute path
+    segments.push({ name: '/', path: '/' })
+
+    const parts = path.split('/').filter(Boolean)
+    let currentPath = ''
+    for (const part of parts) {
+      currentPath = currentPath + '/' + part
+      segments.push({ name: part, path: currentPath })
+    }
+  } else {
+    // Relative path (unlikely now, but fallback)
+    const parts = path.split('/').filter(Boolean)
+    let currentPath = ''
+    for (const part of parts) {
+      currentPath = currentPath ? currentPath + '/' + part : part
+      segments.push({ name: part, path: currentPath })
+    }
+  }
 
   return (
     <div className="flex items-center text-xs overflow-hidden">
@@ -58,7 +65,7 @@ export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
             className="px-1 py-0.5 rounded hover:bg-accent hover:text-accent-foreground transition-colors truncate max-w-[120px]"
             title={segment.path}
           >
-            {segment.isRoot ? <Home className="h-3 w-3" /> : segment.name}
+            {segment.name === '/' ? <Home className="h-3 w-3" /> : segment.name}
           </button>
         </div>
       ))}

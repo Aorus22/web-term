@@ -26,12 +26,25 @@ type FileSystem interface {
 	Rename(oldPath, newPath string) error
 	Mkdir(path string) error
 	Stat(path string) (FileInfo, error)
+	Home() (string, error)
 }
 
 // LocalFS implements FileSystem for the local machine
 type LocalFS struct{}
 
+func (fs *LocalFS) Home() (string, error) {
+	return os.UserHomeDir()
+}
+
 func (fs *LocalFS) List(path string) ([]FileInfo, error) {
+	// On Windows, root "/" should show available drives instead of erroring
+	if path == "/" {
+		drives := listDrives()
+		if len(drives) > 0 {
+			return drives, nil
+		}
+	}
+
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
@@ -151,6 +164,10 @@ func (fs *SFTPFS) Mkdir(path string) error {
 	return fs.Client.MkdirAll(path)
 }
 
+func (fs *SFTPFS) Home() (string, error) {
+	return fs.Client.Getwd()
+}
+
 func (fs *SFTPFS) Stat(path string) (FileInfo, error) {
 	info, err := fs.Client.Stat(path)
 	if err != nil {
@@ -163,4 +180,23 @@ func (fs *SFTPFS) Stat(path string) (FileInfo, error) {
 		ModTime: info.ModTime(),
 		IsDir:   info.IsDir(),
 	}, nil
+}
+
+// listDrives returns available drive letters as directory entries (Windows).
+// On non-Windows systems, this returns an empty slice.
+func listDrives() []FileInfo {
+	var files []FileInfo
+	for _, c := range "ABCDEFGHIJKLMNOPQRSTUVWXYZ" {
+		drivePath := string(c) + ":\\"
+		if info, err := os.Stat(drivePath); err == nil && info.IsDir() {
+			files = append(files, FileInfo{
+				Name:    string(c) + ":",
+				Size:    0,
+				Mode:    0,
+				ModTime: info.ModTime(),
+				IsDir:   true,
+			})
+		}
+	}
+	return files
 }

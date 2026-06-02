@@ -68,6 +68,26 @@ func (h *SFTPHandler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(files)
 }
 
+func (h *SFTPHandler) Home(w http.ResponseWriter, r *http.Request) {
+	fs, closer, err := h.getFS(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if closer != nil {
+		defer closer.Close()
+	}
+
+	homePath, err := fs.Home()
+	if err != nil {
+		sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"path": homePath})
+}
+
 func (h *SFTPHandler) Download(w http.ResponseWriter, r *http.Request) {
 	fs, closer, err := h.getFS(r)
 	if err != nil {

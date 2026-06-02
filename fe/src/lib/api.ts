@@ -234,6 +234,12 @@ export const sftpApi = {
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
     }),
+  home: (connectionId: string): Promise<{ path: string }> =>
+    fetch(`${getSftpApiBase()}/home?connectionId=${encodeURIComponent(connectionId)}`)
+      .then(r => {
+        if (!r.ok) return r.json().then(e => Promise.reject(e))
+        return r.json()
+      }),
   transfer: (srcConnId: string, srcPath: string, dstConnId: string, dstPath: string): Promise<{ transferId: string }> =>
     fetch(`${getSftpApiBase()}/transfer?srcConnectionId=${srcConnId}&srcPath=${encodeURIComponent(srcPath)}&dstConnectionId=${dstConnId}&dstPath=${encodeURIComponent(dstPath)}`, {
       method: 'POST',

@@ -11,6 +11,11 @@ export interface SFTPClipboard {
   isDir: boolean;
 }
 
+export interface SftpPanelState {
+  connectionId: string
+  path: string
+}
+
 interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
@@ -38,6 +43,11 @@ interface AppState {
   // SFTP Clipboard
   sftpClipboard: SFTPClipboard | null
   setSftpClipboard: (clipboard: SFTPClipboard | null) => void
+  // SFTP Panel state (persists across page switches)
+  sftpLeftPanel: SftpPanelState
+  sftpRightPanel: SftpPanelState
+  setSftpLeftPanel: (state: SftpPanelState) => void
+  setSftpRightPanel: (state: SftpPanelState) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -132,4 +142,9 @@ export const useAppStore = create<AppState>((set) => ({
   setBackendPort: (port) => set({ backendPort: port }),
   sftpClipboard: null,
   setSftpClipboard: (clipboard) => set({ sftpClipboard: clipboard }),
+  // SFTP Panel state
+  sftpLeftPanel: { connectionId: "local", path: "" },
+  sftpRightPanel: { connectionId: "local", path: "" },
+  setSftpLeftPanel: (state) => set({ sftpLeftPanel: state }),
+  setSftpRightPanel: (state) => set({ sftpRightPanel: state }),
 }))

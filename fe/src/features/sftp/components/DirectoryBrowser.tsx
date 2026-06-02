@@ -1,9 +1,9 @@
-import { useState, useRef, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { connectionsApi, sftpApi } from '@/lib/api'
 import type { FileInfo } from '@/lib/api'
-import { Loader2, AlertCircle, CornerLeftUp, Download } from 'lucide-react'
+import { Loader2, AlertCircle, CornerLeftUp, Download, Menu, RefreshCw, Upload, FolderPlus, Edit2, Trash2 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   ContextMenu,
@@ -12,8 +12,14 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useAppStore } from '@/stores/app-store'
-import { DirectoryToolbar } from './DirectoryToolbar'
 import { RenameDialog, NewFolderDialog, DeleteConfirmDialog, OverwriteDialog } from './OperationDialogs'
 import { useSFTPTransfer } from '@/hooks/use-sftp-transfer'
 import { toast } from 'sonner'
@@ -39,21 +45,45 @@ const formatDate = (dateString: string) => {
 }
 
 const getParentPath = (currentPath: string) => {
-  if (currentPath === '.' || currentPath === '' || currentPath === '/') return '.'
-  const isAbsolute = currentPath.startsWith('/')
+  if (!currentPath || currentPath === '.' || currentPath === '' || currentPath === '/') return '/'
+  // Windows path like "C:\Users"
+  if (/^[A-Za-z]:\\$/.test(currentPath)) return '/' // at drive root, go to drives list
+  if (/^[A-Za-z]:/.test(currentPath)) {
+    const cleanPath = currentPath.replace(/\\+$/, '')
+    const parts = cleanPath.split('\\')
+    parts.pop()
+    if (parts.length === 1) return '/' // C: → go to root (drives)
+    return parts.join('\\')
+  }
+  // Unix absolute path
   const cleanPath = currentPath.replace(/\/+$/, '')
   const parts = cleanPath.split('/')
   parts.pop()
-  
-  if (parts.length === 0) return isAbsolute ? '/' : '.'
+  if (parts.length === 0) return '/'
   if (parts.length === 1 && parts[0] === '') return '/'
-  
   return parts.join('/')
 }
 
-export function DirectoryBrowser() {
-  const [selectedConnection, setSelectedConnection] = useState<string>("local")
-  const [path, setPath] = useState<string>(".")
+interface DirectoryBrowserProps {
+  panelId: 'left' | 'right'
+}
+
+export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
+  const {
+    sftpLeftPanel,
+    sftpRightPanel,
+    setSftpLeftPanel,
+    setSftpRightPanel,
+    sftpClipboard,
+    setSftpClipboard,
+  } = useAppStore()
+
+  const panel = panelId === 'left' ? sftpLeftPanel : sftpRightPanel
+  const setPanel = panelId === 'left' ? setSftpLeftPanel : setSftpRightPanel
+
+  const selectedConnection = panel.connectionId
+  const path = panel.path
+
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
   const [isFocused, setIsFocused] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -68,7 +98,6 @@ export function DirectoryBrowser() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
-  const { sftpClipboard, setSftpClipboard } = useAppStore()
   const { trackTransfer } = useSFTPTransfer()
   
   const { data: connections } = useQuery({
@@ -76,10 +105,25 @@ export function DirectoryBrowser() {
     queryFn: () => connectionsApi.list()
   })
 
+  // Fetch home directory when path is empty (initial load or connection change)
+  useEffect(() => {
+    if (path) return // preserve persisted path on remount
+    const fetchHome = async () => {
+      try {
+        const { path: homePath } = await sftpApi.home(selectedConnection)
+        setPanel({ connectionId: selectedConnection, path: homePath })
+      } catch (e) {
+        console.error('Failed to fetch home directory:', e)
+        setPanel({ connectionId: selectedConnection, path: '/' })
+      }
+    }
+    fetchHome()
+  }, [selectedConnection, path, setPanel])
+
   const { data: files, isLoading, error } = useQuery({
     queryKey: ['sftp', selectedConnection, path],
     queryFn: () => sftpApi.list(selectedConnection, path),
-    enabled: !!selectedConnection
+    enabled: !!selectedConnection && !!path
   })
 
   const refreshDir = useCallback(() => {
@@ -103,7 +147,7 @@ export function DirectoryBrowser() {
   }, [selectedConnection, trackTransfer, setSftpClipboard, refreshDir])
 
   const handleAction = useCallback((action: 'cut' | 'copy', file: FileInfo) => {
-    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
     setSftpClipboard({
       action,
       connectionId: selectedConnection,
@@ -115,7 +159,7 @@ export function DirectoryBrowser() {
 
   const handlePaste = useCallback(async () => {
     if (!sftpClipboard) return
-    const targetPath = path === '.' || path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
+    const targetPath = path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
 
     // Overwrite check
     if (files?.some(f => f.name === sftpClipboard.fileName)) {
@@ -129,8 +173,8 @@ export function DirectoryBrowser() {
 
   const handleRenameConfirm = async (newName: string) => {
     if (!selectedFile || !newName || newName === selectedFile.name) return
-    const oldPath = path === '.' ? selectedFile.name : path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
-    const newPath = path === '.' ? newName : path === '/' ? `/${newName}` : `${path}/${newName}`
+    const oldPath = path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
+    const newPath = path === '/' ? `/${newName}` : `${path}/${newName}`
     
     try {
       await sftpApi.rename(selectedConnection, oldPath, newPath)
@@ -144,7 +188,7 @@ export function DirectoryBrowser() {
 
   const handleDeleteConfirm = async () => {
     if (!selectedFile) return
-    const fullPath = path === '.' ? selectedFile.name : path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
+    const fullPath = path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
     try {
       await sftpApi.remove(selectedConnection, fullPath)
       refreshDir()
@@ -157,7 +201,7 @@ export function DirectoryBrowser() {
 
   const handleMkdirConfirm = async (name: string) => {
     if (!name) return
-    const fullPath = path === '.' ? name : path === '/' ? `/${name}` : `${path}/${name}`
+    const fullPath = path === '/' ? `/${name}` : `${path}/${name}`
     try {
       await sftpApi.mkdir(selectedConnection, fullPath)
       refreshDir()
@@ -188,7 +232,7 @@ export function DirectoryBrowser() {
   }
 
   const executeUpload = useCallback(async (file: File) => {
-    const targetPath = path === '.' || path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const targetPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
     try {
       const { transferId } = await sftpApi.upload(selectedConnection, targetPath, file)
       trackTransfer(transferId, file.name, 'upload')
@@ -211,7 +255,7 @@ export function DirectoryBrowser() {
   }
 
   const handleDownload = useCallback((file: FileInfo) => {
-    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
     const url = sftpApi.downloadUrl(selectedConnection, fullPath)
     
     const a = document.createElement('a')
@@ -223,7 +267,7 @@ export function DirectoryBrowser() {
   }, [path, selectedConnection])
 
   const handleDragStart = (e: React.DragEvent, file: FileInfo) => {
-    const fullPath = path === '.' ? file.name : path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
     e.dataTransfer.setData('application/json', JSON.stringify({
       connectionId: selectedConnection,
       path: fullPath,
@@ -253,7 +297,7 @@ export function DirectoryBrowser() {
       if (!dataStr) return
       const data = JSON.parse(dataStr)
       // skip drop on same folder and same file name
-      const targetPath = path === '.' || path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
+      const targetPath = path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
       if (data.connectionId === selectedConnection && data.path === targetPath) return
 
       // Overwrite check
@@ -270,26 +314,26 @@ export function DirectoryBrowser() {
     }
   }
 
-  const handleNavigate = useCallback((entry: FileInfo) => {
+  const handleNavigate = useCallback((newPath: string) => {
+    setSelectedFile(null)
+    setPanel({ connectionId: selectedConnection, path: newPath })
+  }, [selectedConnection, setPanel])
+
+  const handleEntryClick = useCallback((entry: FileInfo) => {
     setSelectedFile(null)
     if (!entry.isDir) return
     
     if (entry.name === '..') {
-      setPath(getParentPath(path))
+      setPanel({ connectionId: selectedConnection, path: getParentPath(path) })
     } else {
-      const newPath = path === '.' 
-        ? entry.name 
-        : path === '/' 
-          ? `/${entry.name}` 
-          : `${path}/${entry.name}`
-      setPath(newPath)
+      const newPath = path === '/' ? `/${entry.name}` : `${path}/${entry.name}`
+      setPanel({ connectionId: selectedConnection, path: newPath })
     }
-  }, [path])
+  }, [path, selectedConnection, setPanel])
 
   const handleSourceChange = (v: string | null) => {
     if (!v) return
-    setSelectedConnection(v)
-    setPath(".") // Reset path when source changes
+    setPanel({ connectionId: v, path: '' })
     setSelectedFile(null)
   }
 
@@ -297,14 +341,14 @@ export function DirectoryBrowser() {
     onEnter: () => {
       if (selectedFile) {
         if (selectedFile.isDir) {
-          handleNavigate(selectedFile)
+          handleEntryClick(selectedFile)
         } else {
           handleDownload(selectedFile)
         }
       }
     },
     onBackspace: () => {
-      setPath(getParentPath(path))
+      setPanel({ connectionId: selectedConnection, path: getParentPath(path) })
       setSelectedFile(null)
     },
     onDelete: () => {
@@ -316,11 +360,11 @@ export function DirectoryBrowser() {
     onCopy: () => selectedFile && handleAction('copy', selectedFile),
     onCut: () => selectedFile && handleAction('cut', selectedFile),
     onPaste: handlePaste,
-  }), [selectedFile, path, refreshDir, handleAction, handlePaste, handleNavigate, handleDownload])
+  }), [selectedFile, path, selectedConnection, setPanel, refreshDir, handleAction, handlePaste, handleEntryClick, handleDownload])
 
   useSFTPShortcuts(containerRef, shortcutHandlers)
 
-  // Virtual entry for parent directory if not at root/default
+  // Virtual entry for parent directory if not at root
   const displayFiles = (() => {
     if (!files) return []
     const sortedFiles = [...files].sort((a, b) => {
@@ -329,7 +373,8 @@ export function DirectoryBrowser() {
       return a.name.localeCompare(b.name)
     })
 
-    if (path !== '.' && path !== '/') {
+    // Add ".." if not at root
+    if (path !== '.' && path !== '/' && !(/^[A-Za-z]:\\$/.test(path))) {
       return [
         { name: '..', isDir: true, size: 0, mode: 0, modTime: '' } as FileInfo,
         ...sortedFiles
@@ -337,6 +382,9 @@ export function DirectoryBrowser() {
     }
     return sortedFiles
   })()
+
+  const hasSelection = !!selectedFile
+  const isLoadingHome = !path
 
   return (
     <div 
@@ -347,7 +395,8 @@ export function DirectoryBrowser() {
       className={`flex flex-col h-full bg-background border rounded-lg overflow-hidden transition-all outline-none ${isFocused ? 'ring-1 ring-primary border-primary' : ''}`} 
       onClick={() => setSelectedFile(null)}
     >
-      <div className="p-2 border-b bg-muted/50 flex items-center gap-2">
+      {/* Row 1: Header – Connection Selector + Burger Menu */}
+      <div className="p-2 border-b bg-muted/50 flex items-center gap-2 shrink-0">
         <Select value={selectedConnection} onValueChange={handleSourceChange}>
           <SelectTrigger className="w-[180px] h-8 text-xs">
             <SelectValue placeholder="Select Source" />
@@ -361,24 +410,53 @@ export function DirectoryBrowser() {
             ))}
           </SelectContent>
         </Select>
-        <div className="flex-1 px-2 overflow-hidden">
-          <SftpBreadcrumbs path={path} onNavigate={(newPath) => {
-            setPath(newPath)
-            setSelectedFile(null)
-          }} />
-        </div>
+        
+        <div className="flex-1" />
+        
+        {/* Burger Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+            <Menu className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={refreshDir}>
+              <RefreshCw className="h-4 w-4" />
+              <span>Refresh</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleUploadClick}>
+              <Upload className="h-4 w-4" />
+              <span>Upload File</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsNewFolderDialogOpen(true)}>
+              <FolderPlus className="h-4 w-4" />
+              <span>New Folder</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => setIsRenameDialogOpen(true)} 
+              disabled={!hasSelection}
+            >
+              <Edit2 className="h-4 w-4" />
+              <span>Rename</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => setIsDeleteDialogOpen(true)} 
+              disabled={!hasSelection}
+              variant="destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <DirectoryToolbar 
-        onRefresh={refreshDir}
-        onUpload={handleUploadClick}
-        onNewFolder={() => setIsNewFolderDialogOpen(true)}
-        onRename={() => setIsRenameDialogOpen(true)}
-        onDelete={() => setIsDeleteDialogOpen(true)}
-        canModify={true}
-        hasSelection={!!selectedFile}
-      />
+      {/* Row 2: Breadcrumb bar (replaces old DirectoryToolbar) */}
+      <div className="flex items-center px-3 py-1.5 border-b bg-muted/30 shrink-0">
+        <SftpBreadcrumbs path={path} onNavigate={handleNavigate} />
+      </div>
       
+      {/* Row 3: File listing */}
       <div className="flex-1 overflow-hidden relative">
         <input 
           type="file" 
@@ -387,19 +465,25 @@ export function DirectoryBrowser() {
           onChange={handleFileChange}
         />
 
-        {isLoading && (
+        {isLoadingHome && (
+          <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {isLoading && !isLoadingHome && (
           <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         )}
         
-        {error ? (
+        {!isLoadingHome && error ? (
           <div className="p-4 flex flex-col items-center justify-center h-full text-destructive text-sm gap-2 text-center">
             <AlertCircle className="h-8 w-8" />
             <p>Error loading directory</p>
             <p className="text-xs opacity-80">{error instanceof Error ? error.message : String(error)}</p>
           </div>
-        ) : (
+        ) : !isLoadingHome && (
           <ScrollArea 
             className="h-full" 
             onDragOver={(e) => e.preventDefault()} 
@@ -414,7 +498,7 @@ export function DirectoryBrowser() {
                 </tr>
               </thead>
               <tbody>
-                {displayFiles.length === 0 && !isLoading && (
+                {displayFiles.length === 0 && (
                   <tr>
                     <td colSpan={3} className="p-4 text-center text-muted-foreground text-xs">
                       Directory is empty
@@ -429,7 +513,7 @@ export function DirectoryBrowser() {
                         className={`border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer select-none`}
                         onDoubleClick={(e) => {
                           e.stopPropagation()
-                          handleNavigate(file)
+                          handleEntryClick(file)
                         }}
                       >
                         <td className="p-2 pl-4 flex items-center gap-2 font-medium">
@@ -457,7 +541,7 @@ export function DirectoryBrowser() {
                           }}
                           onDoubleClick={(e) => {
                             e.stopPropagation()
-                            handleNavigate(file)
+                            handleEntryClick(file)
                           }}
                           draggable
                           onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, file)}
@@ -531,4 +615,3 @@ export function DirectoryBrowser() {
     </div>
   )
 }
-
