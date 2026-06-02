@@ -3,8 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { connectionsApi, sftpApi } from '@/lib/api'
 import type { FileInfo } from '@/lib/api'
-import { Loader2, AlertCircle, CornerLeftUp, Download, Menu, RefreshCw, Upload, FolderPlus, Edit2, Trash2 } from 'lucide-react'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { CornerLeftUp, Download, RefreshCw, Upload, FolderPlus, Edit2, Trash2 } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -23,39 +22,64 @@ import { useAppStore } from '@/stores/app-store'
 import { RenameDialog, NewFolderDialog, DeleteConfirmDialog, OverwriteDialog } from './OperationDialogs'
 import { useSFTPTransfer } from '@/hooks/use-sftp-transfer'
 import { toast } from 'sonner'
-import { FileIcon } from './FileIcon'
 import { SftpBreadcrumbs } from './SftpBreadcrumbs'
 import { useSFTPShortcuts } from '../hooks/use-sftp-shortcuts'
+import { FileIcon } from './FileIcon'
+
+// ── Helpers ──
 
 const formatSize = (size: number) => {
-  if (size === 0) return '0 B'
+  if (size === 0) return '- -'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(size) / Math.log(k))
-  return parseFloat((size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  return parseFloat((size / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
 const formatDate = (dateString: string) => {
   if (!dateString) return ''
   try {
-    return new Date(dateString).toLocaleString()
-  } catch (e) {
-    return dateString
+    const d = new Date(dateString)
+    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) +
+           ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  } catch { return dateString }
+}
+
+const formatPermissions = (mode: number, isDir: boolean): string => {
+  const r = (m: number) => mode & m ? 'r' : '-'
+  const w = (m: number) => mode & m ? 'w' : '-'
+  const x = (m: number) => mode & m ? 'x' : '-'
+  return (isDir ? 'd' : '-') + r(0o400) + w(0o200) + x(0o100) + r(0o040) + w(0o020) + x(0o010) + r(0o004) + w(0o002) + x(0o001)
+}
+
+const getFileKind = (file: FileInfo): string => {
+  if (file.isDir) return 'folder'
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  const map: Record<string, string> = {
+    png: 'PNG image', jpg: 'JPEG image', jpeg: 'JPEG image', gif: 'GIF image', svg: 'SVG image',
+    mp3: 'MP3 audio', wav: 'WAV audio', flac: 'FLAC audio',
+    mp4: 'MP4 video', mkv: 'MKV video',
+    zip: 'ZIP archive', tar: 'TAR archive', gz: 'GZip archive', rar: 'RAR archive',
+    pdf: 'PDF document', doc: 'DOC document', docx: 'DOCX document',
+    txt: 'Text', md: 'Markdown', json: 'JSON', xml: 'XML', yaml: 'YAML', yml: 'YAML',
+    ts: 'TypeScript', tsx: 'TSX', js: 'JavaScript', jsx: 'JSX',
+    py: 'Python', rs: 'Rust', go: 'Go', java: 'Java', cpp: 'C++', c: 'C',
+    css: 'CSS', scss: 'SCSS', html: 'HTML',
+    sh: 'Shell script', bash: 'Shell script',
   }
+  return ext && map[ext] ? map[ext] : (ext ? ext.toUpperCase() + ' file' : 'File')
 }
 
 const getParentPath = (currentPath: string) => {
-  if (!currentPath || currentPath === '.' || currentPath === '' || currentPath === '/') return '/'
-  // Windows path like "C:\Users"
-  if (/^[A-Za-z]:\\$/.test(currentPath)) return '/' // at drive root, go to drives list
+  if (!currentPath || currentPath === '.' || currentPath === '/' || currentPath === '') return '/'
+  if (/^[A-Za-z]:\\$/.test(currentPath)) return '/'
   if (/^[A-Za-z]:/.test(currentPath)) {
     const cleanPath = currentPath.replace(/\\+$/, '')
     const parts = cleanPath.split('\\')
     parts.pop()
-    if (parts.length === 1) return '/' // C: → go to root (drives)
+    if (parts.length === 1) return '/'
     return parts.join('\\')
   }
-  // Unix absolute path
   const cleanPath = currentPath.replace(/\/+$/, '')
   const parts = cleanPath.split('/')
   parts.pop()
@@ -64,18 +88,17 @@ const getParentPath = (currentPath: string) => {
   return parts.join('/')
 }
 
+// ── Component ──
+
 interface DirectoryBrowserProps {
   panelId: 'left' | 'right'
 }
 
 export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   const {
-    sftpLeftPanel,
-    sftpRightPanel,
-    setSftpLeftPanel,
-    setSftpRightPanel,
-    sftpClipboard,
-    setSftpClipboard,
+    sftpLeftPanel, sftpRightPanel,
+    setSftpLeftPanel, setSftpRightPanel,
+    sftpClipboard, setSftpClipboard,
   } = useAppStore()
 
   const panel = panelId === 'left' ? sftpLeftPanel : sftpRightPanel
@@ -85,10 +108,8 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   const path = panel.path
 
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
-  const [isFocused, setIsFocused] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   
-  // Dialog states
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
   const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -105,9 +126,9 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     queryFn: () => connectionsApi.list()
   })
 
-  // Fetch home directory when path is empty (initial load or connection change)
+  // Resolve home directory when path is empty
   useEffect(() => {
-    if (path) return // preserve persisted path on remount
+    if (path) return
     const fetchHome = async () => {
       try {
         const { path: homePath } = await sftpApi.home(selectedConnection)
@@ -130,11 +151,12 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     queryClient.invalidateQueries({ queryKey: ['sftp', selectedConnection, path] })
   }, [queryClient, selectedConnection, path])
 
+  // ── Transfer / Upload / Operations (unchanged logic) ──
+
   const executeTransfer = useCallback(async (data: any, targetPath: string) => {
     try {
       const { transferId } = await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
       trackTransfer(transferId, data.fileName, 'transfer')
-      
       if (data.action === 'cut') {
          await sftpApi.remove(data.connectionId, data.path)
          setSftpClipboard(null)
@@ -148,26 +170,17 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
 
   const handleAction = useCallback((action: 'cut' | 'copy', file: FileInfo) => {
     const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
-    setSftpClipboard({
-      action,
-      connectionId: selectedConnection,
-      path: fullPath,
-      fileName: file.name,
-      isDir: file.isDir
-    })
+    setSftpClipboard({ action, connectionId: selectedConnection, path: fullPath, fileName: file.name, isDir: file.isDir })
   }, [path, selectedConnection, setSftpClipboard])
 
   const handlePaste = useCallback(async () => {
     if (!sftpClipboard) return
     const targetPath = path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
-
-    // Overwrite check
     if (files?.some(f => f.name === sftpClipboard.fileName)) {
       setPendingTransfer({ data: sftpClipboard, targetPath })
       setIsOverwriteDialogOpen(true)
       return
     }
-
     executeTransfer(sftpClipboard, targetPath)
   }, [sftpClipboard, path, files, executeTransfer])
 
@@ -175,59 +188,31 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     if (!selectedFile || !newName || newName === selectedFile.name) return
     const oldPath = path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
     const newPath = path === '/' ? `/${newName}` : `${path}/${newName}`
-    
-    try {
-      await sftpApi.rename(selectedConnection, oldPath, newPath)
-      refreshDir()
-      setSelectedFile(null)
-    } catch (e) {
-      console.error('Rename error:', e)
-      toast.error('Failed to rename')
-    }
+    try { await sftpApi.rename(selectedConnection, oldPath, newPath); refreshDir(); setSelectedFile(null) }
+    catch (e: any) { toast.error('Failed to rename') }
   }
 
   const handleDeleteConfirm = async () => {
     if (!selectedFile) return
     const fullPath = path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
-    try {
-      await sftpApi.remove(selectedConnection, fullPath)
-      refreshDir()
-      setSelectedFile(null)
-    } catch (e) {
-      console.error('Delete error:', e)
-      toast.error('Failed to delete')
-    }
+    try { await sftpApi.remove(selectedConnection, fullPath); refreshDir(); setSelectedFile(null) }
+    catch (e: any) { toast.error('Failed to delete') }
   }
 
   const handleMkdirConfirm = async (name: string) => {
     if (!name) return
     const fullPath = path === '/' ? `/${name}` : `${path}/${name}`
-    try {
-      await sftpApi.mkdir(selectedConnection, fullPath)
-      refreshDir()
-    } catch (e) {
-      console.error('Mkdir error:', e)
-      toast.error('Failed to create folder')
-    }
+    try { await sftpApi.mkdir(selectedConnection, fullPath); refreshDir() }
+    catch (e: any) { toast.error('Failed to create folder') }
   }
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click()
-  }
+  const handleUploadClick = () => fileInputRef.current?.click()
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    
-    // Overwrite check
-    if (files?.some(f => f.name === file.name)) {
-      setPendingUpload(file)
-      setIsOverwriteDialogOpen(true)
-    } else {
-      executeUpload(file)
-    }
-    
-    // Clear input so same file can be selected again
+    if (files?.some(f => f.name === file.name)) { setPendingUpload(file); setIsOverwriteDialogOpen(true) }
+    else executeUpload(file)
     e.target.value = ''
   }
 
@@ -237,81 +222,46 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       const { transferId } = await sftpApi.upload(selectedConnection, targetPath, file)
       trackTransfer(transferId, file.name, 'upload')
       refreshDir()
-    } catch (e) {
-      console.error('Upload error:', e)
-      toast.error(`Failed to upload ${file.name}`)
-    }
+    } catch (e: any) { toast.error(`Failed to upload ${file.name}`) }
   }, [path, selectedConnection, trackTransfer, refreshDir])
 
   const handleOverwriteConfirm = () => {
-    if (pendingUpload) {
-      executeUpload(pendingUpload)
-      setPendingUpload(null)
-    } else if (pendingTransfer) {
-      executeTransfer(pendingTransfer.data, pendingTransfer.targetPath)
-      setPendingTransfer(null)
-    }
+    if (pendingUpload) { executeUpload(pendingUpload); setPendingUpload(null) }
+    else if (pendingTransfer) { executeTransfer(pendingTransfer.data, pendingTransfer.targetPath); setPendingTransfer(null) }
     setIsOverwriteDialogOpen(false)
   }
 
   const handleDownload = useCallback((file: FileInfo) => {
     const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
     const url = sftpApi.downloadUrl(selectedConnection, fullPath)
-    
-    const a = document.createElement('a')
-    a.href = url
-    a.download = file.name
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    const a = document.createElement('a'); a.href = url; a.download = file.name
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }, [path, selectedConnection])
 
   const handleDragStart = (e: React.DragEvent, file: FileInfo) => {
     const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
     e.dataTransfer.setData('application/json', JSON.stringify({
-      connectionId: selectedConnection,
-      path: fullPath,
-      fileName: file.name,
-      isDir: file.isDir,
-      action: 'copy'
+      connectionId: selectedConnection, path: fullPath, fileName: file.name, isDir: file.isDir, action: 'copy'
     }))
   }
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
-    
-    // Check for OS files
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0]
-      if (files?.some(f => f.name === file.name)) {
-        setPendingUpload(file)
-        setIsOverwriteDialogOpen(true)
-      } else {
-        executeUpload(file)
-      }
+      if (files?.some(f => f.name === file.name)) { setPendingUpload(file); setIsOverwriteDialogOpen(true) }
+      else executeUpload(file)
       return
     }
-
     try {
       const dataStr = e.dataTransfer.getData('application/json')
       if (!dataStr) return
       const data = JSON.parse(dataStr)
-      // skip drop on same folder and same file name
       const targetPath = path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
       if (data.connectionId === selectedConnection && data.path === targetPath) return
-
-      // Overwrite check
-      if (files?.some(f => f.name === data.fileName)) {
-        setPendingTransfer({ data, targetPath })
-        setIsOverwriteDialogOpen(true)
-        return
-      }
-
+      if (files?.some(f => f.name === data.fileName)) { setPendingTransfer({ data, targetPath }); setIsOverwriteDialogOpen(true); return }
       executeTransfer(data, targetPath)
-    } catch (err) {
-      console.error('Drop error:', err)
-      toast.error('Failed to transfer file')
-    }
+    } catch (err) { toast.error('Failed to transfer file') }
   }
 
   const handleNavigate = useCallback((newPath: string) => {
@@ -322,7 +272,6 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   const handleEntryClick = useCallback((entry: FileInfo) => {
     setSelectedFile(null)
     if (!entry.isDir) return
-    
     if (entry.name === '..') {
       setPanel({ connectionId: selectedConnection, path: getParentPath(path) })
     } else {
@@ -338,24 +287,9 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   }
 
   const shortcutHandlers = useMemo(() => ({
-    onEnter: () => {
-      if (selectedFile) {
-        if (selectedFile.isDir) {
-          handleEntryClick(selectedFile)
-        } else {
-          handleDownload(selectedFile)
-        }
-      }
-    },
-    onBackspace: () => {
-      setPanel({ connectionId: selectedConnection, path: getParentPath(path) })
-      setSelectedFile(null)
-    },
-    onDelete: () => {
-      if (selectedFile) {
-        setIsDeleteDialogOpen(true)
-      }
-    },
+    onEnter: () => { if (selectedFile) selectedFile.isDir ? handleEntryClick(selectedFile) : handleDownload(selectedFile) },
+    onBackspace: () => { setPanel({ connectionId: selectedConnection, path: getParentPath(path) }); setSelectedFile(null) },
+    onDelete: () => { if (selectedFile) setIsDeleteDialogOpen(true) },
     onRefresh: refreshDir,
     onCopy: () => selectedFile && handleAction('copy', selectedFile),
     onCut: () => selectedFile && handleAction('cut', selectedFile),
@@ -364,254 +298,179 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
 
   useSFTPShortcuts(containerRef, shortcutHandlers)
 
-  // Virtual entry for parent directory if not at root
+  // ── Display files ──
   const displayFiles = (() => {
     if (!files) return []
-    const sortedFiles = [...files].sort((a, b) => {
+    const sorted = [...files].sort((a, b) => {
       if (a.isDir && !b.isDir) return -1
       if (!a.isDir && b.isDir) return 1
-      return a.name.localeCompare(b.name)
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
     })
-
-    // Add ".." if not at root
     if (path !== '.' && path !== '/' && !(/^[A-Za-z]:\\$/.test(path))) {
-      return [
-        { name: '..', isDir: true, size: 0, mode: 0, modTime: '' } as FileInfo,
-        ...sortedFiles
-      ]
+      return [{ name: '..', isDir: true, size: 0, mode: 0, modTime: '' } as FileInfo, ...sorted]
     }
-    return sortedFiles
+    return sorted
   })()
 
-  const hasSelection = !!selectedFile
   const isLoadingHome = !path
 
   return (
     <div 
       ref={containerRef}
       tabIndex={0}
-      onFocus={() => setIsFocused(true)}
-      onBlur={() => setIsFocused(false)}
-      className={`flex flex-col h-full bg-background border rounded-lg overflow-hidden transition-all outline-none ${isFocused ? 'ring-1 ring-primary border-primary' : ''}`} 
+      className="flex flex-col h-full bg-background outline-none overflow-hidden"
       onClick={() => setSelectedFile(null)}
     >
-      {/* Row 1: Header – Connection Selector + Burger Menu */}
-      <div className="p-2 border-b bg-muted/50 flex items-center gap-2 shrink-0">
+      {/* ── Toolbar ── */}
+      <div className="flex items-center gap-2.5 px-3 py-1.5 bg-muted border-b shrink-0">
         <Select value={selectedConnection} onValueChange={handleSourceChange}>
-          <SelectTrigger className="w-[180px] h-8 text-xs">
-            <SelectValue placeholder="Select Source" />
+          <SelectTrigger className="h-7 border-0 bg-transparent text-sm font-semibold px-1 hover:bg-accent/50 w-auto min-w-0 [&>svg]:text-muted-foreground [&>svg]:h-3 [&>svg]:w-3">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="local">Local Machine</SelectItem>
             {connections?.map((conn) => (
-              <SelectItem key={conn.id} value={conn.id}>
-                {conn.label} ({conn.host})
-              </SelectItem>
+              <SelectItem key={conn.id} value={conn.id}>{conn.label} ({conn.host})</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        
         <div className="flex-1" />
-        
-        {/* Burger Menu */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-            <Menu className="h-4 w-4" />
+          <DropdownMenuTrigger className="flex items-center gap-1.5 bg-transparent border-0 text-muted-foreground text-xs cursor-pointer py-1 px-2 rounded hover:bg-accent hover:text-foreground transition-colors outline-none">
+            Actions
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuItem onClick={refreshDir}>
-              <RefreshCw className="h-4 w-4" />
-              <span>Refresh</span>
+              <RefreshCw className="h-4 w-4" /> Refresh
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleUploadClick}>
-              <Upload className="h-4 w-4" />
-              <span>Upload File</span>
+              <Upload className="h-4 w-4" /> Upload File
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIsNewFolderDialogOpen(true)}>
-              <FolderPlus className="h-4 w-4" />
-              <span>New Folder</span>
+              <FolderPlus className="h-4 w-4" /> New Folder
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => setIsRenameDialogOpen(true)} 
-              disabled={!hasSelection}
-            >
-              <Edit2 className="h-4 w-4" />
-              <span>Rename</span>
+            <DropdownMenuItem onClick={() => setIsRenameDialogOpen(true)} disabled={!selectedFile}>
+              <Edit2 className="h-4 w-4" /> Rename
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => setIsDeleteDialogOpen(true)} 
-              disabled={!hasSelection}
-              variant="destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Delete</span>
+            <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} disabled={!selectedFile} variant="destructive">
+              <Trash2 className="h-4 w-4" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Row 2: Breadcrumb bar (replaces old DirectoryToolbar) */}
-      <div className="flex items-center px-3 py-1.5 border-b bg-muted/30 shrink-0">
-        <SftpBreadcrumbs path={path} onNavigate={handleNavigate} />
+      {/* ── Breadcrumb ── */}
+      <SftpBreadcrumbs path={path} onNavigate={handleNavigate} />
+
+      {/* ── Column headers ── */}
+      <div className="grid grid-cols-[1fr_150px_60px_80px] px-3 py-1 bg-muted/80 border-b text-muted-foreground text-[11px] font-semibold tracking-wider uppercase shrink-0">
+        <div>Name</div>
+        <div>Date Modified</div>
+        <div>Size</div>
+        <div>Kind</div>
       </div>
-      
-      {/* Row 3: File listing */}
+
+      {/* ── File list ── */}
       <div className="flex-1 overflow-hidden relative">
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          onChange={handleFileChange}
-        />
+        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
 
-        {isLoadingHome && (
-          <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        )}
-
-        {isLoading && !isLoadingHome && (
-          <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        {(isLoadingHome || isLoading) && (
+          <div className="absolute inset-0 z-10 bg-background/70 flex items-center justify-center">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         )}
         
         {!isLoadingHome && error ? (
-          <div className="p-4 flex flex-col items-center justify-center h-full text-destructive text-sm gap-2 text-center">
-            <AlertCircle className="h-8 w-8" />
-            <p>Error loading directory</p>
-            <p className="text-xs opacity-80">{error instanceof Error ? error.message : String(error)}</p>
+          <div className="p-6 flex flex-col items-center justify-center h-full text-destructive text-sm gap-2 text-center">
+            <div className="text-base">Error loading directory</div>
+            <div className="text-xs opacity-70">{error instanceof Error ? error.message : String(error)}</div>
           </div>
         ) : !isLoadingHome && (
-          <ScrollArea 
-            className="h-full" 
+          <div 
+            className="h-full overflow-y-auto"
             onDragOver={(e) => e.preventDefault()} 
             onDrop={handleDrop}
           >
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-background border-b z-10">
-                <tr className="text-muted-foreground text-left text-xs">
-                  <th className="font-medium p-2 pl-4">Name</th>
-                  <th className="font-medium p-2 w-24">Size</th>
-                  <th className="font-medium p-2 w-40">Modified</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayFiles.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="p-4 text-center text-muted-foreground text-xs">
-                      Directory is empty
-                    </td>
-                  </tr>
-                )}
-                {displayFiles.map((file, i) => {
-                  if (file.name === '..') {
-                    return (
-                      <tr 
-                        key={`${file.name}-${i}`}
-                        className={`border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer select-none`}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation()
-                          handleEntryClick(file)
-                        }}
-                      >
-                        <td className="p-2 pl-4 flex items-center gap-2 font-medium">
-                          <CornerLeftUp className="h-4 w-4 text-muted-foreground" />
-                          <span className="truncate">{file.name}</span>
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
-                        </td>
-                      </tr>
-                    )
-                  }
+            {displayFiles.length === 0 && (
+              <div className="p-4 text-center text-muted-foreground text-xs">Directory is empty</div>
+            )}
+            {displayFiles.map((file, i) => {
+              if (file.name === '..') {
+                return (
+                  <div 
+                    key={`${file.name}-${i}`}
+                    className="grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-[38px] cursor-pointer transition-colors hover:bg-accent"
+                    onDoubleClick={(e) => { e.stopPropagation(); handleEntryClick(file) }}
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <CornerLeftUp className="h-[18px] w-[18px] text-muted-foreground shrink-0" />
+                      <span className="text-[13px] text-foreground truncate">..</span>
+                    </div>
+                    <div className="text-muted-foreground text-[11.5px]" />
+                    <div className="text-muted-foreground text-[11.5px] text-center" />
+                    <div className="text-muted-foreground text-[11.5px]" />
+                  </div>
+                )
+              }
 
-                  const isSelected = selectedFile?.name === file.name
+              const isSelected = selectedFile?.name === file.name
 
-                  return (
-                    <ContextMenu key={`${file.name}-${i}`}>
-                      <ContextMenuTrigger render={
-                        <tr 
-                          className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${file.isDir ? 'cursor-pointer' : ''} select-none ${isSelected ? 'bg-accent text-accent-foreground' : ''}`}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedFile(file)
-                          }}
-                          onDoubleClick={(e) => {
-                            e.stopPropagation()
-                            handleEntryClick(file)
-                          }}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, file)}
-                        />
-                      }>
-                        <td className="p-2 pl-4 flex items-center gap-2 font-medium">
-                          <FileIcon name={file.name} isDir={file.isDir} />
-                          <span className="truncate">{file.name}</span>
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
-                          {!file.isDir ? formatSize(file.size) : ''}
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
-                          {file.modTime ? formatDate(file.modTime) : ''}
-                        </td>
-                      </ContextMenuTrigger>
-                      <ContextMenuContent className="w-48">
-                        {!file.isDir && (
-                          <>
-                            <ContextMenuItem onClick={() => handleDownload(file)}>
-                              <Download className="h-4 w-4 mr-2" /> Download
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                          </>
-                        )}
-                        <ContextMenuItem onClick={() => handleAction('cut', file)}>Cut</ContextMenuItem>
-                        <ContextMenuItem onClick={() => handleAction('copy', file)}>Copy</ContextMenuItem>
-                        <ContextMenuItem disabled={!sftpClipboard} onClick={handlePaste}>Paste Here</ContextMenuItem>
+              return (
+                <ContextMenu key={`${file.name}-${i}`}>
+                  <ContextMenuTrigger render={
+                    <div 
+                      className={`grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-[38px] cursor-pointer transition-colors ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent'}`}
+                      onClick={(e) => { e.stopPropagation(); setSelectedFile(file) }}
+                      onDoubleClick={(e) => { e.stopPropagation(); handleEntryClick(file) }}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, file)}
+                    />
+                  }>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      {file.isDir ? (
+                        <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] shrink-0"><path fill="currentColor" className="text-blue-500" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+                      ) : (
+                        <FileIcon name={file.name} isDir={false} />
+                      )}
+                      <div className="flex flex-col overflow-hidden min-w-0">
+                        <span className="text-[13px] text-foreground truncate leading-tight">{file.name}</span>
+                        <span className="text-[10px] text-muted-foreground leading-tight">{formatPermissions(file.mode, file.isDir)}</span>
+                      </div>
+                    </div>
+                    <div className="text-muted-foreground text-[11.5px]">{file.modTime ? formatDate(file.modTime) : ''}</div>
+                    <div className="text-muted-foreground text-[11.5px] text-center">{file.isDir ? '- -' : formatSize(file.size)}</div>
+                    <div className="text-muted-foreground text-[11.5px]">{getFileKind(file)}</div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-48">
+                    {!file.isDir && (
+                      <>
+                        <ContextMenuItem onClick={() => handleDownload(file)}>
+                          <Download className="h-4 w-4 mr-2" /> Download
+                        </ContextMenuItem>
                         <ContextMenuSeparator />
-                        <ContextMenuItem onClick={() => {
-                          setSelectedFile(file)
-                          setIsRenameDialogOpen(true)
-                        }}>Rename</ContextMenuItem>
-                        <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => {
-                          setSelectedFile(file)
-                          setIsDeleteDialogOpen(true)
-                        }}>Delete</ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  )
-                })}
-              </tbody>
-            </table>
-          </ScrollArea>
+                      </>
+                    )}
+                    <ContextMenuItem onClick={() => handleAction('cut', file)}>Cut</ContextMenuItem>
+                    <ContextMenuItem onClick={() => handleAction('copy', file)}>Copy</ContextMenuItem>
+                    <ContextMenuItem disabled={!sftpClipboard} onClick={handlePaste}>Paste Here</ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={() => { setSelectedFile(file); setIsRenameDialogOpen(true) }}>Rename</ContextMenuItem>
+                    <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => { setSelectedFile(file); setIsDeleteDialogOpen(true) }}>Delete</ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              )
+            })}
+          </div>
         )}
       </div>
 
-      <RenameDialog 
-        open={isRenameDialogOpen} 
-        onOpenChange={setIsRenameDialogOpen} 
-        oldName={selectedFile?.name || ''} 
-        onConfirm={handleRenameConfirm} 
-      />
-      <NewFolderDialog 
-        open={isNewFolderDialogOpen} 
-        onOpenChange={setIsNewFolderDialogOpen} 
-        onConfirm={handleMkdirConfirm} 
-      />
-      <DeleteConfirmDialog 
-        open={isDeleteDialogOpen} 
-        onOpenChange={setIsDeleteDialogOpen} 
-        fileName={selectedFile?.name || ''} 
-        onConfirm={handleDeleteConfirm} 
-      />
-      <OverwriteDialog 
-        open={isOverwriteDialogOpen} 
-        onOpenChange={setIsOverwriteDialogOpen} 
-        fileName={pendingUpload?.name || pendingTransfer?.data.fileName || ''} 
-        onConfirm={handleOverwriteConfirm} 
-      />
+      {/* ── Dialogs ── */}
+      <RenameDialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen} oldName={selectedFile?.name || ''} onConfirm={handleRenameConfirm} />
+      <NewFolderDialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen} onConfirm={handleMkdirConfirm} />
+      <DeleteConfirmDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} fileName={selectedFile?.name || ''} onConfirm={handleDeleteConfirm} />
+      <OverwriteDialog open={isOverwriteDialogOpen} onOpenChange={setIsOverwriteDialogOpen} fileName={pendingUpload?.name || pendingTransfer?.data.fileName || ''} onConfirm={handleOverwriteConfirm} />
     </div>
   )
 }

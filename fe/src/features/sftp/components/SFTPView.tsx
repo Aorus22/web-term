@@ -4,13 +4,13 @@ import { TransferManager } from "./TransferManager"
 
 export function SFTPView() {
   return (
-    <div className="flex-1 p-4 overflow-hidden relative">
-      <ResizablePanelGroup orientation="horizontal" className="h-full gap-2">
+    <div className="flex-1 overflow-hidden relative">
+      <ResizablePanelGroup orientation="horizontal" className="h-full">
         <ResizablePanel defaultSize={50} minSize={20}>
           <DirectoryBrowser panelId="left" />
         </ResizablePanel>
         
-        <ResizableHandle withHandle className="bg-transparent hover:bg-accent/50 w-2 transition-colors rounded-full" />
+        <ResizableHandle withHandle className="bg-border hover:bg-border/70 w-[1px] transition-colors" />
         
         <ResizablePanel defaultSize={50} minSize={20}>
           <DirectoryBrowser panelId="right" />

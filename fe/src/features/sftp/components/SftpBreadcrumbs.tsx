@@ -1,44 +1,40 @@
-import { ChevronRight, Home } from 'lucide-react'
-
 interface SftpBreadcrumbsProps {
   path: string
   onNavigate: (path: string) => void
 }
 
+function FolderSvg() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-[13px] h-[13px] shrink-0">
+      <path fill="currentColor" className="text-blue-500" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+    </svg>
+  )
+}
+
 export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
-  // Loading state – path not yet resolved
-  if (!path || path === '.') {
+  if (!path) {
     return (
-      <div className="flex items-center text-xs text-muted-foreground">
-        <Home className="h-3 w-3 mr-1" />
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/80 border-b text-muted-foreground text-xs shrink-0">
         <span>Loading...</span>
       </div>
     )
   }
 
-  // Check if path starts with Windows drive like "C:" or "C:\"
   const isWindowsPath = /^[A-Za-z]:/.test(path)
-
   const segments: { name: string; path: string }[] = []
 
   if (isWindowsPath) {
-    // Windows path like "C:\Users\username"
-    const drive = path.substring(0, 2) // e.g. "C:"
-    const rest = path.substring(2).replace(/\\/g, '/') // normalize backslashes
+    const drive = path.substring(0, 2)
+    const rest = path.substring(2).replace(/\\/g, '/')
     const parts = rest.split('/').filter(Boolean)
-
-    // Drive segment
     segments.push({ name: drive, path: drive + '\\' })
-
     let currentPath = drive + '\\'
     for (const part of parts) {
       currentPath = currentPath + part + '\\'
       segments.push({ name: part, path: currentPath })
     }
   } else if (path.startsWith('/')) {
-    // Unix absolute path
-    segments.push({ name: '/', path: '/' })
-
+    segments.push({ name: 'root', path: '/' })
     const parts = path.split('/').filter(Boolean)
     let currentPath = ''
     for (const part of parts) {
@@ -46,7 +42,6 @@ export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
       segments.push({ name: part, path: currentPath })
     }
   } else {
-    // Relative path (unlikely now, but fallback)
     const parts = path.split('/').filter(Boolean)
     let currentPath = ''
     for (const part of parts) {
@@ -56,19 +51,26 @@ export function SftpBreadcrumbs({ path, onNavigate }: SftpBreadcrumbsProps) {
   }
 
   return (
-    <div className="flex items-center text-xs overflow-hidden">
-      {segments.map((segment, i) => (
-        <div key={segment.path} className="flex items-center shrink-0">
-          {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5 shrink-0" />}
-          <button
-            onClick={() => onNavigate(segment.path)}
-            className="px-1 py-0.5 rounded hover:bg-accent hover:text-accent-foreground transition-colors truncate max-w-[120px]"
-            title={segment.path}
-          >
-            {segment.name === '/' ? <Home className="h-3 w-3" /> : segment.name}
-          </button>
-        </div>
-      ))}
+    <div className="flex items-center gap-1 px-3 py-1.5 bg-muted/80 border-b shrink-0">
+      {/* Nav arrows (placeholder for future history) */}
+      <button className="text-muted-foreground hover:text-foreground px-0.5 py-0.5 rounded text-sm leading-none transition-colors cursor-default" tabIndex={-1}>&#8249;</button>
+      <button className="text-muted-foreground hover:text-foreground px-0.5 py-0.5 rounded text-sm leading-none transition-colors cursor-default" tabIndex={-1}>&#8250;</button>
+
+      <div className="flex items-center gap-0.5 text-xs">
+        {segments.map((segment, i) => (
+          <span key={segment.path} className="flex items-center gap-0.5 shrink-0">
+            {i > 0 && <span className="text-muted-foreground/50 text-[10px] mx-0.5">&#8250;</span>}
+            <FolderSvg />
+            <button
+              onClick={() => onNavigate(segment.path)}
+              className="px-0.5 py-0.5 rounded hover:bg-accent transition-colors text-foreground truncate max-w-[120px]"
+              title={segment.path}
+            >
+              {segment.name === 'root' ? '/' : segment.name}
+            </button>
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
