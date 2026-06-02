@@ -14,6 +14,8 @@ export interface SFTPClipboard {
 export interface SftpPanelState {
   connectionId: string
   path: string
+  history: string[]
+  historyIndex: number
 }
 
 interface AppState {
@@ -46,8 +48,8 @@ interface AppState {
   // SFTP Panel state (persists across page switches)
   sftpLeftPanel: SftpPanelState
   sftpRightPanel: SftpPanelState
-  setSftpLeftPanel: (state: SftpPanelState) => void
-  setSftpRightPanel: (state: SftpPanelState) => void
+  setSftpLeftPanel: (state: SftpPanelState | ((prev: SftpPanelState) => SftpPanelState)) => void
+  setSftpRightPanel: (state: SftpPanelState | ((prev: SftpPanelState) => SftpPanelState)) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -143,8 +145,8 @@ export const useAppStore = create<AppState>((set) => ({
   sftpClipboard: null,
   setSftpClipboard: (clipboard) => set({ sftpClipboard: clipboard }),
   // SFTP Panel state
-  sftpLeftPanel: { connectionId: "local", path: "" },
-  sftpRightPanel: { connectionId: "local", path: "" },
-  setSftpLeftPanel: (state) => set({ sftpLeftPanel: state }),
-  setSftpRightPanel: (state) => set({ sftpRightPanel: state }),
+  sftpLeftPanel: { connectionId: "local", path: "", history: [], historyIndex: -1 },
+  sftpRightPanel: { connectionId: "local", path: "", history: [], historyIndex: -1 },
+  setSftpLeftPanel: (state) => set((s) => ({ sftpLeftPanel: typeof state === 'function' ? state(s.sftpLeftPanel) : state })),
+  setSftpRightPanel: (state) => set((s) => ({ sftpRightPanel: typeof state === 'function' ? state(s.sftpRightPanel) : state })),
 }))

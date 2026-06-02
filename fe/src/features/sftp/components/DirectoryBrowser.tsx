@@ -106,6 +106,37 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
 
   const selectedConnection = panel.connectionId
   const path = panel.path
+  const { history, historyIndex } = panel
+  
+  // ── History-based navigation ──
+  const navigateTo = useCallback((newPath: string) => {
+    setPanel(prev => {
+      const newHistory = [...prev.history.slice(0, prev.historyIndex + 1), newPath]
+      return { ...prev, path: newPath, history: newHistory, historyIndex: newHistory.length - 1 }
+    })
+    setSelectedFile(null)
+  }, [setPanel])
+
+  const goBack = useCallback(() => {
+    setPanel(prev => {
+      if (prev.historyIndex <= 0) return prev
+      const newIdx = prev.historyIndex - 1
+      return { ...prev, path: prev.history[newIdx], historyIndex: newIdx }
+    })
+    setSelectedFile(null)
+  }, [setPanel])
+
+  const goForward = useCallback(() => {
+    setPanel(prev => {
+      if (prev.historyIndex >= prev.history.length - 1) return prev
+      const newIdx = prev.historyIndex + 1
+      return { ...prev, path: prev.history[newIdx], historyIndex: newIdx }
+    })
+    setSelectedFile(null)
+  }, [setPanel])
+
+  const canGoBack = historyIndex > 0
+  const canGoForward = historyIndex < history.length - 1
 
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -132,10 +163,10 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     const fetchHome = async () => {
       try {
         const { path: homePath } = await sftpApi.home(selectedConnection)
-        setPanel({ connectionId: selectedConnection, path: homePath })
+        setPanel({ connectionId: selectedConnection, path: homePath, history: [homePath], historyIndex: 0 })
       } catch (e) {
         console.error('Failed to fetch home directory:', e)
-        setPanel({ connectionId: selectedConnection, path: '/' })
+        setPanel({ connectionId: selectedConnection, path: '/', history: ['/'], historyIndex: 0 })
       }
     }
     fetchHome()
@@ -265,30 +296,28 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   }
 
   const handleNavigate = useCallback((newPath: string) => {
-    setSelectedFile(null)
-    setPanel({ connectionId: selectedConnection, path: newPath })
-  }, [selectedConnection, setPanel])
+    navigateTo(newPath)
+  }, [navigateTo])
 
   const handleEntryClick = useCallback((entry: FileInfo) => {
-    setSelectedFile(null)
     if (!entry.isDir) return
     if (entry.name === '..') {
-      setPanel({ connectionId: selectedConnection, path: getParentPath(path) })
+      navigateTo(getParentPath(path))
     } else {
       const newPath = path === '/' ? `/${entry.name}` : `${path}/${entry.name}`
-      setPanel({ connectionId: selectedConnection, path: newPath })
+      navigateTo(newPath)
     }
-  }, [path, selectedConnection, setPanel])
+  }, [path, navigateTo])
 
   const handleSourceChange = (v: string | null) => {
     if (!v) return
-    setPanel({ connectionId: v, path: '' })
+    setPanel({ connectionId: v, path: '', history: [], historyIndex: -1 })
     setSelectedFile(null)
   }
 
   const shortcutHandlers = useMemo(() => ({
     onEnter: () => { if (selectedFile) selectedFile.isDir ? handleEntryClick(selectedFile) : handleDownload(selectedFile) },
-    onBackspace: () => { setPanel({ connectionId: selectedConnection, path: getParentPath(path) }); setSelectedFile(null) },
+    onBackspace: () => { navigateTo(getParentPath(path)); setSelectedFile(null) },
     onDelete: () => { if (selectedFile) setIsDeleteDialogOpen(true) },
     onRefresh: refreshDir,
     onCopy: () => selectedFile && handleAction('copy', selectedFile),
@@ -322,9 +351,9 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       onClick={() => setSelectedFile(null)}
     >
       {/* ── Toolbar ── */}
-      <div className="flex items-center gap-2.5 px-3 py-1.5 bg-muted border-b shrink-0">
+      <div className="flex items-center gap-2 p-2 bg-muted border-b shrink-0">
         <Select value={selectedConnection} onValueChange={handleSourceChange}>
-          <SelectTrigger className="h-7 border-0 bg-transparent text-sm font-semibold px-1 hover:bg-accent/50 w-auto min-w-0 [&>svg]:text-muted-foreground [&>svg]:h-3 [&>svg]:w-3">
+          <SelectTrigger className="h-8 border-0 bg-transparent text-sm font-semibold px-1 hover:bg-accent/50 w-auto min-w-0">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -336,7 +365,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
         </Select>
         <div className="flex-1" />
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-1.5 bg-transparent border-0 text-muted-foreground text-xs cursor-pointer py-1 px-2 rounded hover:bg-accent hover:text-foreground transition-colors outline-none">
+          <DropdownMenuTrigger className="flex items-center gap-1.5 h-8 bg-transparent border-0 text-muted-foreground text-xs cursor-pointer px-2 rounded hover:bg-accent hover:text-foreground transition-colors outline-none">
             Actions
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
           </DropdownMenuTrigger>
@@ -362,10 +391,10 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       </div>
 
       {/* ── Breadcrumb ── */}
-      <SftpBreadcrumbs path={path} onNavigate={handleNavigate} />
+      <SftpBreadcrumbs path={path} onNavigate={handleNavigate} onBack={goBack} onForward={goForward} canGoBack={canGoBack} canGoForward={canGoForward} />
 
       {/* ── Column headers ── */}
-      <div className="grid grid-cols-[1fr_150px_60px_80px] px-3 py-1 bg-muted/80 border-b text-muted-foreground text-[11px] font-semibold tracking-wider uppercase shrink-0">
+      <div className="grid grid-cols-[1fr_150px_60px_80px] px-3 py-2 bg-muted/80 border-b text-muted-foreground text-xs font-medium shrink-0">
         <div>Name</div>
         <div>Date Modified</div>
         <div>Size</div>
@@ -401,16 +430,16 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
                 return (
                   <div 
                     key={`${file.name}-${i}`}
-                    className="grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-[38px] cursor-pointer transition-colors hover:bg-accent"
+                    className="grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-10 cursor-pointer transition-colors hover:bg-accent"
                     onDoubleClick={(e) => { e.stopPropagation(); handleEntryClick(file) }}
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <CornerLeftUp className="h-[18px] w-[18px] text-muted-foreground shrink-0" />
-                      <span className="text-[13px] text-foreground truncate">..</span>
+                      <CornerLeftUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-foreground truncate">..</span>
                     </div>
-                    <div className="text-muted-foreground text-[11.5px]" />
-                    <div className="text-muted-foreground text-[11.5px] text-center" />
-                    <div className="text-muted-foreground text-[11.5px]" />
+                    <div className="text-muted-foreground text-xs" />
+                    <div className="text-muted-foreground text-xs text-center" />
+                    <div className="text-muted-foreground text-xs" />
                   </div>
                 )
               }
@@ -421,7 +450,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
                 <ContextMenu key={`${file.name}-${i}`}>
                   <ContextMenuTrigger render={
                     <div 
-                      className={`grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-[38px] cursor-pointer transition-colors ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent'}`}
+                      className={`grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-10 cursor-pointer transition-colors ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent'}`}
                       onClick={(e) => { e.stopPropagation(); setSelectedFile(file) }}
                       onDoubleClick={(e) => { e.stopPropagation(); handleEntryClick(file) }}
                       draggable
@@ -430,18 +459,18 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
                   }>
                     <div className="flex items-center gap-2 overflow-hidden">
                       {file.isDir ? (
-                        <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] shrink-0"><path fill="currentColor" className="text-blue-500" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+                        <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 text-blue-500"><path fill="currentColor" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
                       ) : (
                         <FileIcon name={file.name} isDir={false} />
                       )}
                       <div className="flex flex-col overflow-hidden min-w-0">
-                        <span className="text-[13px] text-foreground truncate leading-tight">{file.name}</span>
-                        <span className="text-[10px] text-muted-foreground leading-tight">{formatPermissions(file.mode, file.isDir)}</span>
+                        <span className="text-sm text-foreground truncate leading-tight">{file.name}</span>
+                        <span className="text-xs text-muted-foreground leading-tight">{formatPermissions(file.mode, file.isDir)}</span>
                       </div>
                     </div>
-                    <div className="text-muted-foreground text-[11.5px]">{file.modTime ? formatDate(file.modTime) : ''}</div>
-                    <div className="text-muted-foreground text-[11.5px] text-center">{file.isDir ? '- -' : formatSize(file.size)}</div>
-                    <div className="text-muted-foreground text-[11.5px]">{getFileKind(file)}</div>
+                    <div className="text-muted-foreground text-xs">{file.modTime ? formatDate(file.modTime) : ''}</div>
+                    <div className="text-muted-foreground text-xs text-center">{file.isDir ? '- -' : formatSize(file.size)}</div>
+                    <div className="text-muted-foreground text-xs">{getFileKind(file)}</div>
                   </ContextMenuTrigger>
                   <ContextMenuContent className="w-48">
                     {!file.isDir && (
