@@ -64,7 +64,7 @@ function startBackend() {
         WEBTERM_ENCRYPTION_KEY: encryptionKey,
     };
 
-    backendProcess = spawn(backendPath, [], { env });
+    backendProcess = spawn(backendPath, [], { env, cwd: app.isPackaged ? process.resourcesPath : path.join(__dirname, '..') });
 
     backendProcess.stdout.on('data', (data) => {
         const text = data.toString();

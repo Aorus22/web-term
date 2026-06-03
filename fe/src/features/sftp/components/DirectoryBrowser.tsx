@@ -52,24 +52,6 @@ const formatPermissions = (mode: number, isDir: boolean): string => {
   return (isDir ? 'd' : '-') + r(0o400) + w(0o200) + x(0o100) + r(0o040) + w(0o020) + x(0o010) + r(0o004) + w(0o002) + x(0o001)
 }
 
-const getFileKind = (file: FileInfo): string => {
-  if (file.isDir) return 'folder'
-  const ext = file.name.split('.').pop()?.toLowerCase()
-  const map: Record<string, string> = {
-    png: 'PNG image', jpg: 'JPEG image', jpeg: 'JPEG image', gif: 'GIF image', svg: 'SVG image',
-    mp3: 'MP3 audio', wav: 'WAV audio', flac: 'FLAC audio',
-    mp4: 'MP4 video', mkv: 'MKV video',
-    zip: 'ZIP archive', tar: 'TAR archive', gz: 'GZip archive', rar: 'RAR archive',
-    pdf: 'PDF document', doc: 'DOC document', docx: 'DOCX document',
-    txt: 'Text', md: 'Markdown', json: 'JSON', xml: 'XML', yaml: 'YAML', yml: 'YAML',
-    ts: 'TypeScript', tsx: 'TSX', js: 'JavaScript', jsx: 'JSX',
-    py: 'Python', rs: 'Rust', go: 'Go', java: 'Java', cpp: 'C++', c: 'C',
-    css: 'CSS', scss: 'SCSS', html: 'HTML',
-    sh: 'Shell script', bash: 'Shell script',
-  }
-  return ext && map[ext] ? map[ext] : (ext ? ext.toUpperCase() + ' file' : 'File')
-}
-
 const getParentPath = (currentPath: string) => {
   if (!currentPath || currentPath === '.' || currentPath === '/' || currentPath === '') return '/'
   if (/^[A-Za-z]:\\$/.test(currentPath)) return '/'
@@ -87,6 +69,11 @@ const getParentPath = (currentPath: string) => {
   if (parts.length === 1 && parts[0] === '') return '/'
   return parts.join('/')
 }
+
+// ── Sort types ──
+
+type SortColumn = 'name' | 'date' | 'size'
+type SortDirection = 'asc' | 'desc'
 
 // ── Component ──
 
@@ -107,6 +94,19 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   const selectedConnection = panel.connectionId
   const path = panel.path
   const { history, historyIndex } = panel
+  
+  // ── Sort state ──
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
   
   // ── History-based navigation ──
   const navigateTo = useCallback((newPath: string) => {
@@ -140,6 +140,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
 
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const listBodyRef = useRef<HTMLDivElement>(null)
   
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
   const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false)
@@ -151,6 +152,11 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const { trackTransfer } = useSFTPTransfer()
+  
+  // ── Type-to-navigate state ──
+  const lastNavKeyRef = useRef<string>('')
+  const lastNavTimeRef = useRef<number>(0)
+  const NAV_TIMEOUT = 800
   
   const { data: connections } = useQuery({
     queryKey: ['connections'],
@@ -176,6 +182,14 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     queryKey: ['sftp', selectedConnection, path],
     queryFn: () => sftpApi.list(selectedConnection, path),
     enabled: !!selectedConnection && !!path
+  })
+
+  // Fetch drives for Windows volume switching (always available when on local)
+  const { data: drives } = useQuery({
+    queryKey: ['sftp', 'local', '/'],
+    queryFn: () => sftpApi.list('local', '/'),
+    enabled: selectedConnection === 'local',
+    staleTime: 60000,
   })
 
   const refreshDir = useCallback(() => {
@@ -315,6 +329,72 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     setSelectedFile(null)
   }
 
+  // ── Display files (sorted) ──
+  const sortedFiles = useMemo(() => {
+    if (!files) return []
+    const sorted = [...files].sort((a, b) => {
+      if (sortColumn === 'name') {
+        // Directories first, then by name
+        if (a.isDir && !b.isDir) return -1
+        if (!a.isDir && b.isDir) return 1
+        const cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        return sortDirection === 'asc' ? cmp : -cmp
+      }
+      if (sortColumn === 'date') {
+        // Directories first
+        if (a.isDir && !b.isDir) return -1
+        if (!a.isDir && b.isDir) return 1
+        const aTime = a.modTime ? new Date(a.modTime).getTime() : 0
+        const bTime = b.modTime ? new Date(b.modTime).getTime() : 0
+        return sortDirection === 'asc' ? aTime - bTime : bTime - aTime
+      }
+      // size
+      if (a.isDir && !b.isDir) return -1
+      if (!a.isDir && b.isDir) return 1
+      return sortDirection === 'asc' ? a.size - b.size : b.size - a.size
+    })
+    return sorted
+  }, [files, sortColumn, sortDirection])
+
+  const displayFiles = useMemo(() => {
+    const list = [...sortedFiles]
+    if (path !== '.' && path !== '/' && !(/^[A-Za-z]:\\$/.test(path))) {
+      return [{ name: '..', isDir: true, size: 0, mode: 0, modTime: '' } as FileInfo, ...list]
+    }
+    return list
+  }, [sortedFiles, path])
+
+  // ── Type-to-navigate handler ──
+  const handleTypeNavigate = useCallback((key: string) => {
+    const lowerKey = key.toLowerCase()
+    const now = Date.now()
+    const isRepeat = lowerKey === lastNavKeyRef.current && (now - lastNavTimeRef.current) < NAV_TIMEOUT
+    
+    lastNavKeyRef.current = lowerKey
+    lastNavTimeRef.current = now
+
+    // Find matching files (excluding '..' entry)
+    const matching = displayFiles.filter(f => f.name !== '..' && f.name.toLowerCase().startsWith(lowerKey))
+    if (matching.length === 0) return
+
+    if (isRepeat && selectedFile) {
+      // Find current index among matches
+      const currentIdx = matching.findIndex(f => f.name === selectedFile.name)
+      const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % matching.length : 0
+      setSelectedFile(matching[nextIdx])
+    } else {
+      setSelectedFile(matching[0])
+    }
+  }, [displayFiles, selectedFile])
+
+  // Scroll selected file into view whenever selection changes
+  useEffect(() => {
+    if (!selectedFile || !listBodyRef.current) return
+    const escaped = selectedFile.name.replace(/"/g, '\\"')
+    const el = listBodyRef.current.querySelector(`[data-file="${escaped}"]`)
+    if (el) el.scrollIntoView({ block: 'nearest' })
+  }, [selectedFile])
+
   const shortcutHandlers = useMemo(() => ({
     onEnter: () => { if (selectedFile) selectedFile.isDir ? handleEntryClick(selectedFile) : handleDownload(selectedFile) },
     onBackspace: () => { navigateTo(getParentPath(path)); setSelectedFile(null) },
@@ -323,25 +403,24 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     onCopy: () => selectedFile && handleAction('copy', selectedFile),
     onCut: () => selectedFile && handleAction('cut', selectedFile),
     onPaste: handlePaste,
-  }), [selectedFile, path, selectedConnection, setPanel, refreshDir, handleAction, handlePaste, handleEntryClick, handleDownload])
+    onTypeNavigate: handleTypeNavigate,
+  }), [selectedFile, path, selectedConnection, setPanel, refreshDir, handleAction, handlePaste, handleEntryClick, handleDownload, handleTypeNavigate, navigateTo])
 
   useSFTPShortcuts(containerRef, shortcutHandlers)
 
-  // ── Display files ──
-  const displayFiles = (() => {
-    if (!files) return []
-    const sorted = [...files].sort((a, b) => {
-      if (a.isDir && !b.isDir) return -1
-      if (!a.isDir && b.isDir) return 1
-      return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-    })
-    if (path !== '.' && path !== '/' && !(/^[A-Za-z]:\\$/.test(path))) {
-      return [{ name: '..', isDir: true, size: 0, mode: 0, modTime: '' } as FileInfo, ...sorted]
-    }
-    return sorted
-  })()
+  // ── Sort indicator ──
+  const sortArrow = (col: SortColumn) => {
+    if (sortColumn !== col) return <span className="text-muted-foreground/30 ml-0.5">⇅</span>
+    return <span className="ml-0.5">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+  }
 
   const isLoadingHome = !path
+
+  // ── Resolve host label for SelectValue display ──
+  const selectedLabel = useMemo(() => {
+    if (selectedConnection === 'local') return 'Local Machine'
+    return connections?.find(c => c.id === selectedConnection)?.label || selectedConnection
+  }, [selectedConnection, connections])
 
   return (
     <div 
@@ -354,12 +433,12 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       <div className="flex items-center gap-2 p-2 bg-muted border-b shrink-0">
         <Select value={selectedConnection} onValueChange={handleSourceChange}>
           <SelectTrigger className="h-8 border-0 bg-transparent text-sm font-semibold px-1 hover:bg-accent/50 w-auto min-w-0">
-            <SelectValue />
+            <SelectValue>{selectedLabel}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="local">Local Machine</SelectItem>
             {connections?.map((conn) => (
-              <SelectItem key={conn.id} value={conn.id}>{conn.label} ({conn.host})</SelectItem>
+              <SelectItem key={conn.id} value={conn.id}>{conn.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -391,14 +470,36 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       </div>
 
       {/* ── Breadcrumb ── */}
-      <SftpBreadcrumbs path={path} onNavigate={handleNavigate} onBack={goBack} onForward={goForward} canGoBack={canGoBack} canGoForward={canGoForward} />
+      <SftpBreadcrumbs
+        path={path}
+        onNavigate={handleNavigate}
+        onBack={goBack}
+        onForward={goForward}
+        canGoBack={canGoBack}
+        canGoForward={canGoForward}
+        drives={drives}
+      />
 
-      {/* ── Column headers ── */}
-      <div className="grid grid-cols-[1fr_150px_60px_80px] px-3 py-2 bg-muted/80 border-b text-muted-foreground text-xs font-medium shrink-0">
-        <div>Name</div>
-        <div>Date Modified</div>
-        <div>Size</div>
-        <div>Kind</div>
+      {/* ── Column headers (sortable) ── */}
+      <div className="grid grid-cols-[1fr_150px_100px] px-3 py-2 bg-muted/80 border-b text-muted-foreground text-xs font-medium shrink-0">
+        <div
+          className="flex items-center gap-0.5 cursor-pointer hover:text-foreground select-none"
+          onClick={() => handleSort('name')}
+        >
+          Name {sortArrow('name')}
+        </div>
+        <div
+          className="flex items-center gap-0.5 cursor-pointer hover:text-foreground select-none"
+          onClick={() => handleSort('date')}
+        >
+          Date Modified {sortArrow('date')}
+        </div>
+        <div
+          className="flex items-center gap-0.5 cursor-pointer hover:text-foreground select-none"
+          onClick={() => handleSort('size')}
+        >
+          Size {sortArrow('size')}
+        </div>
       </div>
 
       {/* ── File list ── */}
@@ -418,6 +519,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
           </div>
         ) : !isLoadingHome && (
           <div 
+            ref={listBodyRef}
             className="h-full overflow-y-auto"
             onDragOver={(e) => e.preventDefault()} 
             onDrop={handleDrop}
@@ -430,16 +532,16 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
                 return (
                   <div 
                     key={`${file.name}-${i}`}
-                    className="grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-10 cursor-pointer transition-colors hover:bg-accent"
+                    className="grid grid-cols-[1fr_150px_100px] items-center px-3 h-10 cursor-pointer transition-colors hover:bg-accent"
                     onDoubleClick={(e) => { e.stopPropagation(); handleEntryClick(file) }}
+                    data-file={file.name}
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
                       <CornerLeftUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-sm text-foreground truncate">..</span>
+                      <span className="text-sm text-foreground truncate" title={file.name}>..</span>
                     </div>
                     <div className="text-muted-foreground text-xs" />
                     <div className="text-muted-foreground text-xs text-center" />
-                    <div className="text-muted-foreground text-xs" />
                   </div>
                 )
               }
@@ -450,7 +552,8 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
                 <ContextMenu key={`${file.name}-${i}`}>
                   <ContextMenuTrigger render={
                     <div 
-                      className={`grid grid-cols-[1fr_150px_60px_80px] items-center px-3 h-10 cursor-pointer transition-colors ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent'}`}
+                      data-file={file.name}
+                      className={`grid grid-cols-[1fr_150px_100px] items-center px-3 h-10 cursor-pointer transition-colors ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent'}`}
                       onClick={(e) => { e.stopPropagation(); setSelectedFile(file) }}
                       onDoubleClick={(e) => { e.stopPropagation(); handleEntryClick(file) }}
                       draggable
@@ -464,13 +567,12 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
                         <FileIcon name={file.name} isDir={false} />
                       )}
                       <div className="flex flex-col overflow-hidden min-w-0">
-                        <span className="text-sm text-foreground truncate leading-tight">{file.name}</span>
+                        <span className="text-sm text-foreground truncate leading-tight" title={file.name}>{file.name}</span>
                         <span className="text-xs text-muted-foreground leading-tight">{formatPermissions(file.mode, file.isDir)}</span>
                       </div>
                     </div>
                     <div className="text-muted-foreground text-xs">{file.modTime ? formatDate(file.modTime) : ''}</div>
                     <div className="text-muted-foreground text-xs text-center">{file.isDir ? '- -' : formatSize(file.size)}</div>
-                    <div className="text-muted-foreground text-xs">{getFileKind(file)}</div>
                   </ContextMenuTrigger>
                   <ContextMenuContent className="w-48">
                     {!file.isDir && (

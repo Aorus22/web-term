@@ -8,6 +8,7 @@ interface SFTPShortcutHandlers {
   onCopy?: () => void
   onCut?: () => void
   onPaste?: () => void
+  onTypeNavigate?: (key: string) => void
 }
 
 export function useSFTPShortcuts(
@@ -31,6 +32,13 @@ export function useSFTPShortcuts(
       if (isTyping) return
 
       const { key, ctrlKey, altKey, metaKey } = e
+
+      // Type-to-navigate: single character (no modifiers)
+      if (key.length === 1 && !ctrlKey && !altKey && !metaKey) {
+        e.preventDefault()
+        handlers.onTypeNavigate?.(key)
+        return
+      }
 
       // Enter: Open directory or download
       if (key === 'Enter' && !ctrlKey && !altKey && !metaKey) {
