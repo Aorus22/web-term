@@ -158,7 +158,7 @@ function AppContent() {
     <div 
       className={cn(
         "flex h-screen w-full bg-background text-foreground relative",
-        isDesktop && windowState !== 'maximized' && "rounded-xl border border-border shadow-2xl overflow-hidden"
+        isDesktop && windowState !== 'maximized' && "rounded-xl shadow-lg overflow-hidden"
       )}
     >
       <ResizeHandles windowState={windowState} />
@@ -250,7 +250,7 @@ function AppContent() {
         <header 
           data-tauri-drag-region
           className={cn(
-            "h-12 border-b flex items-center px-4 gap-4 bg-secondary/50 shrink-0",
+            "h-12 flex items-center px-4 gap-4 bg-secondary/50 shrink-0",
             isDesktop && "drag-region"
           )}
           style={isDesktop ? { WebkitAppRegion: 'drag' } as any : {}}
