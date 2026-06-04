@@ -156,7 +156,7 @@ export const NewTabView = () => {
                   <Card
                     key={conn.id}
                     className={`cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md border-border/50 hover:border-primary/50 relative group ${
-                      isActive ? 'ring-2 ring-primary ring-offset-2 bg-primary/5' : ''
+                      isActive ? 'border-primary bg-primary/5' : ''
                     }`}
                     onClick={() => handleConnect(conn)}
                   >
