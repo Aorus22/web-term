@@ -82,7 +82,7 @@ type ManagedSession struct {
 	Type         SessionType
 	SSHClient    *ssh.Client  // nil for local sessions
 	SSHSession   *ssh.Session // nil for local sessions
-	LocalPTY     *os.File     // nil for SSH sessions
+	LocalPTY     io.ReadWriteCloser     // nil for SSH sessions
 	Stdin        io.WriteCloser
 	Host         string
 	User         string
@@ -166,7 +166,7 @@ func NewSessionManager() *SessionManager {
 	}
 }
 
-func (m *SessionManager) CreateSession(sType SessionType, client *ssh.Client, session *ssh.Session, pty *os.File, stdin io.WriteCloser, host string, user string, port int, connID string) *ManagedSession {
+func (m *SessionManager) CreateSession(sType SessionType, client *ssh.Client, session *ssh.Session, pty io.ReadWriteCloser, stdin io.WriteCloser, host string, user string, port int, connID string) *ManagedSession {
 	id := uuid.New().String()
 	s := &ManagedSession{
 		ID:           id,

@@ -6,15 +6,12 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 	"webterm/internal/config"
 	"webterm/internal/db"
 
-	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
@@ -353,30 +350,6 @@ func HandleWebSocket(database *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	}
 }
 
-func spawnLocalPTY(connectMsg ConnectMessage) (*os.File, int, error) {
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/bash"
-	}
-	c := exec.Command(shell)
-	// Set TERM environment variable
-	term := connectMsg.Term
-	if term == "" {
-		term = "xterm-256color"
-	}
-	c.Env = append(os.Environ(), "TERM="+term)
-	f, err := pty.Start(c)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if connectMsg.Rows > 0 && connectMsg.Cols > 0 {
-		_ = pty.Setsize(f, &pty.Winsize{Rows: uint16(connectMsg.Rows), Cols: uint16(connectMsg.Cols)})
-	}
-
-	return f, c.Process.Pid, nil
-}
-
 func masterForwarder(session *ManagedSession, readers ...io.Reader) {
 	forward := func(src io.Reader) {
 		buf := make([]byte, 4096)
@@ -436,8 +409,8 @@ func wsMessageLoop(conn *websocket.Conn, session *ManagedSession) {
 								H    uint32
 							}{uint32(ctrl.Cols), uint32(ctrl.Rows), 0, 0}
 							_, _ = session.SSHSession.SendRequest("window-change", false, ssh.Marshal(winSize))
-						} else if session.Type == SessionTypeLocal && session.LocalPTY != nil {
-							_ = pty.Setsize(session.LocalPTY, &pty.Winsize{Rows: uint16(ctrl.Rows), Cols: uint16(ctrl.Cols)})
+					} else if session.Type == SessionTypeLocal && session.LocalPTY != nil {
+						_ = resizeLocalPTY(session.LocalPTY, uint16(ctrl.Cols), uint16(ctrl.Rows))
 						}
 					}
 				case "ready":
