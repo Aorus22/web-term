@@ -1,13 +1,12 @@
 import { useCallback } from 'react'
-import { toast } from 'sonner'
 import { useAppStore } from '@/stores/app-store'
-import { useSFTPStore } from '@/features/sftp/stores/sftp-store'
+import { useSFTPStore, type TransferStatus } from '@/features/sftp/stores/sftp-store'
 
 interface SSETransferStatus {
   id: string
-  status: 'pending' | 'active' | 'completed' | 'error'
-  bytesTotal: number
-  bytesTransferred: number
+  total_bytes: number
+  bytes_transferred: number
+  status: string
   error?: string
 }
 
@@ -19,9 +18,6 @@ export function useSFTPTransfer() {
   const updateTransfer = useSFTPStore(state => state.updateTransfer)
 
   const trackTransfer = useCallback((transferId: string, fileName: string, type: 'upload' | 'transfer' = 'upload') => {
-    const label = type === 'upload' ? 'Uploading' : 'Transferring'
-    const successLabel = type === 'upload' ? 'Uploaded' : 'Transferred'
-    
     // Add to global store
     addTransfer({
       id: transferId,
@@ -32,39 +28,27 @@ export function useSFTPTransfer() {
       bytesTransferred: 0,
     })
 
-    const toastId = toast.loading(`${label} ${fileName}...`, {
-      description: 'Starting...',
-    })
-
     const eventSource = new EventSource(`${baseUrl}/api/sftp/transfer/${transferId}/progress`)
 
     eventSource.onmessage = (event) => {
       try {
-        const status: SSETransferStatus = JSON.parse(event.data)
-        const progress = status.bytesTotal > 0 
-          ? Math.round((status.bytesTransferred / status.bytesTotal) * 100) 
+        const sse: SSETransferStatus = JSON.parse(event.data)
+        const progress = sse.total_bytes > 0 
+          ? Math.round((sse.bytes_transferred / sse.total_bytes) * 100) 
           : 0
         
-        // Update global store
+        // Map SSE data to store format (snake_case keys + status mapping)
+        const storeStatus = sse.status === 'transferring' ? 'active' : sse.status
+
         updateTransfer(transferId, {
-          status: status.status,
+          status: storeStatus as TransferStatus['status'],
           progress,
-          bytesTotal: status.bytesTotal,
-          bytesTransferred: status.bytesTransferred,
-          error: status.error,
+          bytesTotal: sse.total_bytes,
+          bytesTransferred: sse.bytes_transferred,
+          error: sse.error,
         })
 
-        if (status.status === 'completed') {
-          toast.success(`Successfully ${successLabel.toLowerCase()} ${fileName}`, {
-            id: toastId,
-            description: 'Complete',
-          })
-          eventSource.close()
-        } else if (status.status === 'error') {
-          toast.error(`Failed to ${type} ${fileName}`, {
-            id: toastId,
-            description: status.error || 'Unknown error',
-          })
+        if (sse.status === 'completed' || sse.status === 'error') {
           eventSource.close()
         }
       } catch (err) {
@@ -74,7 +58,6 @@ export function useSFTPTransfer() {
 
     eventSource.onerror = (err) => {
       console.error('SSE error', err)
-      // SSE might reconnect automatically, but if it fails repeatedly we might want to close it.
     }
 
     return () => {

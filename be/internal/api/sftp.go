@@ -272,6 +272,24 @@ func (h *SFTPHandler) Progress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Send initial status immediately
+	sendStatus := func() bool {
+		status, err := h.TM.GetStatus(transferID)
+		if err != nil {
+			fmt.Fprintf(w, "event: error\ndata: {\"message\": \"%s\"}\n\n", err.Error())
+			flusher.Flush()
+			return false
+		}
+		data, _ := json.Marshal(status)
+		fmt.Fprintf(w, "data: %s\n\n", string(data))
+		flusher.Flush()
+		return status.Status != ssh.TransferPhaseCompleted && status.Status != ssh.TransferPhaseError
+	}
+
+	if !sendStatus() {
+		return
+	}
+
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -280,19 +298,7 @@ func (h *SFTPHandler) Progress(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-ticker.C:
-			status, err := h.TM.GetStatus(transferID)
-			if err != nil {
-				fmt.Fprintf(w, "event: error\ndata: {\"message\": \"%s\"}\n\n", err.Error())
-				flusher.Flush()
-				return
-			}
-
-			data, _ := json.Marshal(status)
-			fmt.Fprintf(w, "data: %s\n\n", string(data))
-			flusher.Flush()
-
-			if status.Status == ssh.TransferPhaseCompleted || status.Status == ssh.TransferPhaseError {
-				// Wait a bit before closing to ensure client gets the final state
+			if !sendStatus() {
 				time.Sleep(500 * time.Millisecond)
 				return
 			}
@@ -307,6 +313,7 @@ func (h *SFTPHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 	dstPath := r.URL.Query().Get("dstPath")
 
 	transferID := uuid.New().String()
+	h.TM.CreateTransfer(transferID, 0)
 
 	// Return transferId immediately
 	w.Header().Set("Content-Type", "application/json")
@@ -353,7 +360,7 @@ func (h *SFTPHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.TM.CreateTransfer(transferID, info.Size)
+		h.TM.SetTotalBytes(transferID, info.Size)
 
 		reader, err := srcFS.Read(srcPath)
 		if err != nil {
@@ -362,14 +369,14 @@ func (h *SFTPHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		}
 		defer reader.Close()
 
-		stagingPath, err := h.SM.StageFile(reader)
+		pr := ssh.NewProgressReader(transferID, h.TM, info.Size, reader)
+		stagingPath, err := h.SM.StageFile(pr)
 		if err != nil {
 			h.TM.SetError(transferID, fmt.Errorf("failed to stage file: %v", err))
 			return
 		}
 		defer h.SM.Cleanup(stagingPath)
 
-		// Stream from staging to destination with progress
 		stagingFile, err := os.Open(stagingPath)
 		if err != nil {
 			h.TM.SetError(transferID, fmt.Errorf("failed to open staging file: %v", err))
@@ -377,8 +384,7 @@ func (h *SFTPHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		}
 		defer stagingFile.Close()
 
-		pr := ssh.NewProgressReader(transferID, h.TM, info.Size, stagingFile)
-		err = dstFS.Write(dstPath, pr)
+		err = dstFS.Write(dstPath, stagingFile)
 		if err != nil {
 			h.TM.SetError(transferID, fmt.Errorf("failed to write to destination: %v", err))
 			return

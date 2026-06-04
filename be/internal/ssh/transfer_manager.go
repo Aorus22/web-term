@@ -43,6 +43,14 @@ func (m *TransferManager) CreateTransfer(id string, totalBytes int64) {
 	}
 }
 
+func (m *TransferManager) SetTotalBytes(id string, totalBytes int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if t, ok := m.transfers[id]; ok {
+		t.TotalBytes = totalBytes
+	}
+}
+
 func (m *TransferManager) UpdateProgress(id string, bytesTransferred int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
