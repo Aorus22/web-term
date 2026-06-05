@@ -88,6 +88,11 @@ export function useSSHSession(sessionId: string) {
         wsRef.current = null
       }
       wsMap.delete(sessionId)
+      // Clean up pending resize timer
+      if (resizeTimerRef.current) {
+        clearTimeout(resizeTimerRef.current)
+        resizeTimerRef.current = null
+      }
     }
   }, [sessionId])
 
@@ -289,11 +294,25 @@ export function useSSHSession(sessionId: string) {
     }
   }, [])
 
+  // Debounced resize to prevent flooding PTY during rapid resize events.
+  // During heavy output (e.g. docker build), rapid resize messages can
+  // cause visual corruption because ANSI escape sequences (cursor positioning,
+  // line clearing) are width-dependent and already in-flight.
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSizeRef = useRef<{ cols: number; rows: number } | null>(null)
+
   const sendResize = useCallback((cols: number, rows: number) => {
-    const socket = wsRef.current
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: 'resize', cols, rows }))
-    }
+    pendingSizeRef.current = { cols, rows }
+
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
+    resizeTimerRef.current = setTimeout(() => {
+      const socket = wsRef.current
+      const size = pendingSizeRef.current
+      if (socket && socket.readyState === WebSocket.OPEN && size) {
+        socket.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }))
+      }
+      resizeTimerRef.current = null
+    }, 100)
   }, [])
 
   const signalReady = useCallback(() => {

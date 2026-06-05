@@ -162,21 +162,26 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           },
         }
 
-        // Setup ResizeObserver
+        // Setup ResizeObserver with debounce to prevent flooding PTY during rapid resize
+        let resizeTimer: ReturnType<typeof setTimeout> | null = null
         const resizeObserver = new ResizeObserver(() => {
-          if (terminal && fitAddon) {
-            try {
-              fitAddon.fit()
-            } catch (e) {
-              // ignore fit errors during transitions
+          if (resizeTimer) clearTimeout(resizeTimer)
+          resizeTimer = setTimeout(() => {
+            if (terminal && fitAddon) {
+              try {
+                fitAddon.fit()
+              } catch (e) {
+                // ignore fit errors during transitions
+              }
             }
-          }
+          }, 80)
         })
-        resizeObserver.observe(containerRef.current)
+        resizeObserver.observe(containerRef.current!)
 
         onReady?.()
 
         return () => {
+          if (resizeTimer) clearTimeout(resizeTimer)
           resizeObserver.disconnect()
           terminal?.dispose()
           terminalRefInternal.current = null
