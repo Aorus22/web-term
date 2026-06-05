@@ -8,13 +8,12 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "build:fe": "cd ../fe && npm run build",
-    "build:be": "cd ../be && go build -o ../desktop-tauri/src-tauri/binaries/webterm-backend-x86_64-unknown-linux-gnu ./cmd/server/main.go"
+    "build:be": "cd ../be && go build -o ../desktop-tauri/src-tauri/binaries/webterm-backend-x86_64-pc-windows-msvc.exe ./cmd/server/main.go"
   },
   "dependencies": {
-    "@tauri-apps/api": "^1.5.3",
-    "@tauri-apps/shell": "^2.0.0"
+    "@tauri-apps/api": "^2.11.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^1.5.9"
+    "@tauri-apps/cli": "^2"
   }
 }

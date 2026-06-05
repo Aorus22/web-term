@@ -6,6 +6,19 @@ export const isElectron = !!window.electron;
 export const isTauri = !!(window as any).__TAURI_INTERNALS__;
 export const isDesktop = isElectron || isTauri;
 
+// Detect platform: Tauri uses navigator.userAgent heuristics
+// since there's no direct process.platform equivalent in the webview.
+function detectTauriPlatform(): string {
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('win')) return 'win32';
+  if (ua.includes('mac')) return 'darwin';
+  return 'linux';
+}
+
+export const platform = isElectron
+  ? window.electron?.platform
+  : (isTauri ? detectTauriPlatform() : 'web');
+
 export async function startDragging() {
   if (isTauri) {
     const window = getCurrentWebviewWindow();
@@ -93,4 +106,4 @@ export function onBackendReady(callback: (port: number) => void) {
   return () => {};
 }
 
-export const platform = isElectron ? window.electron?.platform : (isTauri ? 'linux' : 'web');
+

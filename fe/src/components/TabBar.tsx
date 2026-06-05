@@ -12,6 +12,7 @@ import { getSessionWebSocket } from '@/features/terminal/useSSHSession'
 import { sessionsApi } from '@/lib/api'
 import { 
   isDesktop, 
+  isTauri, 
   platform, 
   minimizeWindow, 
   maximizeWindow, 
@@ -38,7 +39,7 @@ export function TabBar() {
   
   // On Windows, we use titleBarOverlay (native caption buttons) in Electron.
   // For Tauri or other platforms, we might use custom controls.
-  const showCustomControls = isDesktop && !isWindows;
+  const showCustomControls = isDesktop && (isTauri || !isWindows);
 
   useEffect(() => {
     if (isDesktop) {
