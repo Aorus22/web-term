@@ -2,7 +2,6 @@
 set -e
 
 COMPILED_DIR="compiled"
-BIN_DIR="$COMPILED_DIR/bin"
 BUILD_ELECTRON=false
 
 # Parse args
@@ -14,36 +13,19 @@ for arg in "$@"; do
   esac
 done
 
-# Full clean only if building electron (first time)
 if $BUILD_ELECTRON; then
+  # Full clean + full rebuild
   rm -rf "$COMPILED_DIR"
-  mkdir -p "$BIN_DIR" "$COMPILED_DIR/fe"
-else
-  mkdir -p "$BIN_DIR" "$COMPILED_DIR/fe"
-fi
+  mkdir -p "$COMPILED_DIR"
 
-echo "Building backend..."
-(cd be && go build -o ../"$BIN_DIR"/webterm-backend ./cmd/server/main.go)
+  echo "Building backend..."
+  (cd be && go build -o ../"$COMPILED_DIR"/resources/be/webterm-backend ./cmd/server/main.go)
 
-echo "Building frontend..."
-(cd fe && npm run build)
+  echo "Building frontend..."
+  (cd fe && npm run build)
+  mkdir -p "$COMPILED_DIR/resources/fe"
+  cp -r fe/dist "$COMPILED_DIR/resources/fe/dist"
 
-echo "Copying frontend to $COMPILED_DIR/fe/dist..."
-rm -rf "$COMPILED_DIR/fe/dist"
-cp -r fe/dist "$COMPILED_DIR/fe/dist"
-
-# Also update frontend + backend inside existing electron resources (fast, no repack)
-if [ -d "$COMPILED_DIR/electron/resources/fe" ]; then
-  echo "Updating frontend in electron resources..."
-  rm -rf "$COMPILED_DIR/electron/resources/fe/dist"
-  cp -r fe/dist "$COMPILED_DIR/electron/resources/fe/dist"
-fi
-if [ -d "$COMPILED_DIR/electron/resources/be" ]; then
-  echo "Updating backend in electron resources..."
-  cp "$BIN_DIR/webterm-backend" "$COMPILED_DIR/electron/resources/be/webterm-backend"
-fi
-
-if $BUILD_ELECTRON; then
   case "$(uname -s)" in
     Linux*)   ELECTRON_TARGET="--linux" ;;
     Darwin*)  ELECTRON_TARGET="--mac" ;;
@@ -52,39 +34,100 @@ if $BUILD_ELECTRON; then
   esac
 
   echo "Building Electron app for: $ELECTRON_TARGET..."
+  # Build backend binary for electron-builder (expected in be/ directory)
+  (cd be && go build -o webterm-backend ./cmd/server/main.go)
+  touch be/webterm-backend.exe
+
   (cd desktop && npx electron-builder $ELECTRON_TARGET)
 
-  echo "Copying desktop builds to $COMPILED_DIR/electron..."
-  if [ -d "desktop/dist/linux-unpacked" ]; then
-    cp -r desktop/dist/linux-unpacked "$COMPILED_DIR/electron"
-  elif [ -d "desktop/dist/win-unpacked" ]; then
-    cp -r desktop/dist/win-unpacked "$COMPILED_DIR/electron"
-  elif [ -d "desktop/dist/mac" ]; then
-    cp -r desktop/dist/mac "$COMPILED_DIR/electron"
-  fi
-  cp desktop/dist/*.AppImage "$COMPILED_DIR/" 2>/dev/null
-  cp desktop/dist/*.exe "$COMPILED_DIR/" 2>/dev/null
-  cp desktop/dist/*.dmg "$COMPILED_DIR/" 2>/dev/null
-  rm -rf squashfs-root 2>/dev/null
+  # Clean up temp files
+  rm -f be/webterm-backend be/webterm-backend.exe
 
-  # Update frontend in the freshly copied electron resources too
-  if [ -d "$COMPILED_DIR/electron/resources/fe" ]; then
-    echo "Updating frontend in fresh electron resources..."
-    rm -rf "$COMPILED_DIR/electron/resources/fe/dist"
-    cp -r fe/dist "$COMPILED_DIR/electron/resources/fe/dist"
+  # Copy electron-builder output to compiled/ root (mirroring AppImage structure)
+  if [ -d "desktop/dist/linux-unpacked" ]; then
+    echo "Copying linux-unpacked to $COMPILED_DIR/..."
+    # Copy everything EXCEPT resources/ (we'll replace with ours)
+    for item in desktop/dist/linux-unpacked/*; do
+      name=$(basename "$item")
+      if [ "$name" != "resources" ]; then
+        cp -r "$item" "$COMPILED_DIR/$name"
+      fi
+    done
+    # Replace resources/ with ours (which has latest be + fe)
+    # But we need app.asar from electron-builder
+    cp -r desktop/dist/linux-unpacked/resources/app.asar "$COMPILED_DIR/resources/app.asar"
+  elif [ -d "desktop/dist/win-unpacked" ]; then
+    for item in desktop/dist/win-unpacked/*; do
+      name=$(basename "$item")
+      if [ "$name" != "resources" ]; then
+        cp -r "$item" "$COMPILED_DIR/$name"
+      fi
+    done
+    cp -r desktop/dist/win-unpacked/resources/app.asar "$COMPILED_DIR/resources/app.asar"
+  elif [ -d "desktop/dist/mac" ]; then
+    cp -r desktop/dist/mac/* "$COMPILED_DIR/" 2>/dev/null || true
+    # On mac the app is inside the .app bundle
+    if [ -d "desktop/dist/mac/WebTerm.app" ]; then
+      cp -r desktop/dist/mac/WebTerm.app "$COMPILED_DIR/"
+    fi
   fi
+
+  # Copy distributable packages
+  cp desktop/dist/*.AppImage "$COMPILED_DIR/" 2>/dev/null || true
+  cp desktop/dist/*.exe "$COMPILED_DIR/" 2>/dev/null || true
+  cp desktop/dist/*.dmg "$COMPILED_DIR/" 2>/dev/null || true
 
   # Extract AppImage to squashfs-root for easy running
   echo "Extracting AppImage to squashfs-root..."
   rm -rf squashfs-root
-  "$COMPILED_DIR"/WebTerm-*.AppImage --appimage-extract > /dev/null 2>&1
-  mv squashfs-root "$COMPILED_DIR/"
-  echo "AppImage extracted to $COMPILED_DIR/squashfs-root"
+  appimage=$(ls "$COMPILED_DIR"/WebTerm-*.AppImage 2>/dev/null | head -1)
+  if [ -n "$appimage" ]; then
+    "$appimage" --appimage-extract > /dev/null 2>&1
+    mv squashfs-root "$COMPILED_DIR/"
+    echo "AppImage extracted to $COMPILED_DIR/squashfs-root"
+  fi
+
+else
+  # Quick rebuild: just update backend + frontend in existing compiled/
+  if [ ! -f "$COMPILED_DIR/resources/app.asar" ]; then
+    echo "Error: $COMPILED_DIR not found or incomplete. Run 'compile.sh --electron' first."
+    exit 1
+  fi
+
+  mkdir -p "$COMPILED_DIR/resources/be" "$COMPILED_DIR/resources/fe"
+
+  echo "Building backend..."
+  (cd be && go build -o ../"$COMPILED_DIR"/resources/be/webterm-backend ./cmd/server/main.go)
+
+  echo "Building frontend..."
+  (cd fe && npm run build)
+
+  echo "Updating frontend..."
+  rm -rf "$COMPILED_DIR/resources/fe/dist"
+  cp -r fe/dist "$COMPILED_DIR/resources/fe/dist"
+
+  # Also update inside squashfs-root if it exists
+  if [ -d "$COMPILED_DIR/squashfs-root/resources/be" ]; then
+    echo "Updating backend in squashfs-root..."
+    cp "$COMPILED_DIR/resources/be/webterm-backend" "$COMPILED_DIR/squashfs-root/resources/be/webterm-backend"
+  fi
+  if [ -d "$COMPILED_DIR/squashfs-root/resources/fe" ]; then
+    echo "Updating frontend in squashfs-root..."
+    rm -rf "$COMPILED_DIR/squashfs-root/resources/fe/dist"
+    cp -r fe/dist "$COMPILED_DIR/squashfs-root/resources/fe/dist"
+  fi
 fi
 
 echo ""
 echo "Build complete! Output in $COMPILED_DIR/:"
 ls -la "$COMPILED_DIR/"
 echo ""
-echo "Tip: use './compile.sh' for fast frontend-only rebuild"
-echo "     use './compile.sh -e' for full electron repack"
+echo "Structure mirrors AppImage:"
+echo "  $COMPILED_DIR/webterm-desktop     ← Electron binary"
+echo "  $COMPILED_DIR/resources/be/          ← Go backend"
+echo "  $COMPILED_DIR/resources/fe/dist/     ← Frontend"
+echo "  $COMPILED_DIR/WebTerm-*.AppImage     ← Portable build"
+echo ""
+echo "Usage:"
+echo "  ./compile.sh                # Quick rebuild (update be + fe only)"
+echo "  ./compile.sh --electron|-e   # Full rebuild (new Electron + AppImage)"
