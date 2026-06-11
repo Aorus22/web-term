@@ -24,34 +24,6 @@ export interface TerminalThemePreset {
   }
 }
 
-/**
- * Map UI theme name to the closest matching terminal theme name.
- * Extracts the base name (removing -dark/-light suffix) and looks up
- * the corresponding terminal theme. Falls back to 'default' for dark
- * themes and 'light' for light themes if no match is found.
- */
-export function getTerminalThemeForUITheme(uiThemeName: string): string {
-	const baseName = uiThemeName.replace(/-(dark|light)$/, '')
-	const isDark = uiThemeName.endsWith('-dark')
-
-	const knownTerminalThemes: Record<string, string> = {
-		default: 'default',
-		nord: 'nord',
-		dracula: 'dracula',
-		monokai: 'monokai',
-		one: 'one-dark',
-		github: 'github-dark',
-		'tokyo-night': 'tokyo-night',
-		catppuccin: 'catppuccin',
-		gruvbox: 'gruvbox-dark',
-		solarized: isDark ? 'solarized-dark' : 'solarized-light',
-	}
-
-	if (knownTerminalThemes[baseName]) return knownTerminalThemes[baseName]
-
-	return isDark ? 'default' : 'light'
-}
-
 export const terminalThemes: TerminalThemePreset[] = [
   {
     name: 'default',
