@@ -17,7 +17,7 @@ done
 # Full clean only if building electron (first time)
 if $BUILD_ELECTRON; then
   rm -rf "$COMPILED_DIR"
-  mkdir -p "$BIN_DIR"
+  mkdir -p "$BIN_DIR" "$COMPILED_DIR/fe"
 else
   mkdir -p "$BIN_DIR" "$COMPILED_DIR/fe"
 fi
@@ -69,6 +69,13 @@ if $BUILD_ELECTRON; then
     rm -rf "$COMPILED_DIR/electron/resources/fe/dist"
     cp -r fe/dist "$COMPILED_DIR/electron/resources/fe/dist"
   fi
+
+  # Extract AppImage to squashfs-root for easy running
+  echo "Extracting AppImage to squashfs-root..."
+  rm -rf squashfs-root
+  "$COMPILED_DIR"/WebTerm-*.AppImage --appimage-extract > /dev/null 2>&1
+  mv squashfs-root "$COMPILED_DIR/"
+  echo "AppImage extracted to $COMPILED_DIR/squashfs-root"
 fi
 
 echo ""

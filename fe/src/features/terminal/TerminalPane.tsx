@@ -3,6 +3,8 @@ import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useSSHSession } from './useSSHSession'
 import { useAppStore } from '@/stores/app-store'
 import { useSettings } from '@/features/settings/hooks/useSettings'
+import { useAppTheme } from '@/components/AppThemeProvider'
+import { getTerminalThemeForUITheme } from '@/features/settings/data/terminal-themes'
 import { PasswordPrompt } from './PasswordPrompt'
 import { PassphrasePrompt } from './PassphrasePrompt'
 import { ReconnectOverlay } from './ReconnectOverlay'
@@ -37,8 +39,9 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
 
   // console.log(`[TerminalPane:${sessionId}] Render. Status: ${session?.status}, HasAttach: ${!!attach}`)
 
-  // Derive Terminal props from settings
-  const terminalTheme = settings?.terminal_color_theme || 'default'
+  // Derive terminal theme from the selected UI theme (merged with UI color)
+  const uiThemeName = useAppTheme()
+  const terminalTheme = getTerminalThemeForUITheme(uiThemeName)
   const cursorBlinkSetting = settings?.cursor_blink !== 'false'  // default true
   const fontFamily = settings?.font_family || 'Geist Mono'
   const fontSize = settings?.font_size || '14'
