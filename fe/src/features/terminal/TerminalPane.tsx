@@ -77,6 +77,7 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
       hasConnectedRef.current = true
       const opts: ConnectOptions = {
         type: 'local',
+        ...(session?.cwd && { cwd: session.cwd }),
         rows,
         cols,
         term,

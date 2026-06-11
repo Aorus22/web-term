@@ -20,12 +20,23 @@ func spawnLocalPTY(connectMsg ConnectMessage) (io.ReadWriteCloser, int, error) {
 		shell = "powershell.exe"
 	}
 
+	cmd := exec.Command(shell)
+	// Set working directory: use Cwd from connect message, or fall back to $HOME
+	if connectMsg.Cwd != "" {
+		cmd.Dir = connectMsg.Cwd
+	} else {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			cmd.Dir = home
+		}
+	}
+
 	var opts []conpty.ConPtyOption
 	if connectMsg.Cols > 0 && connectMsg.Rows > 0 {
 		opts = append(opts, conpty.ConPtyDimensions(connectMsg.Cols, connectMsg.Rows))
 	}
 
-	cpty, err := conpty.Start(shell, opts...)
+	cpty, err := conpty.Start(cmd, opts...)
 	if err != nil {
 		return nil, 0, err
 	}

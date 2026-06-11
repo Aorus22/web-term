@@ -21,6 +21,17 @@ func spawnLocalPTY(connectMsg ConnectMessage) (io.ReadWriteCloser, int, error) {
 		term = "xterm-256color"
 	}
 	c.Env = append(os.Environ(), "TERM="+term)
+
+	// Set working directory: use Cwd from connect message, or fall back to $HOME
+	if connectMsg.Cwd != "" {
+		c.Dir = connectMsg.Cwd
+	} else {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			c.Dir = home
+		}
+	}
+
 	f, err := pty.Start(c)
 	if err != nil {
 		return nil, 0, err
