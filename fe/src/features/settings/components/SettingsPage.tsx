@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAppTheme, setAppTheme, getLuminance } from '@/components/AppThemeProvider'
+import { terminalThemes } from '../data/terminal-themes'
 import { FontDialog } from './FontDialog'
 
 type ThemeMode = 'all' | 'dark' | 'light'
@@ -208,6 +209,29 @@ export function SettingsPage() {
                 <SelectContent>
                   <SelectItem value="wterm">wterm (Experimental)</SelectItem>
                   <SelectItem value="xterm">xterm.js (Stable)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Paintbrush className="h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Terminal Theme</span>
+                  <span className="text-xs text-muted-foreground">Color scheme for the terminal</span>
+                </div>
+              </div>
+              <Select 
+                value={settings.terminal_color_theme || 'default'} 
+                onValueChange={(v) => handleUpdate('terminal_color_theme', v ?? 'default')}
+              >
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {terminalThemes.map(t => (
+                    <SelectItem key={t.name} value={t.name}>{t.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
