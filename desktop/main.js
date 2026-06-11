@@ -89,23 +89,36 @@ function startBackend() {
     });
 }
 
+// ── Linux transparent window setup ──────────────────────────────────
+// Must be called BEFORE app.on('ready', ...) or the GPU process won't pick them up.
+const isWin = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+const isLinux = !isWin && !isMac;
+
+if (isLinux) {
+    const isWayland = !!(process.env.WAYLAND_DISPLAY || process.env.XDG_SESSION_TYPE === 'wayland');
+    if (!isWayland) {
+        // X11 requires these flags for transparent window support
+        app.commandLine.appendSwitch('enable-transparent-visuals');
+        app.commandLine.appendSwitch('disable-gpu');
+    }
+}
+
 // IPC Handlers
 ipcMain.handle('get-backend-port', () => {
     return backendPort;
 });
 
 function createWindow() {
-    const isWin = process.platform === 'win32';
-    const isMac = process.platform === 'darwin';
-
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         minWidth: 800,
         minHeight: 600,
         frame: false,
-        transparent: false,
-        backgroundColor: '#1e1e1e',
+        transparent: isLinux,
+        backgroundColor: isLinux ? '#00000000' : '#1e1e1e',
+        roundedCorners: true,
         ...( (isWin || isMac) ? { titleBarStyle: 'hidden' } : {} ),
         titleBarOverlay: isWin ? {
             color: '#00000000', 

@@ -444,16 +444,19 @@
 
   .drag-region {
     -webkit-app-region: drag;
+  }
   .no-drag {
     -webkit-app-region: no-drag;
   }
 
-  /* Force WebKit to clip rounded corners properly on Linux */
+  /* Force rounded corners on Linux Electron (frameless transparent window)
+     - clip-path: clips HTML rendering to rounded shape (works reliably on X11/Wayland)
+     - border-radius + overflow: hidden: rounds the element border (visible with transparent window)
+     - Both together ensure corners are round even if one technique fails */
   .rounded-xl {
     isolation: isolate;
     overflow: hidden !important;
-    /* Use clip-path which is more robust during resizing than mask-image */
-    clip-path: inset(0 round 0.875rem); 
+    border-radius: 0.875rem;
+    clip-path: inset(0 round 0.875rem);
     -webkit-clip-path: inset(0 round 0.875rem);
-  }
   }
