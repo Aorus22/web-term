@@ -93,6 +93,7 @@ export interface PortForward {
   local_port: number
   remote_port: number
   active: boolean
+  auto_start: boolean
   error: string
   created_at: string
   updated_at: string
@@ -100,7 +101,7 @@ export interface PortForward {
 
 export const forwardsApi = {
   list: (): Promise<PortForward[]> => fetch(getForwardsApiBase()).then(r => r.json()),
-  create: (data: Omit<PortForward, 'id' | 'active' | 'error' | 'created_at' | 'updated_at'>): Promise<PortForward> =>
+  create: (data: Omit<PortForward, 'id' | 'active' | 'error' | 'auto_start' | 'created_at' | 'updated_at'>): Promise<PortForward> =>
     fetch(getForwardsApiBase(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

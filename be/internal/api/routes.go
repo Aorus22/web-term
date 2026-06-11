@@ -40,6 +40,9 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 		TunnelMgr: tunnelMgr,
 	}
 
+	// Auto-start enabled port forwards on startup (graceful failure handled inside)
+	AutoStartForwards(database, tunnelMgr)
+
 	sh := &SettingsHandler{
 		DB:  database,
 		Cfg: cfg,

@@ -56,6 +56,7 @@ type PortForward struct {
 	ConnectionID string    `json:"connection_id" gorm:"not null;type:varchar(36)"`
 	LocalPort    int       `json:"local_port" gorm:"not null"`
 	RemotePort   int       `json:"remote_port" gorm:"not null"`
+	AutoStart    bool      `json:"auto_start" gorm:"default:false"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

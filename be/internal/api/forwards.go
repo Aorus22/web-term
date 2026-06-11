@@ -24,6 +24,7 @@ type forwardResponse struct {
 	LocalPort    int    `json:"local_port"`
 	RemotePort   int    `json:"remote_port"`
 	Active       bool   `json:"active"`
+	AutoStart    bool   `json:"auto_start"`
 	Error        string `json:"error"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
@@ -45,6 +46,7 @@ func (h *ForwardHandler) ListForwards(w http.ResponseWriter, r *http.Request) {
 			LocalPort:    f.LocalPort,
 			RemotePort:   f.RemotePort,
 			Active:       h.TunnelMgr.IsActive(f.ID),
+			AutoStart:    f.AutoStart,
 			Error:        h.TunnelMgr.GetError(f.ID),
 			CreatedAt:    f.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:    f.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -105,6 +107,7 @@ func (h *ForwardHandler) CreateForward(w http.ResponseWriter, r *http.Request) {
 		LocalPort:    forward.LocalPort,
 		RemotePort:   forward.RemotePort,
 		Active:       false,
+		AutoStart:    false,
 		Error:        "",
 		CreatedAt:    forward.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:    forward.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -158,6 +161,9 @@ func (h *ForwardHandler) StartForward(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Persist auto_start so it restarts on next startup
+	h.DB.Model(&forward).Update("auto_start", true)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "active",
@@ -168,6 +174,9 @@ func (h *ForwardHandler) StopForward(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	h.TunnelMgr.Stop(id)
+
+	// Persist auto_start so it doesn't restart on next startup
+	h.DB.Model(&db.PortForward{}).Where("id = ?", id).Update("auto_start", false)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{

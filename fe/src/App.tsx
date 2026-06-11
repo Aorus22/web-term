@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PanelLeft, Server, Key, ArrowLeftRight, Settings, Files } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import type { SSHSession } from '@/features/terminal/types'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { useAppStore } from '@/stores/app-store'
+import { useAppStore, loadTabsFromStorage, saveTabsToStorage } from '@/stores/app-store'
+import { generateId } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
@@ -81,12 +83,56 @@ function AppContent() {
   } = useAppStore()
 
   const [windowState, setWindowState] = useState<'maximized' | 'restored'>('restored')
+  const restoredFromLocalRef = useRef(false)
 
   useEffect(() => {
-    if (backendPort !== 0) {
-      rehydrateSessions()
+    if (backendPort !== 0 && !restoredFromLocalRef.current) {
+      // First rehydrate from backend (detached sessions still alive)
+      rehydrateSessions().then(() => {
+        // Then restore tabs from localStorage (for sessions that survived backend restart)
+        const savedTabs = loadTabsFromStorage()
+        if (savedTabs.length > 0) {
+          for (const tab of savedTabs) {
+            // Skip quick-connect sessions — no credentials to auto-connect
+            if (tab.isQuickConnect && tab.type === 'ssh') continue
+
+            // Skip if already restored from backend (dedup by connectionId)
+            if (tab.connectionId) {
+              const exists = useAppStore.getState().sessions.some(
+                s => s.connectionId === tab.connectionId
+              )
+              if (exists) continue
+            }
+
+            const newId = generateId()
+            const newSession: SSHSession = {
+              id: newId,
+              type: tab.type,
+              connectionId: tab.connectionId,
+              host: tab.host,
+              port: tab.port,
+              username: tab.username,
+              label: tab.label,
+              status: 'connecting',
+              isQuickConnect: tab.isQuickConnect,
+            }
+            useAppStore.getState().addSession(newSession)
+          }
+        }
+
+        // Mark initial restore as done — persist effect can now save
+        restoredFromLocalRef.current = true
+      })
     }
   }, [backendPort, rehydrateSessions])
+
+  // Persist sessions to localStorage whenever they change,
+  // but only after the initial restore has finished.
+  useEffect(() => {
+    if (backendPort !== 0 && restoredFromLocalRef.current) {
+      saveTabsToStorage(sessions)
+    }
+  }, [backendPort, sessions])
 
   useEffect(() => {
     if (isDesktop) {

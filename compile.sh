@@ -32,11 +32,15 @@ echo "Copying frontend to $COMPILED_DIR/fe/dist..."
 rm -rf "$COMPILED_DIR/fe/dist"
 cp -r fe/dist "$COMPILED_DIR/fe/dist"
 
-# Also update frontend inside existing electron resources (fast, no repack)
+# Also update frontend + backend inside existing electron resources (fast, no repack)
 if [ -d "$COMPILED_DIR/electron/resources/fe" ]; then
   echo "Updating frontend in electron resources..."
   rm -rf "$COMPILED_DIR/electron/resources/fe/dist"
   cp -r fe/dist "$COMPILED_DIR/electron/resources/fe/dist"
+fi
+if [ -d "$COMPILED_DIR/electron/resources/be" ]; then
+  echo "Updating backend in electron resources..."
+  cp "$BIN_DIR/webterm-backend" "$COMPILED_DIR/electron/resources/be/webterm-backend"
 fi
 
 if $BUILD_ELECTRON; then

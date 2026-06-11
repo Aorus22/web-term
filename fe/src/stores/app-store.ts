@@ -3,6 +3,45 @@ import type { Connection } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
 import { generateId } from '@/lib/utils'
 
+const TABS_STORAGE_KEY = 'webterm-saved-tabs'
+
+export interface SavedTab {
+  type: 'ssh' | 'local'
+  connectionId?: string
+  host: string
+  port: number
+  username: string
+  label: string
+  isQuickConnect: boolean
+}
+
+export function saveTabsToStorage(sessions: SSHSession[]) {
+  const data: SavedTab[] = sessions.map(s => ({
+    type: s.type,
+    connectionId: s.connectionId,
+    host: s.host,
+    port: s.port,
+    username: s.username,
+    label: s.label,
+    isQuickConnect: s.isQuickConnect,
+  }))
+  try {
+    localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(data))
+  } catch {
+    // localStorage full or unavailable — ignore
+  }
+}
+
+export function loadTabsFromStorage(): SavedTab[] {
+  try {
+    const raw = localStorage.getItem(TABS_STORAGE_KEY)
+    if (!raw) return []
+    return JSON.parse(raw)
+  } catch {
+    return []
+  }
+}
+
 export interface SFTPClipboard {
   action: 'cut' | 'copy';
   connectionId: string;
