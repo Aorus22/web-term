@@ -180,7 +180,7 @@
     --term-font-size: 14px;
     
     /* FORCE the background to our theme color, ignoring terminal-driven overrides */
-    background: var(--theme-bg-actual) !important;
+    background: var(--theme-bg-actual);
     color: var(--term-fg);
   }
 
