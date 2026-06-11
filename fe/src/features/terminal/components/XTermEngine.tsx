@@ -82,7 +82,7 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       }
     }, [])
 
-    // Update theme when theme name changes
+    // Update theme when it changes without recreating the terminal
     useEffect(() => {
       if (terminalRefInternal.current) {
         terminalRefInternal.current.options.theme = getXTermTheme(theme)
@@ -193,7 +193,7 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
       // We intentionally exclude 'theme' from this dependency array to avoid
       // full terminal re-initialization when the theme changes.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fontFamily, fontSize, cursorBlink, cursorStyle, sendData, sendResize, onReady, terminalRef])
+    }, [fontFamily, fontSize, cursorBlink, cursorStyle, sendData, sendResize, onReady, terminalRef, getXTermTheme])
 
     return (
       <div style={{ padding: '12px', height: '100%', width: '100%', boxSizing: 'border-box' }}>

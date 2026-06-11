@@ -46,15 +46,12 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
   const fontFamily = settings?.font_family || 'Geist Mono'
   const fontSize = settings?.font_size || '14'
 
-  // Match terminal bg/fg to the UI theme colors via inline style.
-  // Removed !important from .wterm background in index.css, so inline style overrides.
-  const terminalStyle: React.CSSProperties = {
+  const terminalStyle = {
     width: '100%',
     height: '100%',
     fontFamily: `'${fontFamily}', monospace`,
     fontSize: `${fontSize}px`,
-    backgroundColor: 'var(--background)',
-    color: 'var(--foreground)',
+    backgroundColor: 'var(--theme-bg-actual)',
   }
 
   // Auto-connect on mount (or as soon as settings are available)

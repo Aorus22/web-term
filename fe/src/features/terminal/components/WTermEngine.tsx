@@ -59,21 +59,21 @@ export const WTermEngine = forwardRef<TerminalHandle, WTermEngineProps>(
 
     return (
       <Terminal
-          ref={(el) => {
-            internalRef.current = el
-            if (el) {
-              handleReady(el)
-            }
-          }}
-          autoResize
-          cursorBlink={cursorBlink}
-          theme={theme}
-          className={className}
-          onData={sendData}
-          onResize={sendResize}
-          onReady={handleReady}
-          style={{ width: '100%', height: '100%', ...style }}
-        />
+        ref={(el) => {
+          internalRef.current = el
+          if (el) {
+            handleReady(el)
+          }
+        }}
+        autoResize
+        cursorBlink={cursorBlink}
+        theme={theme}
+        className={className}
+        onData={sendData}
+        onResize={sendResize}
+        onReady={handleReady}
+        style={{ width: '100%', height: '100%', ...style }}
+      />
     )
   }
 )
