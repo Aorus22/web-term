@@ -104,100 +104,116 @@ if (isLinux) {
     }
 }
 
-// IPC Handlers
-ipcMain.handle('get-backend-port', () => {
-    return backendPort;
-});
+// ── Single instance lock ────────────────────────────────────────────
+// Prevent multiple instances of the app from running simultaneously.
+// If a second instance is launched, focus the existing window instead.
+const gotTheLock = app.requestSingleInstanceLock();
 
-function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        minWidth: 800,
-        minHeight: 600,
-        frame: false,
-        transparent: isLinux,
-        backgroundColor: isLinux ? '#00000000' : '#1e1e1e',
-        roundedCorners: true,
-        ...( (isWin || isMac) ? { titleBarStyle: 'hidden' } : {} ),
-        titleBarOverlay: isWin ? {
-            color: '#00000000', 
-            symbolColor: '#94a3b8',
-            height: 48 
-        } : false,
-        autoHideMenuBar: false,
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        },
-        title: "WebTerm Desktop",
-        icon: nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')),
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
     });
 
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    if (isDev) {
-        mainWindow.loadURL('http://localhost:5173');
-    } else if (app.isPackaged) {
-        mainWindow.loadFile(path.join(process.resourcesPath, 'fe', 'dist', 'index.html'));
-    } else {
-        mainWindow.loadFile(path.join(__dirname, '..', 'fe', 'dist', 'index.html'));
+    // IPC Handlers
+    ipcMain.handle('get-backend-port', () => {
+        return backendPort;
+    });
+
+    function createWindow() {
+        mainWindow = new BrowserWindow({
+            width: 1200,
+            height: 800,
+            minWidth: 800,
+            minHeight: 600,
+            frame: false,
+            transparent: isLinux,
+            backgroundColor: isLinux ? '#00000000' : '#1e1e1e',
+            roundedCorners: true,
+            ...( (isWin || isMac) ? { titleBarStyle: 'hidden' } : {} ),
+            titleBarOverlay: isWin ? {
+                color: '#00000000', 
+                symbolColor: '#94a3b8',
+                height: 48 
+            } : false,
+            autoHideMenuBar: false,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            },
+            title: "WebTerm Desktop",
+            icon: nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')),
+        });
+
+        const isDev = process.env.NODE_ENV === 'development';
+        
+        if (isDev) {
+            mainWindow.loadURL('http://localhost:5173');
+        } else if (app.isPackaged) {
+            mainWindow.loadFile(path.join(process.resourcesPath, 'fe', 'dist', 'index.html'));
+        } else {
+            mainWindow.loadFile(path.join(__dirname, '..', 'fe', 'dist', 'index.html'));
+        }
+
+        mainWindow.on('closed', function () {
+            mainWindow = null;
+        });
+
+        mainWindow.on('maximize', () => {
+            mainWindow.webContents.send('window-state-change', 'maximized');
+        });
+
+        mainWindow.on('unmaximize', () => {
+            mainWindow.webContents.send('window-state-change', 'restored');
+        });
     }
 
-    mainWindow.on('closed', function () {
-        mainWindow = null;
+    // IPC Handlers for Window Controls
+    ipcMain.on('window-minimize', () => {
+        mainWindow.minimize();
     });
 
-    mainWindow.on('maximize', () => {
-        mainWindow.webContents.send('window-state-change', 'maximized');
+    ipcMain.on('window-maximize', () => {
+        if (mainWindow.isMaximized()) {
+            mainWindow.unmaximize();
+        } else {
+            mainWindow.maximize();
+        }
     });
 
-    mainWindow.on('unmaximize', () => {
-        mainWindow.webContents.send('window-state-change', 'restored');
+    ipcMain.on('window-close', () => {
+        mainWindow.close();
+    });
+
+    ipcMain.handle('get-window-state', () => {
+        return mainWindow ? (mainWindow.isMaximized() ? 'maximized' : 'restored') : 'restored';
+    });
+
+    app.on('ready', () => {
+        startBackend();
+        createWindow();
+    });
+
+    app.on('window-all-closed', function () {
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    });
+
+    app.on('activate', function () {
+        if (mainWindow === null) {
+            createWindow();
+        }
+    });
+
+    app.on('will-quit', () => {
+        if (backendProcess) {
+            backendProcess.kill();
+        }
     });
 }
-
-// IPC Handlers for Window Controls
-ipcMain.on('window-minimize', () => {
-    mainWindow.minimize();
-});
-
-ipcMain.on('window-maximize', () => {
-    if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-    } else {
-        mainWindow.maximize();
-    }
-});
-
-ipcMain.on('window-close', () => {
-    mainWindow.close();
-});
-
-ipcMain.handle('get-window-state', () => {
-    return mainWindow ? (mainWindow.isMaximized() ? 'maximized' : 'restored') : 'restored';
-});
-
-app.on('ready', () => {
-    startBackend();
-    createWindow();
-});
-
-app.on('window-all-closed', function () {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
-
-app.on('activate', function () {
-    if (mainWindow === null) {
-        createWindow();
-    }
-});
-
-app.on('will-quit', () => {
-    if (backendProcess) {
-        backendProcess.kill();
-    }
-});
