@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { forwardsApi } from '@/lib/api'
+import { forwardsApi, type PortForwardType } from '@/lib/api'
 
 export const useForwards = () => {
   return useQuery({
@@ -51,8 +51,10 @@ export const useStopForward = () => {
 export const useUpdateForward = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name: string; connection_id: string; local_port: number; remote_port: number } }) =>
-      forwardsApi.update(id, data),
+    mutationFn: ({ id, data }: {
+      id: string
+      data: { name: string; connection_id: string; local_port: number; remote_port: number; type: PortForwardType }
+    }) => forwardsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['forwards'] })
     },

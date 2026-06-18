@@ -56,6 +56,7 @@ type PortForward struct {
 	ConnectionID string    `json:"connection_id" gorm:"not null;type:varchar(36)"`
 	LocalPort    int       `json:"local_port" gorm:"not null"`
 	RemotePort   int       `json:"remote_port" gorm:"not null"`
+	Type         string    `json:"type" gorm:"default:local;not null;size:16"` // "local" (ssh -L) or "reverse" (ssh -R)
 	AutoStart    bool      `json:"auto_start" gorm:"default:false"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

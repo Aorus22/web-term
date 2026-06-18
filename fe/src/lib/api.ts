@@ -92,6 +92,7 @@ export interface PortForward {
   connection_id: string
   local_port: number
   remote_port: number
+  type: 'local' | 'reverse'
   active: boolean
   auto_start: boolean
   error: string
@@ -99,9 +100,11 @@ export interface PortForward {
   updated_at: string
 }
 
+export type PortForwardType = 'local' | 'reverse'
+
 export const forwardsApi = {
   list: (): Promise<PortForward[]> => fetch(getForwardsApiBase()).then(r => r.json()),
-  create: (data: Omit<PortForward, 'id' | 'active' | 'error' | 'auto_start' | 'created_at' | 'updated_at'>): Promise<PortForward> =>
+  create: (data: { name: string; connection_id: string; local_port: number; remote_port: number; type: PortForwardType }): Promise<PortForward> =>
     fetch(getForwardsApiBase(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -119,12 +122,12 @@ export const forwardsApi = {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
       return r.json()
     }),
-stop: (id: string): Promise<PortForward> =>
+  stop: (id: string): Promise<PortForward> =>
     fetch(`${getForwardsApiBase()}/${id}/stop`, { method: 'POST' }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))
       return r.json()
     }),
-  update: (id: string, data: { name: string; connection_id: string; local_port: number; remote_port: number }): Promise<PortForward> =>
+  update: (id: string, data: { name: string; connection_id: string; local_port: number; remote_port: number; type: PortForwardType }): Promise<PortForward> =>
     fetch(`${getForwardsApiBase()}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

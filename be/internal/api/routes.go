@@ -74,6 +74,7 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	// Port Forward endpoints
 	mux.HandleFunc("GET /api/forwards", fh.ListForwards)
 	mux.HandleFunc("POST /api/forwards", fh.CreateForward)
+	mux.HandleFunc("PUT /api/forwards/{id}", fh.UpdateForward)
 	mux.HandleFunc("DELETE /api/forwards/{id}", fh.DeleteForward)
 	mux.HandleFunc("POST /api/forwards/{id}/start", fh.StartForward)
 	mux.HandleFunc("POST /api/forwards/{id}/stop", fh.StopForward)

@@ -24,7 +24,7 @@ func AutoStartForwards(database *gorm.DB, tunnelMgr *ssh.TunnelManager) {
 					database.Model(&f).Update("auto_start", false)
 					return
 				}
-				if err := tunnelMgr.Start(f.ID, conn, f.LocalPort, f.RemotePort); err != nil {
+				if err := tunnelMgr.Start(f.ID, f.Type, conn, f.LocalPort, f.RemotePort); err != nil {
 					log.Printf("auto-start forward %s (%s) failed: %v — disabling", f.ID, f.Name, err)
 					database.Model(&f).Update("auto_start", false)
 				} else {

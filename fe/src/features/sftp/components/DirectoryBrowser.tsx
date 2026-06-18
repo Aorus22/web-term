@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 import { SftpBreadcrumbs } from './SftpBreadcrumbs'
 import { useSFTPShortcuts } from '../hooks/use-sftp-shortcuts'
 import { FileIcon } from './FileIcon'
+import { joinPath, findUniqueName } from '@/lib/utils'
 
 // ── Helpers ──
 
@@ -196,7 +197,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     queryClient.invalidateQueries({ queryKey: ['sftp', selectedConnection, path] })
   }, [queryClient, selectedConnection, path])
 
-  // ── Transfer / Upload / Operations (unchanged logic) ──
+  // ── Transfer / Upload / Operations ──
 
   const executeTransfer = useCallback(async (data: any, targetPath: string) => {
     try {
@@ -207,20 +208,20 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
          setSftpClipboard(null)
       }
       refreshDir()
-    } catch (e) {
+    } catch (e: any) {
       console.error('Transfer error:', e)
-      toast.error('Failed to transfer file')
+      toast.error(`Failed to transfer: ${e?.message || e}`)
     }
   }, [selectedConnection, trackTransfer, setSftpClipboard, refreshDir])
 
   const handleAction = useCallback((action: 'cut' | 'copy', file: FileInfo) => {
-    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = joinPath(path, file.name)
     setSftpClipboard({ action, connectionId: selectedConnection, path: fullPath, fileName: file.name, isDir: file.isDir })
   }, [path, selectedConnection, setSftpClipboard])
 
   const handlePaste = useCallback(async () => {
     if (!sftpClipboard) return
-    const targetPath = path === '/' ? `/${sftpClipboard.fileName}` : `${path}/${sftpClipboard.fileName}`
+    const targetPath = joinPath(path, sftpClipboard.fileName)
     if (files?.some(f => f.name === sftpClipboard.fileName)) {
       setPendingTransfer({ data: sftpClipboard, targetPath })
       setIsOverwriteDialogOpen(true)
@@ -230,25 +231,69 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   }, [sftpClipboard, path, files, executeTransfer])
 
   const handleRenameConfirm = async (newName: string) => {
-    if (!selectedFile || !newName || newName === selectedFile.name) return
-    const oldPath = path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
-    const newPath = path === '/' ? `/${newName}` : `${path}/${newName}`
-    try { await sftpApi.rename(selectedConnection, oldPath, newPath); refreshDir(); setSelectedFile(null) }
-    catch (e: any) { toast.error('Failed to rename') }
+    console.log('[RENAME] handleRenameConfirm called', { newName, selectedFile, path, selectedConnection })
+    if (!selectedFile) {
+      console.warn('[RENAME] No selectedFile — aborting')
+      return
+    }
+    const trimmed = newName.trim()
+    if (!trimmed) {
+      console.warn('[RENAME] Empty name')
+      toast.error('Name cannot be empty')
+      return
+    }
+    if (trimmed === selectedFile.name) {
+      console.log('[RENAME] Same name, no-op')
+      return
+    }
+    if (files?.some(f => f.name === trimmed)) {
+      console.warn('[RENAME] Name conflict:', trimmed)
+      toast.error(`A file named "${trimmed}" already exists`)
+      return
+    }
+    const oldPath = joinPath(path, selectedFile.name)
+    const newPath = joinPath(path, trimmed)
+    console.log('[RENAME] Sending request', { oldPath, newPath })
+    try {
+      const result = await sftpApi.rename(selectedConnection, oldPath, newPath)
+      console.log('[RENAME] Success', result)
+      refreshDir()
+      setSelectedFile(null)
+      toast.success(`Renamed to ${trimmed}`)
+    } catch (e: any) {
+      console.error('[RENAME] Failed:', e)
+      toast.error(`Failed to rename: ${e?.message || e}`)
+    }
   }
 
   const handleDeleteConfirm = async () => {
     if (!selectedFile) return
-    const fullPath = path === '/' ? `/${selectedFile.name}` : `${path}/${selectedFile.name}`
-    try { await sftpApi.remove(selectedConnection, fullPath); refreshDir(); setSelectedFile(null) }
-    catch (e: any) { toast.error('Failed to delete') }
+    const fullPath = joinPath(path, selectedFile.name)
+    try {
+      await sftpApi.remove(selectedConnection, fullPath)
+      refreshDir()
+      setSelectedFile(null)
+      toast.success(`Deleted ${selectedFile.name}`)
+    } catch (e: any) {
+      toast.error(`Failed to delete: ${e?.message || e}`)
+    }
   }
 
   const handleMkdirConfirm = async (name: string) => {
-    if (!name) return
-    const fullPath = path === '/' ? `/${name}` : `${path}/${name}`
-    try { await sftpApi.mkdir(selectedConnection, fullPath); refreshDir() }
-    catch (e: any) { toast.error('Failed to create folder') }
+    const trimmed = name.trim()
+    if (!trimmed) return
+    if (files?.some(f => f.name === trimmed)) {
+      toast.error(`A file named "${trimmed}" already exists`)
+      return
+    }
+    const fullPath = joinPath(path, trimmed)
+    try {
+      await sftpApi.mkdir(selectedConnection, fullPath)
+      refreshDir()
+      toast.success(`Created ${trimmed}`)
+    } catch (e: any) {
+      toast.error(`Failed to create folder: ${e?.message || e}`)
+    }
   }
 
   const handleUploadClick = () => fileInputRef.current?.click()
@@ -262,29 +307,45 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   }
 
   const executeUpload = useCallback(async (file: File) => {
-    const targetPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const targetPath = joinPath(path, file.name)
     try {
       const { transferId } = await sftpApi.upload(selectedConnection, targetPath, file)
       trackTransfer(transferId, file.name, 'upload')
       refreshDir()
-    } catch (e: any) { toast.error(`Failed to upload ${file.name}`) }
+    } catch (e: any) { toast.error(`Failed to upload ${file.name}: ${e?.message || e}`) }
   }, [path, selectedConnection, trackTransfer, refreshDir])
 
-  const handleOverwriteConfirm = () => {
+  const handleOverwriteOverwrite = () => {
     if (pendingUpload) { executeUpload(pendingUpload); setPendingUpload(null) }
     else if (pendingTransfer) { executeTransfer(pendingTransfer.data, pendingTransfer.targetPath); setPendingTransfer(null) }
     setIsOverwriteDialogOpen(false)
   }
 
+  const handleOverwriteKeepBoth = () => {
+    const existingNames = files?.map(f => f.name) ?? []
+    if (pendingUpload) {
+      const newName = findUniqueName(pendingUpload.name, existingNames)
+      const renamed = new File([pendingUpload], newName, { type: pendingUpload.type })
+      executeUpload(renamed)
+      setPendingUpload(null)
+    } else if (pendingTransfer) {
+      const newName = findUniqueName(pendingTransfer.data.fileName, existingNames)
+      const newTargetPath = joinPath(path, newName)
+      executeTransfer(pendingTransfer.data, newTargetPath)
+      setPendingTransfer(null)
+    }
+    setIsOverwriteDialogOpen(false)
+  }
+
   const handleDownload = useCallback((file: FileInfo) => {
-    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = joinPath(path, file.name)
     const url = sftpApi.downloadUrl(selectedConnection, fullPath)
     const a = document.createElement('a'); a.href = url; a.download = file.name
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }, [path, selectedConnection])
 
   const handleDragStart = (e: React.DragEvent, file: FileInfo) => {
-    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`
+    const fullPath = joinPath(path, file.name)
     e.dataTransfer.setData('application/json', JSON.stringify({
       connectionId: selectedConnection, path: fullPath, fileName: file.name, isDir: file.isDir, action: 'copy'
     }))
@@ -302,7 +363,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       const dataStr = e.dataTransfer.getData('application/json')
       if (!dataStr) return
       const data = JSON.parse(dataStr)
-      const targetPath = path === '/' ? `/${data.fileName}` : `${path}/${data.fileName}`
+      const targetPath = joinPath(path, data.fileName)
       if (data.connectionId === selectedConnection && data.path === targetPath) return
       if (files?.some(f => f.name === data.fileName)) { setPendingTransfer({ data, targetPath }); setIsOverwriteDialogOpen(true); return }
       executeTransfer(data, targetPath)
@@ -318,7 +379,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
     if (entry.name === '..') {
       navigateTo(getParentPath(path))
     } else {
-      const newPath = path === '/' ? `/${entry.name}` : `${path}/${entry.name}`
+      const newPath = joinPath(path, entry.name)
       navigateTo(newPath)
     }
   }, [path, navigateTo])
@@ -601,7 +662,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       <RenameDialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen} oldName={selectedFile?.name || ''} onConfirm={handleRenameConfirm} />
       <NewFolderDialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen} onConfirm={handleMkdirConfirm} />
       <DeleteConfirmDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} fileName={selectedFile?.name || ''} onConfirm={handleDeleteConfirm} />
-      <OverwriteDialog open={isOverwriteDialogOpen} onOpenChange={setIsOverwriteDialogOpen} fileName={pendingUpload?.name || pendingTransfer?.data.fileName || ''} onConfirm={handleOverwriteConfirm} />
+      <OverwriteDialog open={isOverwriteDialogOpen} onOpenChange={setIsOverwriteDialogOpen} fileName={pendingUpload?.name || pendingTransfer?.data.fileName || ''} onConfirm={handleOverwriteOverwrite} onKeepBoth={handleOverwriteKeepBoth} />
     </div>
   )
 }

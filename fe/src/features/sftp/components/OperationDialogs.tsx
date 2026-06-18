@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -29,10 +29,34 @@ interface RenameDialogProps {
 }
 
 export function RenameDialog({ open, onOpenChange, oldName, onConfirm }: RenameDialogProps) {
+  console.log('[RENAME] Render RenameDialog', { open, oldName })
+  // Track the current input text. Initialize from oldName on first mount.
   const [name, setName] = useState(oldName)
+  const inputRef = useRef<HTMLInputElement>(null)
 
+  // Focus and select just the basename (not the extension) when the dialog opens,
+  // matching macOS Finder behavior. Hidden files like ".gitignore" are selected whole.
   useEffect(() => {
-    if (open) setName(oldName)
+    if (!open) return
+    // Wait for the next frame so the input is mounted and the value is in state.
+    const id = requestAnimationFrame(() => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      const isHidden = oldName.startsWith('.') && oldName.indexOf('.') === oldName.lastIndexOf('.')
+      const lastDot = oldName.lastIndexOf('.')
+      const end = lastDot > 0 && !isHidden ? lastDot : oldName.length
+      el.setSelectionRange(0, end)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open, oldName])
+
+  // When the dialog is closed, reset name to oldName so the next open picks up
+  // the latest file name. Done in a layout effect to avoid flashing the wrong value.
+  useEffect(() => {
+    if (!open) {
+      setName(oldName)
+    }
   }, [open, oldName])
 
   return (
@@ -51,8 +75,12 @@ export function RenameDialog({ open, onOpenChange, oldName, onConfirm }: RenameD
             </Label>
             <Input
               id="name"
+              ref={inputRef}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                console.log('[RENAME] input onChange', e.target.value)
+                setName(e.target.value)
+              }}
               className="col-span-3"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -68,6 +96,7 @@ export function RenameDialog({ open, onOpenChange, oldName, onConfirm }: RenameD
             Cancel
           </Button>
           <Button onClick={() => {
+            console.log('[RENAME] Button clicked, name=', name)
             onConfirm(name)
             onOpenChange(false)
           }}>
@@ -142,20 +171,27 @@ interface OverwriteDialogProps {
   onOpenChange: (open: boolean) => void
   fileName: string
   onConfirm: () => void
+  onKeepBoth: () => void
 }
 
-export function OverwriteDialog({ open, onOpenChange, fileName, onConfirm }: OverwriteDialogProps) {
+export function OverwriteDialog({ open, onOpenChange, fileName, onConfirm, onKeepBoth }: OverwriteDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>File Already Exists</AlertDialogTitle>
           <AlertDialogDescription>
-            A file named "{fileName}" already exists in the destination. Do you want to overwrite it?
+            A file named "{fileName}" already exists in the destination.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onKeepBoth}
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+          >
+            Keep Both
+          </AlertDialogAction>
           <AlertDialogAction onClick={onConfirm}>Overwrite</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

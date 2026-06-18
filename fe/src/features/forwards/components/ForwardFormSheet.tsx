@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { ArrowLeftRight, ArrowRightLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Sheet,
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/select'
 import { useCreateForward, useUpdateForward } from '../hooks/useForwards'
 import { useConnections } from '@/features/connections/hooks/useConnections'
-import type { PortForward } from '@/lib/api'
+import type { PortForward, PortForwardType } from '@/lib/api'
 
 interface ForwardFormSheetProps {
   open: boolean
@@ -39,6 +40,7 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
 
   const isEditMode = !!editForward
 
+  const [type, setType] = React.useState<PortForwardType>('local')
   const [name, setName] = React.useState('')
   const [connectionId, setConnectionId] = React.useState('')
   const [localPort, setLocalPort] = React.useState('')
@@ -49,11 +51,13 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
   React.useEffect(() => {
     if (open) {
       if (editForward) {
+        setType(editForward.type ?? 'local')
         setName(editForward.name)
         setConnectionId(editForward.connection_id)
         setLocalPort(String(editForward.local_port))
         setRemotePort(String(editForward.remote_port))
       } else {
+        setType('local')
         setName('')
         setConnectionId('')
         setLocalPort('')
@@ -113,6 +117,7 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
             connection_id: connectionId,
             local_port: lp,
             remote_port: rp,
+            type,
           },
         })
         toast.success('Port forward updated')
@@ -122,6 +127,7 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
           connection_id: connectionId,
           local_port: lp,
           remote_port: rp,
+          type,
         })
         toast.success('Port forward created')
       }
@@ -142,6 +148,8 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
     !isValidPort(parseInt(localPort, 10)) ||
     !isValidPort(parseInt(remotePort, 10))
 
+  const isReverse = type === 'reverse'
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col">
@@ -150,11 +158,43 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
           <SheetDescription>
             {isEditMode
               ? 'Modify the port forwarding rule.'
-              : 'Set up an SSH local port forwarding tunnel.'}
+              : 'Set up an SSH port forwarding tunnel.'}
           </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Type selector (Local / Reverse) */}
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={type === 'local' ? 'default' : 'outline'}
+                className="justify-start"
+                onClick={() => setType('local')}
+              >
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                Local (ssh -L)
+              </Button>
+              <Button
+                type="button"
+                variant={type === 'reverse' ? 'default' : 'outline'}
+                className="justify-start"
+                onClick={() => setType('reverse')}
+              >
+                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                Reverse (ssh -R)
+              </Button>
+            </div>
+            {!isEditMode && (
+              <p className="text-xs text-muted-foreground">
+                {isReverse
+                  ? 'Reverse: the remote host will be able to reach a service on your local machine.'
+                  : 'Local: bind a local port to forward to a service on the remote host.'}
+              </p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="fwd-name">Name</Label>
             <Input
@@ -203,6 +243,11 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
               onBlur={() => validateField('localPort', localPort)}
               placeholder="e.g., 5432"
             />
+            {isReverse && (
+              <p className="text-xs text-muted-foreground">
+                Backend will listen on this port locally.
+              </p>
+            )}
             {errors.localPort && <p className="text-xs text-destructive">{errors.localPort}</p>}
           </div>
 
@@ -218,6 +263,11 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
               onBlur={() => validateField('remotePort', remotePort)}
               placeholder="e.g., 5432"
             />
+            {isReverse && (
+              <p className="text-xs text-muted-foreground">
+                Remote SSH server will expose this port to its network (bound 0.0.0.0).
+              </p>
+            )}
             {errors.remotePort && <p className="text-xs text-destructive">{errors.remotePort}</p>}
           </div>
         </form>

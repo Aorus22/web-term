@@ -139,6 +139,11 @@ export const PortForwardsPage = () => {
                           <h3 className="text-base font-bold truncate leading-tight">
                             {forward.name}
                           </h3>
+                          {forward.type === 'reverse' && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-600">
+                              Reverse
+                            </span>
+                          )}
                           {forward.active && (
                             <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-600">
                               Active
@@ -149,7 +154,9 @@ export const PortForwardsPage = () => {
                           {connLabel}
                         </p>
                         <p className="text-xs text-foreground/60 truncate leading-none mt-1">
-                          localhost:{forward.local_port} → :{forward.remote_port}
+                          {forward.type === 'reverse'
+                            ? `:${forward.remote_port} ← localhost:${forward.local_port}`
+                            : `localhost:${forward.local_port} → :${forward.remote_port}`}
                         </p>
                         {forward.error && (
                           <p className="text-[11px] text-destructive truncate leading-none mt-1">
