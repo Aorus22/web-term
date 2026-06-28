@@ -1,0 +1,30 @@
+# ================================================================
+# docker-compose.build.web.yaml
+# Build WebTerm for web deployment & extract to compiled/web/
+#
+# Usage:
+#   docker compose -f docker-compose.build.web.yaml build
+#   docker compose -f docker-compose.build.web.yaml run --rm build-web
+#
+# Output: compiled/web/  ← contains web-term-server + fe/dist/
+# ================================================================
+
+services:
+  build-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.build.web
+    image: web-term:build
+    volumes:
+      - ./compiled/web:/output
+    command: >
+      sh -c "
+        echo '=== Extracting build artifacts ===' &&
+        cp /app/web-term-server /output/ &&
+        rm -rf /output/fe &&
+        mkdir -p /output/fe &&
+        cp -r /app/fe/dist /output/fe/ &&
+        cp /app/.env /output/ &&
+        echo '=== Done! Files in compiled/web/: ===' &&
+        find /output -maxdepth 3 -not -path '*/\.*' | head -20
+      "

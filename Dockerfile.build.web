@@ -1,0 +1,32 @@
+# ============================================================
+# Dockerfile.build.web — Build WebTerm for web deployment
+# Output: binary + fe/dist + .env in compiled/web/
+# ============================================================
+
+# ---- Stage 1: Build frontend ----
+FROM node:22-alpine AS fe-builder
+WORKDIR /app/fe
+COPY fe/package*.json ./
+RUN npm ci
+COPY fe/ ./
+ENV VITE_API_URL=""
+ENV VITE_WS_URL=""
+RUN npm run build
+
+# ---- Stage 2: Build backend ----
+FROM golang:1.25-alpine AS be-builder
+WORKDIR /app/be
+COPY be/go.mod be/go.sum ./
+RUN go mod download
+COPY be/ ./
+RUN go mod tidy && CGO_ENABLED=0 go build -o web-term-server ./cmd/server
+
+# ---- Stage 3: Combine ----
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+COPY --from=be-builder /app/be/web-term-server .
+COPY --from=fe-builder /app/fe/dist ./fe/dist
+COPY be/.env ./
+EXPOSE 8080
+CMD ["./web-term-server"]
