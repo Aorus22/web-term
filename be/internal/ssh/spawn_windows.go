@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/UserExistsError/conpty"
 )
@@ -20,23 +22,30 @@ func spawnLocalPTY(connectMsg ConnectMessage) (io.ReadWriteCloser, int, error) {
 		shell = "powershell.exe"
 	}
 
-	cmd := exec.Command(shell)
-	// Set working directory: use Cwd from connect message, or fall back to $HOME
-	if connectMsg.Cwd != "" {
-		cmd.Dir = connectMsg.Cwd
-	} else {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			cmd.Dir = home
-		}
-	}
-
 	var opts []conpty.ConPtyOption
 	if connectMsg.Cols > 0 && connectMsg.Rows > 0 {
 		opts = append(opts, conpty.ConPtyDimensions(connectMsg.Cols, connectMsg.Rows))
 	}
 
-	cpty, err := conpty.Start(cmd, opts...)
+	// Set working directory: use Cwd from connect message, or fall back to $HOME
+	workDir := connectMsg.Cwd
+	if workDir == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			workDir = home
+		}
+	}
+	if workDir != "" {
+		opts = append(opts, conpty.ConPtyWorkDir(workDir))
+	}
+
+	// conpty.Start takes a raw command-line string; quote the executable path
+	// if it contains spaces so CreateProcess parses it correctly.
+	commandLine := shell
+	if strings.ContainsAny(shell, " \t") {
+		commandLine = strconv.Quote(shell)
+	}
+
+	cpty, err := conpty.Start(commandLine, opts...)
 	if err != nil {
 		return nil, 0, err
 	}

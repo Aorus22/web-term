@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Type, MousePointer2, History, Terminal, Check, Cog, Paintbrush } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Type, MousePointer2, History, Terminal, Check, Cog, Paintbrush, HardDriveDownload } from 'lucide-react'
 import { useSettings, useUpdateSettings } from '../hooks/useSettings'
 import type { AppSettings } from '../hooks/useSettings'
+import { sftpApi } from '@/lib/api'
+import type { RsyncCapability } from '@/lib/api'
 import { themes } from '../data/themes'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
@@ -22,6 +24,8 @@ export function SettingsPage() {
   const { mutate: updateSettings } = useUpdateSettings()
   const [fontDialogOpen, setFontDialogOpen] = useState(false)
   const [current, setCurrent] = useState(() => useAppTheme())
+  const [rsyncStatus, setRsyncStatus] = useState<'checking' | 'available' | 'unavailable'>('checking')
+  const [rsyncInfo, setRsyncInfo] = useState<RsyncCapability | null>(null)
   const [mode, setMode] = useState<ThemeMode>(() => {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('web-term-theme-mode') : null
     return (stored === 'all' || stored === 'dark' || stored === 'light') ? stored : 'all'
@@ -68,6 +72,51 @@ export function SettingsPage() {
       }
     }
   }, [mode, current])
+
+  // Check for a local rsync + ssh install on mount (and on "Check Again").
+  // Note: the 'checking' status is the initial state on mount; the button
+  // resets it before re-running the check.
+  const checkRsync = useCallback(async (fresh = false) => {
+    try {
+      const caps = await sftpApi.engines('local', fresh ? { fresh: true } : undefined)
+      if (caps.rsync?.available) {
+        setRsyncInfo(caps.rsync)
+        setRsyncStatus('available')
+      } else {
+        setRsyncInfo(null)
+        setRsyncStatus('unavailable')
+      }
+    } catch {
+      setRsyncInfo(null)
+      setRsyncStatus('unavailable')
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    sftpApi.engines('local')
+      .then((caps) => {
+        if (cancelled) return
+        if (caps.rsync?.available) {
+          setRsyncInfo(caps.rsync)
+          setRsyncStatus('available')
+        } else {
+          setRsyncInfo(null)
+          setRsyncStatus('unavailable')
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRsyncInfo(null)
+        setRsyncStatus('unavailable')
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleCheckAgain = () => {
+    setRsyncStatus('checking')
+    checkRsync(true)
+  }
 
   if (isLoading || !settings) {
     return (
@@ -280,6 +329,55 @@ export function SettingsPage() {
                   <SelectItem value="0">Unlimited</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* File Transfers Section */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">File Transfers</h2>
+          <div className="bg-card rounded-lg border divide-y overflow-hidden">
+            {/* Rsync Engine availability check */}
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className={cn(
+                  "h-2 w-2 rounded-full shrink-0",
+                  rsyncStatus === 'available' ? "bg-green-500"
+                    : rsyncStatus === 'checking' ? "bg-amber-500 animate-pulse"
+                    : "bg-muted-foreground"
+                )} />
+                <HardDriveDownload className="h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Rsync Engine</span>
+                  <span className="text-xs text-muted-foreground">
+                    {rsyncStatus === 'checking' && 'Checking for rsync and ssh…'}
+                    {rsyncStatus === 'available' && (rsyncInfo?.rsync_version || rsyncInfo?.ssh_version
+                      ? `Rsync ${rsyncInfo.rsync_version ?? ''} · SSH ${rsyncInfo.ssh_version ?? ''}`
+                      : 'Rsync + SSH available')}
+                    {rsyncStatus === 'unavailable' && 'rsync not found. Install rsync and OpenSSH client to enable the Rsync engine.'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleCheckAgain}
+                disabled={rsyncStatus === 'checking'}
+                className="h-8 text-xs px-3 bg-muted rounded border hover:bg-muted/80 transition-colors disabled:opacity-50"
+              >
+                Check Again
+              </button>
+            </div>
+
+            {/* Enable Rsync Engine */}
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">Enable Rsync Engine</span>
+                <span className="text-xs text-muted-foreground">Use rsync for file transfers when the remote supports it</span>
+              </div>
+              <Switch
+                checked={settings.rsync_enabled === 'true'}
+                onCheckedChange={(c) => handleUpdate('rsync_enabled', String(c))}
+                disabled={rsyncStatus !== 'available'}
+              />
             </div>
           </div>
         </div>

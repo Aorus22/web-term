@@ -11,6 +11,7 @@ export interface AppSettings {
   cursor_style: 'block' | 'underline' | 'bar'
   cursor_blink: string
   scrollback: string
+  rsync_enabled: 'true' | 'false'
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   cursor_style: 'block',
   cursor_blink: 'true',
   scrollback: '1000',
+  rsync_enabled: 'false',
 }
 
 export function useSettings() {

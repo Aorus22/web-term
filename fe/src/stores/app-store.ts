@@ -89,6 +89,9 @@ interface AppState {
   sftpRightPanel: SftpPanelState
   setSftpLeftPanel: (state: SftpPanelState | ((prev: SftpPanelState) => SftpPanelState)) => void
   setSftpRightPanel: (state: SftpPanelState | ((prev: SftpPanelState) => SftpPanelState)) => void
+  // File transfer engine selector
+  fileEngine: 'sftp' | 'rsync'
+  setFileEngine: (e: 'sftp' | 'rsync') => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -188,4 +191,7 @@ export const useAppStore = create<AppState>((set) => ({
   sftpRightPanel: { connectionId: "local", path: "", history: [], historyIndex: -1 },
   setSftpLeftPanel: (state) => set((s) => ({ sftpLeftPanel: typeof state === 'function' ? state(s.sftpLeftPanel) : state })),
   setSftpRightPanel: (state) => set((s) => ({ sftpRightPanel: typeof state === 'function' ? state(s.sftpRightPanel) : state })),
+  // File transfer engine selector
+  fileEngine: 'sftp',
+  setFileEngine: (e) => set({ fileEngine: e }),
 }))

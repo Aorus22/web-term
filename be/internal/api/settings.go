@@ -24,6 +24,7 @@ var defaultSettings = map[string]string{
 	"cursor_style":         "block",
 	"cursor_blink":         "true",
 	"scrollback":           "1000",
+	"rsync_enabled":        "false",
 }
 
 type SettingsResponse struct {
@@ -76,6 +77,11 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 
 		if k == "terminal_engine" && v != "wterm" && v != "xterm" {
 			sendError(w, "Invalid terminal_engine: "+v, http.StatusBadRequest)
+			return
+		}
+
+		if k == "rsync_enabled" && v != "true" && v != "false" {
+			sendError(w, "Invalid rsync_enabled: "+v, http.StatusBadRequest)
 			return
 		}
 

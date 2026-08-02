@@ -200,7 +200,26 @@ export interface FileInfo {
   isDir: boolean
 }
 
+export interface RsyncCapability {
+  available: boolean
+  rsync_path?: string
+  rsync_version?: string
+  ssh_path?: string
+  ssh_version?: string
+}
+
+export interface EngineCapabilities {
+  available: string[]
+  rsync: RsyncCapability | null
+}
+
 export const sftpApi = {
+  engines: (connectionId: string, opts?: { fresh?: boolean }): Promise<EngineCapabilities> =>
+    fetch(`${getSftpApiBase()}/engines?connectionId=${connectionId}${opts?.fresh ? '&fresh=1' : ''}`)
+      .then(r => {
+        if (!r.ok) return r.json().then(e => Promise.reject(e))
+        return r.json()
+      }),
   list: (connectionId: string, path: string): Promise<FileInfo[]> =>
     fetch(`${getSftpApiBase()}/ls?connectionId=${connectionId}&path=${encodeURIComponent(path)}`)
       .then(r => {
@@ -209,10 +228,10 @@ export const sftpApi = {
       }),
   downloadUrl: (connectionId: string, path: string): string =>
     `${getSftpApiBase()}/download?connectionId=${connectionId}&path=${encodeURIComponent(path)}`,
-  upload: (connectionId: string, path: string, file: File): Promise<{ transferId: string }> => {
+  upload: (connectionId: string, path: string, file: File, engine: 'sftp' | 'rsync' = 'sftp'): Promise<{ transferId: string }> => {
     const formData = new FormData()
     formData.append('file', file)
-    return fetch(`${getSftpApiBase()}/upload?connectionId=${connectionId}&path=${encodeURIComponent(path)}`, {
+    return fetch(`${getSftpApiBase()}/upload?connectionId=${connectionId}&path=${encodeURIComponent(path)}&engine=${engine}`, {
       method: 'POST',
       body: formData,
     }).then(r => {
@@ -244,8 +263,8 @@ export const sftpApi = {
         if (!r.ok) return r.json().then(e => Promise.reject(e))
         return r.json()
       }),
-  transfer: (srcConnId: string, srcPath: string, dstConnId: string, dstPath: string): Promise<{ transferId: string }> =>
-    fetch(`${getSftpApiBase()}/transfer?srcConnectionId=${srcConnId}&srcPath=${encodeURIComponent(srcPath)}&dstConnectionId=${dstConnId}&dstPath=${encodeURIComponent(dstPath)}`, {
+  transfer: (srcConnId: string, srcPath: string, dstConnId: string, dstPath: string, engine: 'sftp' | 'rsync' = 'sftp'): Promise<{ transferId: string }> =>
+    fetch(`${getSftpApiBase()}/transfer?srcConnectionId=${srcConnId}&srcPath=${encodeURIComponent(srcPath)}&dstConnectionId=${dstConnId}&dstPath=${encodeURIComponent(dstPath)}&engine=${engine}`, {
       method: 'POST',
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(e))

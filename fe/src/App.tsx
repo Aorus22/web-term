@@ -268,7 +268,7 @@ function AppContent() {
               sidebarPage === 'sftp' ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
             )}
           >
-            <Files className="h-4 w-4" /> SFTP
+            <Files className="h-4 w-4" /> Files
           </button>
         </nav>
 

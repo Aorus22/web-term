@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 	"webterm/internal/config"
 	"webterm/internal/db"
@@ -20,6 +21,18 @@ type SFTPHandler struct {
 	Cfg *config.Config
 	SM  *ssh.StagingManager
 	TM  *ssh.TransferManager
+
+	// rsync probe cache keyed by connectionId (remote connections only).
+	rsyncMu    sync.Mutex
+	rsyncCache map[string]cachedRsync
+}
+
+// rsyncCacheTTL is how long a cached remote rsync probe result is considered valid.
+const rsyncCacheTTL = 60 * time.Second
+
+type cachedRsync struct {
+	info     ssh.RsyncAvailability
+	probedAt time.Time
 }
 
 func (h *SFTPHandler) getFS(r *http.Request) (ssh.FileSystem, io.Closer, error) {
@@ -41,6 +54,109 @@ func (h *SFTPHandler) getFS(r *http.Request) (ssh.FileSystem, io.Closer, error) 
 	}
 
 	return &ssh.SFTPFS{Client: sftpClient}, sshClient, nil
+}
+
+func (h *SFTPHandler) rsyncEnabled() bool {
+	if h.DB == nil {
+		return false
+	}
+	var setting db.Setting
+	if err := h.DB.First(&setting, "key = ?", "rsync_enabled").Error; err != nil {
+		return false
+	}
+	return setting.Value == "true"
+}
+
+// rsyncAvailable reports whether the rsync engine can be used to reach connID.
+// For local connections it checks the backend machine's rsync + ssh binaries.
+// For remote connections it resolves the connection and probes rsync over ssh.
+func (h *SFTPHandler) rsyncAvailable(connID string) bool {
+	if connID == "" || connID == "local" {
+		return ssh.CheckLocalRsync().Available
+	}
+	if h.DB == nil {
+		return false
+	}
+	var dbConn db.Connection
+	if err := h.DB.First(&dbConn, "id = ?", connID).Error; err != nil {
+		return false
+	}
+	available, _, err := ssh.ProbeRemoteRsync(h.DB, dbConn, h.Cfg)
+	if err != nil {
+		return false
+	}
+	return available
+}
+
+// Engines reports which transfer engines are available for a connection.
+// Response shape:
+//
+//	{
+//	  "available": ["sftp", "rsync"],
+//	  "rsync": { "available": true, "rsync_path": "...", "rsync_version": "...", "ssh_path": "...", "ssh_version": "..." }
+//	}
+//
+// "rsync" is null when rsync is unavailable; "available" always contains
+// "sftp". A failed remote probe is not an error: it just means no rsync.
+func (h *SFTPHandler) Engines(w http.ResponseWriter, r *http.Request) {
+	connID := r.URL.Query().Get("connectionId")
+	fresh := r.URL.Query().Get("fresh") == "1"
+
+	w.Header().Set("Content-Type", "application/json")
+
+	resp := map[string]interface{}{
+		"available": []string{"sftp"},
+		"rsync":     nil,
+	}
+
+	rsyncInfo := func(info ssh.RsyncAvailability) {
+		if info.Available {
+			resp["available"] = []string{"sftp", "rsync"}
+			resp["rsync"] = info
+		}
+	}
+
+	if connID == "" || connID == "local" {
+		rsyncInfo(ssh.CheckLocalRsync())
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	var dbConn db.Connection
+	if err := h.DB.First(&dbConn, "id = ?", connID).Error; err != nil {
+		sendError(w, "connection not found", http.StatusNotFound)
+		return
+	}
+
+	if !fresh {
+		h.rsyncMu.Lock()
+		cached, ok := h.rsyncCache[connID]
+		h.rsyncMu.Unlock()
+		if ok && time.Since(cached.probedAt) < rsyncCacheTTL {
+			rsyncInfo(cached.info)
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+	}
+
+	available, version, err := ssh.ProbeRemoteRsync(h.DB, dbConn, h.Cfg)
+	if err != nil {
+		// A failed probe just means rsync is not available.
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	info := ssh.RsyncAvailability{Available: available, RsyncVersion: version}
+
+	h.rsyncMu.Lock()
+	if h.rsyncCache == nil {
+		h.rsyncCache = make(map[string]cachedRsync)
+	}
+	h.rsyncCache[connID] = cachedRsync{info: info, probedAt: time.Now()}
+	h.rsyncMu.Unlock()
+
+	rsyncInfo(info)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (h *SFTPHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +236,27 @@ func (h *SFTPHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	connID := r.URL.Query().Get("connectionId")
 	path := r.URL.Query().Get("path")
 
+	engine := r.URL.Query().Get("engine")
+	if engine == "" {
+		engine = "sftp"
+	}
+	if engine != "sftp" && engine != "rsync" {
+		sendError(w, "Invalid engine: "+engine, http.StatusBadRequest)
+		return
+	}
+
+	if engine == "rsync" {
+		if !h.rsyncEnabled() {
+			sendError(w, "Rsync engine is disabled in settings", http.StatusBadRequest)
+			return
+		}
+		// Upload source is always local; only the destination can be remote.
+		if !h.rsyncAvailable(connID) {
+			sendError(w, "Rsync is not available on the source/destination (install rsync and ssh)", http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Handle multipart form
 	err := r.ParseMultipartForm(32 << 20) // 32MB max in memory
 	if err != nil {
@@ -151,6 +288,16 @@ func (h *SFTPHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Start background transfer from staging to destination
 	go func() {
 		defer h.SM.Cleanup(stagingPath)
+
+		if engine == "rsync" {
+			// RunRsyncUpload is the sole SetComplete/SetError authority for the
+			// transfer; it sets total bytes from os.Stat. Re-reporting the
+			// returned error via SetError is idempotent.
+			if err := ssh.RunRsyncUpload(h.DB, h.Cfg, h.TM, transferID, stagingPath, connID, path); err != nil {
+				h.TM.SetError(transferID, err)
+			}
+			return
+		}
 
 		getFS := func(connID string) (ssh.FileSystem, io.Closer, error) {
 			if connID == "local" || connID == "" {
@@ -312,6 +459,26 @@ func (h *SFTPHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 	dstConnID := r.URL.Query().Get("dstConnectionId")
 	dstPath := r.URL.Query().Get("dstPath")
 
+	engine := r.URL.Query().Get("engine")
+	if engine == "" {
+		engine = "sftp"
+	}
+	if engine != "sftp" && engine != "rsync" {
+		sendError(w, "Invalid engine: "+engine, http.StatusBadRequest)
+		return
+	}
+
+	if engine == "rsync" {
+		if !h.rsyncEnabled() {
+			sendError(w, "Rsync engine is disabled in settings", http.StatusBadRequest)
+			return
+		}
+		if !h.rsyncAvailable(srcConnID) || !h.rsyncAvailable(dstConnID) {
+			sendError(w, "Rsync is not available on the source/destination (install rsync and ssh)", http.StatusBadRequest)
+			return
+		}
+	}
+
 	transferID := uuid.New().String()
 	h.TM.CreateTransfer(transferID, 0)
 
@@ -321,6 +488,16 @@ func (h *SFTPHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 
 	// Start background transfer
 	go func() {
+		if engine == "rsync" {
+			// RunRsyncTransfer is the sole SetComplete/SetError authority for
+			// the transfer; it reports progress and terminal state itself.
+			// Re-reporting the returned error via SetError is idempotent.
+			if err := ssh.RunRsyncTransfer(h.DB, h.Cfg, h.TM, transferID, srcConnID, srcPath, dstConnID, dstPath); err != nil {
+				h.TM.SetError(transferID, err)
+			}
+			return
+		}
+
 		getFS := func(connID string) (ssh.FileSystem, io.Closer, error) {
 			if connID == "local" || connID == "" {
 				return &ssh.LocalFS{}, nil, nil

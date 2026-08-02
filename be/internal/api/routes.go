@@ -93,6 +93,7 @@ func SetupRoutes(mux *http.ServeMux, database *gorm.DB, cfg *config.Config) {
 	mux.HandleFunc("POST /api/sftp/mkdir", sfh.Mkdir)
 	mux.HandleFunc("POST /api/sftp/transfer", sfh.Transfer)
 	mux.HandleFunc("GET /api/sftp/transfer/{id}/progress", sfh.Progress)
+	mux.HandleFunc("GET /api/sftp/engines", sfh.Engines)
 
 	// Session endpoints
 	mux.HandleFunc("GET /api/sessions", ListSessions())

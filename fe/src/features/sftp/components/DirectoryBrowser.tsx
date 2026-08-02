@@ -80,9 +80,10 @@ type SortDirection = 'asc' | 'desc'
 
 interface DirectoryBrowserProps {
   panelId: 'left' | 'right'
+  engine: 'sftp' | 'rsync'
 }
 
-export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
+export function DirectoryBrowser({ panelId, engine }: DirectoryBrowserProps) {
   const {
     sftpLeftPanel, sftpRightPanel,
     setSftpLeftPanel, setSftpRightPanel,
@@ -201,7 +202,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
 
   const executeTransfer = useCallback(async (data: any, targetPath: string) => {
     try {
-      const { transferId } = await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath)
+      const { transferId } = await sftpApi.transfer(data.connectionId, data.path, selectedConnection, targetPath, engine)
       trackTransfer(transferId, data.fileName, 'transfer')
       if (data.action === 'cut') {
          await sftpApi.remove(data.connectionId, data.path)
@@ -212,7 +213,7 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
       console.error('Transfer error:', e)
       toast.error(`Failed to transfer: ${e?.message || e}`)
     }
-  }, [selectedConnection, trackTransfer, setSftpClipboard, refreshDir])
+  }, [selectedConnection, trackTransfer, setSftpClipboard, refreshDir, engine])
 
   const handleAction = useCallback((action: 'cut' | 'copy', file: FileInfo) => {
     const fullPath = joinPath(path, file.name)
@@ -309,11 +310,11 @@ export function DirectoryBrowser({ panelId }: DirectoryBrowserProps) {
   const executeUpload = useCallback(async (file: File) => {
     const targetPath = joinPath(path, file.name)
     try {
-      const { transferId } = await sftpApi.upload(selectedConnection, targetPath, file)
+      const { transferId } = await sftpApi.upload(selectedConnection, targetPath, file, engine)
       trackTransfer(transferId, file.name, 'upload')
       refreshDir()
     } catch (e: any) { toast.error(`Failed to upload ${file.name}: ${e?.message || e}`) }
-  }, [path, selectedConnection, trackTransfer, refreshDir])
+  }, [path, selectedConnection, trackTransfer, refreshDir, engine])
 
   const handleOverwriteOverwrite = () => {
     if (pendingUpload) { executeUpload(pendingUpload); setPendingUpload(null) }
