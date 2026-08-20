@@ -3,6 +3,14 @@ export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error
 export interface TerminalHandle {
   write: (data: Uint8Array | string) => void
   focus: () => void
+  /** Returns the currently selected text in the terminal (empty string if none) */
+  getSelection: () => string
+  /** Paste text into the terminal, respecting bracketed-paste mode */
+  paste: (text: string) => void
+  /** Select all terminal content */
+  selectAll: () => void
+  /** Clear terminal scrollback / screen */
+  clear: () => void
 }
 
 export interface SSHSession {

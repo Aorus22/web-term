@@ -52,6 +52,10 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
             terminalRefInternal.current.focus()
           }
         },
+        getSelection: () => terminalRefInternal.current?.getSelection() ?? '',
+        paste: (text: string) => terminalRefInternal.current?.paste(text),
+        selectAll: () => terminalRefInternal.current?.selectAll(),
+        clear: () => terminalRefInternal.current?.clear(),
       }),
       [],
     )
@@ -160,6 +164,10 @@ export const XTermEngine = forwardRef<TerminalHandle, XTermEngineProps>(
           focus: () => {
             terminal?.focus()
           },
+          getSelection: () => terminal?.getSelection() ?? '',
+          paste: (text: string) => terminal?.paste(text),
+          selectAll: () => terminal?.selectAll(),
+          clear: () => terminal?.clear(),
         }
 
         // Setup ResizeObserver with debounce to prevent flooding PTY during rapid resize

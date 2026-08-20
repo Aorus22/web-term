@@ -11,6 +11,7 @@ import { ReconnectOverlay } from './ReconnectOverlay'
 import { SaveConnectionBanner } from './SaveConnectionBanner'
 import { TerminalWrapper } from './components/TerminalWrapper'
 import { TerminalErrorBoundary } from './components/TerminalErrorBoundary'
+import { TerminalContextMenu } from './TerminalContextMenu'
 import type { ConnectOptions } from './types'
 
 interface TerminalPaneProps {
@@ -262,19 +263,21 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
       <div className="h-full w-full flex flex-col overflow-hidden">
         <div className="flex-1 relative overflow-hidden">
           <TerminalErrorBoundary>
-            <TerminalWrapper
-              ref={ref}
-              engine={settings?.terminal_engine || 'wterm'}
-              sendData={sendData}
-              sendResize={sendResize}
-              onReady={handleTerminalReady}
-              theme={terminalTheme}
-              cursorBlink={cursorBlinkSetting}
-              fontFamily={fontFamily}
-              fontSize={fontSize}
-              cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
-              style={terminalStyle}
-            />
+            <TerminalContextMenu terminalRef={ref} sendData={sendData}>
+              <TerminalWrapper
+                ref={ref}
+                engine={settings?.terminal_engine || 'wterm'}
+                sendData={sendData}
+                sendResize={sendResize}
+                onReady={handleTerminalReady}
+                theme={terminalTheme}
+                cursorBlink={cursorBlinkSetting}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
+                style={terminalStyle}
+              />
+            </TerminalContextMenu>
           </TerminalErrorBoundary>
         </div>
       </div>
@@ -317,18 +320,20 @@ export function TerminalPane({ sessionId, initialConnect }: TerminalPaneProps) {
         {/* Frozen terminal content underneath */}
         <div className="flex-1 relative">
           <TerminalErrorBoundary>
-            <TerminalWrapper
-              ref={ref}
-              engine={settings?.terminal_engine || 'wterm'}
-              sendData={() => {}}
-              sendResize={sendResize}
-              theme={terminalTheme}
-              cursorBlink={false}
-              fontFamily={fontFamily}
-              fontSize={fontSize}
-              cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
-              style={terminalStyle}
-            />
+            <TerminalContextMenu terminalRef={ref} sendData={sendData}>
+              <TerminalWrapper
+                ref={ref}
+                engine={settings?.terminal_engine || 'wterm'}
+                sendData={() => {}}
+                sendResize={sendResize}
+                theme={terminalTheme}
+                cursorBlink={false}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                cursorStyle={settings?.cursor_style as 'block' | 'underline' | 'bar' | undefined}
+                style={terminalStyle}
+              />
+            </TerminalContextMenu>
           </TerminalErrorBoundary>
           {/* Reconnect overlay on top (UI-04) */}
           <ReconnectOverlay

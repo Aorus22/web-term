@@ -59,6 +59,10 @@ export const TerminalWrapper = forwardRef<TerminalHandle, TerminalWrapperProps>(
         focus: () => {
           terminalRef.current?.focus()
         },
+        getSelection: () => terminalRef.current?.getSelection() ?? '',
+        paste: (text: string) => terminalRef.current?.paste(text),
+        selectAll: () => terminalRef.current?.selectAll(),
+        clear: () => terminalRef.current?.clear(),
       }),
       [currentEngine],
     )
