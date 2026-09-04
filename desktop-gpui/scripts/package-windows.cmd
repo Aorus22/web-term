@@ -21,6 +21,16 @@ if errorlevel 1 (
 )
 cd ..
 
+rem Ensure shader compiler is available for GPUI release build
+set "FXC_TOOL=%CD%\desktop-gpui\tools\fxc\fxc.exe"
+if not defined GPUI_FXC_PATH (
+    if not exist "!FXC_TOOL!" (
+        echo Compiling standalone FXC shader compiler helper...
+        rustc -O desktop-gpui\tools\fxc\main.rs -o "!FXC_TOOL!"
+    )
+    set "GPUI_FXC_PATH=!FXC_TOOL!"
+)
+
 echo [2/3] Compiling GPUI desktop client in release mode...
 cargo build --release --manifest-path desktop-gpui/Cargo.toml --package webterm
 if errorlevel 1 (
@@ -34,18 +44,16 @@ if exist "desktop-gpui\crates\webterm\assets" (
     xcopy /E /I /Y "desktop-gpui\crates\webterm\assets" "%DIST_DIR%\assets" >nul
 )
 
-(
-echo WebTerm Desktop Client
-echo ======================
-echo Launch with: webterm.exe
-echo.
-echo Architecture:
-echo - Single launchable bundle with backend.exe and webterm.exe side-by-side.
-echo - The backend process is automatically supervised and bound strictly to loopback (127.0.0.1).
-echo - Native GPU terminal rendering via Alacritty.
-) > "%DIST_DIR%\README.txt"
+echo WebTerm Desktop Client> "%DIST_DIR%\README.txt"
+echo ======================>> "%DIST_DIR%\README.txt"
+echo Launch with: webterm.exe>> "%DIST_DIR%\README.txt"
+echo.>> "%DIST_DIR%\README.txt"
+echo Architecture:>> "%DIST_DIR%\README.txt"
+echo - Single launchable bundle with backend.exe and webterm.exe side-by-side.>> "%DIST_DIR%\README.txt"
+echo - The backend process is automatically supervised and bound strictly to loopback (127.0.0.1).>> "%DIST_DIR%\README.txt"
+echo - Native GPU terminal rendering via Alacritty.>> "%DIST_DIR%\README.txt"
 
-echo.
+echo(
 echo =======================================================
 echo WebTerm Windows Bundle assembled successfully!
 echo Location: %DIST_DIR%

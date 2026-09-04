@@ -20,6 +20,16 @@ try {
     Pop-Location
 }
 
+# Ensure shader compiler is available for GPUI release build
+$FxcTool = "$Root\desktop-gpui\tools\fxc\fxc.exe"
+if (-not (Test-Path $env:GPUI_FXC_PATH -ErrorAction SilentlyContinue)) {
+    if (-not (Test-Path $FxcTool)) {
+        Write-Host "Compiling standalone FXC shader compiler helper..." -ForegroundColor Yellow
+        rustc -O "$Root\desktop-gpui\tools\fxc\main.rs" -o $FxcTool
+    }
+    $env:GPUI_FXC_PATH = $FxcTool
+}
+
 Write-Host "[2/3] Compiling GPUI desktop client in release mode..." -ForegroundColor Yellow
 cargo build --release --manifest-path "$Root\desktop-gpui\Cargo.toml" --package webterm
 
