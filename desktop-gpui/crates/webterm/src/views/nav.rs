@@ -44,6 +44,51 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         None
     };
 
+    let conn_modal_overlay = if app.connection_modal.is_some() {
+        Some(crate::views::connection_modal::render_connection_modal(app, cx))
+    } else {
+        None
+    };
+
+    let import_modal_overlay = if app.show_import_modal {
+        Some(crate::views::connection_modal::render_import_modal(app, cx))
+    } else {
+        None
+    };
+
+    let notification_toast = app.notification.clone().map(|msg| {
+        div()
+            .absolute()
+            .top(px(16.0))
+            .right(px(16.0))
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap_3()
+            .px_4()
+            .py_2()
+            .rounded_lg()
+            .bg(if is_dark { rgb(0x18181b) } else { rgb(0xffffff) })
+            .border_1()
+            .border_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
+            .shadow_lg()
+            .text_sm()
+            .text_color(text_color)
+            .child(msg)
+            .child(
+                div()
+                    .cursor_pointer()
+                    .text_xs()
+                    .text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) })
+                    .hover(|s| s.text_color(text_color))
+                    .child("×")
+                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                        this.dismiss_notification(cx);
+                    })),
+            )
+            .into_any_element()
+    });
+
     div()
         .relative()
         .flex()
@@ -180,6 +225,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .child(content_pane),
         )
         .children(modal_overlay)
+        .children(conn_modal_overlay)
+        .children(import_modal_overlay)
+        .children(notification_toast)
         .into_any_element()
 }
 

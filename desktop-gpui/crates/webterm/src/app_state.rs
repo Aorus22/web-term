@@ -2,12 +2,139 @@
 
 use std::sync::LazyLock;
 use gpui::*;
-use webterm_backend_client::{BackendClient, Connection, TerminalWsHandle, WsConnectRequest};
+use webterm_backend_client::{
+    BackendClient, Connection, CreateConnectionRequest, ImportResult, SshKey,
+    TerminalWsHandle, UpdateConnectionRequest, WsConnectRequest,
+};
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
 use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
 
 use crate::session::{SessionStatus, TerminalSessionManager, TerminalTab};
 use crate::views::{nav::render_nav_shell, status::render_status_page};
+
+/// Mode of the Connection modal: Create or Edit with connection ID.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConnectionModalMode {
+    Create,
+    Edit(String),
+}
+
+/// Form state for Creating or Editing a Connection.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConnectionFormState {
+    pub mode: ConnectionModalMode,
+    pub label: String,
+    pub host: String,
+    pub port: String,
+    pub username: String,
+    pub password: String,
+    pub tags: String,
+    pub auth_method: String,
+    pub ssh_key_id: Option<String>,
+    pub error_message: Option<String>,
+}
+
+impl ConnectionFormState {
+    pub fn new_create() -> Self {
+        Self {
+            mode: ConnectionModalMode::Create,
+            label: String::new(),
+            host: String::new(),
+            port: "22".to_string(),
+            username: "root".to_string(),
+            password: String::new(),
+            tags: String::new(),
+            auth_method: "password".to_string(),
+            ssh_key_id: None,
+            error_message: None,
+        }
+    }
+
+    pub fn new_edit(conn: &Connection) -> Self {
+        Self {
+            mode: ConnectionModalMode::Edit(conn.id.clone()),
+            label: conn.label.clone(),
+            host: conn.host.clone(),
+            port: conn.port.to_string(),
+            username: conn.username.clone(),
+            password: String::new(),
+            tags: conn.tags.join(", "),
+            auth_method: conn.auth_method.clone(),
+            ssh_key_id: conn.ssh_key_id.clone(),
+            error_message: None,
+        }
+    }
+
+    pub fn parse_port(&self) -> u16 {
+        self.port.trim().parse::<u16>().unwrap_or(22)
+    }
+
+    pub fn parse_tags(&self) -> Vec<String> {
+        self.tags
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.label.trim().is_empty() {
+            return Err("Connection label is required".to_string());
+        }
+        if self.host.trim().is_empty() {
+            return Err("Host / IP address is required".to_string());
+        }
+        if self.username.trim().is_empty() {
+            return Err("Username is required".to_string());
+        }
+        if self.auth_method == "key" && self.ssh_key_id.is_none() {
+            return Err("Please select an SSH key for key authentication".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn to_create_request(&self) -> CreateConnectionRequest {
+        CreateConnectionRequest {
+            label: self.label.trim().to_string(),
+            host: self.host.trim().to_string(),
+            port: self.parse_port(),
+            username: self.username.trim().to_string(),
+            password: if self.auth_method == "password" && !self.password.is_empty() {
+                Some(self.password.clone())
+            } else {
+                None
+            },
+            tags: self.parse_tags(),
+            auth_method: self.auth_method.clone(),
+            ssh_key_id: if self.auth_method == "key" {
+                self.ssh_key_id.clone()
+            } else {
+                None
+            },
+        }
+    }
+
+    pub fn to_update_request(&self) -> UpdateConnectionRequest {
+        UpdateConnectionRequest {
+            label: self.label.trim().to_string(),
+            host: self.host.trim().to_string(),
+            port: self.parse_port(),
+            username: self.username.trim().to_string(),
+            password: if self.auth_method == "password" && !self.password.is_empty() {
+                Some(self.password.clone())
+            } else {
+                None
+            },
+            tags: self.parse_tags(),
+            auth_method: self.auth_method.clone(),
+            ssh_key_id: if self.auth_method == "key" {
+                self.ssh_key_id.clone()
+            } else {
+                None
+            },
+        }
+    }
+}
 
 /// Active view in the main navigation sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +177,12 @@ pub struct AppState {
     pub search_query: String,
     pub selected_tag: Option<String>,
     pub is_loading_connections: bool,
+    pub ssh_keys: Vec<SshKey>,
+    pub is_loading_keys: bool,
+    pub connection_modal: Option<ConnectionFormState>,
+    pub show_import_modal: bool,
+    pub import_payload: String,
+    pub notification: Option<String>,
 }
 
 impl AppState {
@@ -74,6 +207,12 @@ impl AppState {
             search_query: String::new(),
             selected_tag: None,
             is_loading_connections: false,
+            ssh_keys: Vec::new(),
+            is_loading_keys: false,
+            connection_modal: None,
+            show_import_modal: false,
+            import_payload: String::new(),
+            notification: None,
         }
     }
 
@@ -192,14 +331,209 @@ impl AppState {
         cx.notify();
     }
 
+    /// Fetch all uploaded SSH keys from backend.
+    pub fn fetch_ssh_keys(&mut self, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        self.is_loading_keys = true;
+        cx.notify();
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<Vec<SshKey>, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.list_keys().await {
+                Ok(keys) => {
+                    let _ = tx.send(Ok(keys));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                this.is_loading_keys = false;
+                                match res {
+                                    Ok(keys) => {
+                                        this.ssh_keys = keys;
+                                    }
+                                    Err(err) => {
+                                        eprintln!("Failed to fetch SSH keys: {err}");
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
     /// Open create connection modal.
     pub fn open_create_connection_modal(&mut self, cx: &mut Context<Self>) {
+        self.connection_modal = Some(ConnectionFormState::new_create());
+        self.fetch_ssh_keys(cx);
         cx.notify();
     }
 
     /// Open edit connection modal.
-    pub fn open_edit_connection_modal(&mut self, _id: &str, cx: &mut Context<Self>) {
+    pub fn open_edit_connection_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+        if let Some(conn) = self.connections.iter().find(|c| c.id == id).cloned() {
+            self.connection_modal = Some(ConnectionFormState::new_edit(&conn));
+            self.fetch_ssh_keys(cx);
+
+            if let Some(client) = self.client.clone() {
+                let id_str = id.to_string();
+                let view_weak = cx.entity().downgrade();
+                let (tx, mut rx) =
+                    tokio::sync::mpsc::unbounded_channel::<Result<Connection, String>>();
+
+                TOKIO_RT.spawn(async move {
+                    match client.get_connection(&id_str).await {
+                        Ok(c) => {
+                            let _ = tx.send(Ok(c));
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(e.to_string()));
+                        }
+                    }
+                });
+
+                cx.spawn(move |_view, cx: &mut AsyncApp| {
+                    let view_weak = view_weak.clone();
+                    let cx_handle = cx.clone();
+                    async move {
+                        if let Some(Ok(full_conn)) = rx.recv().await {
+                            cx_handle.update(|cx: &mut App| {
+                                if let Some(app) = view_weak.upgrade() {
+                                    app.update(cx, |this, cx| {
+                                        if let Some(form) = &mut this.connection_modal {
+                                            if form.mode == ConnectionModalMode::Edit(full_conn.id.clone()) {
+                                                if let Some(key_id) = full_conn.ssh_key_id {
+                                                    form.ssh_key_id = Some(key_id);
+                                                }
+                                                cx.notify();
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    }
+                })
+                .detach();
+            }
+        }
         cx.notify();
+    }
+
+    /// Close connection modal.
+    pub fn close_connection_modal(&mut self, cx: &mut Context<Self>) {
+        self.connection_modal = None;
+        cx.notify();
+    }
+
+    /// Save connection form (Create or Update).
+    pub fn save_connection_form(&mut self, cx: &mut Context<Self>) {
+        let form = match &mut self.connection_modal {
+            Some(f) => f,
+            None => return,
+        };
+
+        if let Err(err) = form.validate() {
+            form.error_message = Some(err);
+            cx.notify();
+            return;
+        }
+
+        form.error_message = None;
+
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => {
+                if let Some(f) = &mut self.connection_modal {
+                    f.error_message = Some("Backend client is not connected".to_string());
+                    cx.notify();
+                }
+                return;
+            }
+        };
+
+        let mode = form.mode.clone();
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<String, String>>();
+
+        match mode {
+            ConnectionModalMode::Create => {
+                let req = form.to_create_request();
+                TOKIO_RT.spawn(async move {
+                    match client.create_connection(&req).await {
+                        Ok(_) => {
+                            let _ = tx.send(Ok("Host connection created successfully".to_string()));
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(e.to_string()));
+                        }
+                    }
+                });
+            }
+            ConnectionModalMode::Edit(id) => {
+                let req = form.to_update_request();
+                TOKIO_RT.spawn(async move {
+                    match client.update_connection(&id, &req).await {
+                        Ok(_) => {
+                            let _ = tx.send(Ok("Host connection updated successfully".to_string()));
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(e.to_string()));
+                        }
+                    }
+                });
+            }
+        }
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(msg) => {
+                                        this.connection_modal = None;
+                                        this.notification = Some(msg);
+                                        this.fetch_connections(cx);
+                                    }
+                                    Err(e) => {
+                                        if let Some(f) = &mut this.connection_modal {
+                                            f.error_message = Some(format!("Error saving host: {e}"));
+                                        }
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
     }
 
     /// Delete connection by ID.
@@ -210,21 +544,222 @@ impl AppState {
         };
 
         let id_str = id.to_string();
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
+
         TOKIO_RT.spawn(async move {
-            let _ = client.delete_connection(&id_str).await;
+            match client.delete_connection(&id_str).await {
+                Ok(_) => {
+                    let _ = tx.send(Ok(()));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
         });
 
         self.connections.retain(|c| c.id != id);
         cx.notify();
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(()) => {
+                                        this.notification = Some("Connection deleted".to_string());
+                                    }
+                                    Err(e) => {
+                                        this.notification = Some(format!("Delete failed: {e}"));
+                                        this.fetch_connections(cx);
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
     }
 
     /// Export connections to disk.
     pub fn export_connections_to_disk(&mut self, cx: &mut Context<Self>) {
-        cx.notify();
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<usize, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.export_connections().await {
+                Ok(conns) => {
+                    let count = conns.len();
+                    match serde_json::to_string_pretty(&conns) {
+                        Ok(json_str) => {
+                            let path = std::path::Path::new("webterm-connections-export.json");
+                            if let Err(e) = std::fs::write(path, json_str) {
+                                let _ = tx.send(Err(format!("Failed to write export file: {e}")));
+                            } else {
+                                let _ = tx.send(Ok(count));
+                            }
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(format!("Failed to serialize connections: {e}")));
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(count) => {
+                                        this.notification = Some(format!(
+                                            "Exported {count} connection(s) to webterm-connections-export.json"
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        this.notification = Some(format!("Export failed: {e}"));
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
     }
 
     /// Open import connections modal.
     pub fn open_import_modal(&mut self, cx: &mut Context<Self>) {
+        self.show_import_modal = true;
+        self.import_payload = String::new();
+        cx.notify();
+    }
+
+    /// Close import connections modal.
+    pub fn close_import_modal(&mut self, cx: &mut Context<Self>) {
+        self.show_import_modal = false;
+        self.import_payload.clear();
+        cx.notify();
+    }
+
+    /// Submit imported connections JSON to backend.
+    pub fn submit_import_connections(&mut self, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => {
+                self.notification = Some("Backend client is not connected".to_string());
+                cx.notify();
+                return;
+            }
+        };
+
+        let payload = self.import_payload.trim();
+        let conns: Vec<Connection> = if payload.is_empty() {
+            let path = std::path::Path::new("webterm-connections-export.json");
+            if path.exists() {
+                match std::fs::read_to_string(path) {
+                    Ok(content) => match serde_json::from_str::<Vec<Connection>>(&content) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            self.notification = Some(format!("JSON parsing error from export file: {e}"));
+                            cx.notify();
+                            return;
+                        }
+                    },
+                    Err(e) => {
+                        self.notification = Some(format!("Failed to read export file: {e}"));
+                        cx.notify();
+                        return;
+                    }
+                }
+            } else {
+                self.notification = Some("Please paste JSON array or create webterm-connections-export.json".to_string());
+                cx.notify();
+                return;
+            }
+        } else {
+            match serde_json::from_str::<Vec<Connection>>(payload) {
+                Ok(c) => c,
+                Err(e) => {
+                    self.notification = Some(format!("Invalid JSON array: {e}"));
+                    cx.notify();
+                    return;
+                }
+            }
+        };
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<ImportResult, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.import_connections(&conns).await {
+                Ok(res) => {
+                    let _ = tx.send(Ok(res));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(result) => {
+                                        this.show_import_modal = false;
+                                        this.import_payload.clear();
+                                        this.notification = Some(format!(
+                                            "Import finished: {} imported, {} skipped",
+                                            result.imported, result.skipped
+                                        ));
+                                        this.fetch_connections(cx);
+                                    }
+                                    Err(e) => {
+                                        this.notification = Some(format!("Import error: {e}"));
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Dismiss active notification banner.
+    pub fn dismiss_notification(&mut self, cx: &mut Context<Self>) {
+        self.notification = None;
         cx.notify();
     }
 
@@ -298,6 +833,7 @@ impl AppState {
                                         this.backend_status = BackendStatus::Ready;
                                         this.restore_sessions_or_default(cx);
                                         this.fetch_connections(cx);
+                                        this.fetch_ssh_keys(cx);
                                     }
                                     SupervisorEvent::Failed { reason, stderr_tail } => {
                                         this.backend_status = BackendStatus::Failed {
