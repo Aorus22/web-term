@@ -5,6 +5,10 @@ use gpui::*;
 use parking_lot::Mutex;
 use webterm_settings::{DesktopSettings, WindowState};
 
+/// Debounce interval for window geometry saves.
+#[allow(dead_code)]
+pub const DEBOUNCE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(1000);
+
 /// Restore window geometry from persisted settings.
 pub fn restore(settings: &DesktopSettings) -> Option<WindowBounds> {
     if let Some(ref state) = settings.window_state {
