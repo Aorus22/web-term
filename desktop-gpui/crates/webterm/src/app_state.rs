@@ -25,6 +25,22 @@ pub struct AppState {
     pub spawn_opts: Option<SpawnOptions>,
 }
 
+use std::sync::LazyLock;
+use webterm_supervisor::BackendInfo;
+
+static TOKIO_RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to initialize Tokio runtime for supervisor")
+});
+
+enum SupervisorEvent {
+    Status(BackendStatus),
+    Ready(BackendInfo),
+    Failed { reason: String, stderr_tail: String },
+}
+
 impl AppState {
     /// Create initial AppState from desktop settings.
     pub fn new(settings: DesktopSettings, spawn_opts: Option<SpawnOptions>) -> Self {
@@ -57,68 +73,68 @@ impl AppState {
         cx.notify();
 
         let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<SupervisorEvent>();
 
-        // Run supervisor in tokio background task
+        // Run supervisor inside Tokio runtime
+        TOKIO_RT.spawn(async move {
+            let mut supervisor = Supervisor::new();
+            let mut status_rx = supervisor.subscribe();
+
+            let tx_status = tx.clone();
+            tokio::spawn(async move {
+                while status_rx.changed().await.is_ok() {
+                    let st = status_rx.borrow().clone();
+                    if tx_status.send(SupervisorEvent::Status(st)).is_err() {
+                        break;
+                    }
+                }
+            });
+
+            match supervisor.spawn(spawn_opts).await {
+                Ok(info) => {
+                    let _ = tx.send(SupervisorEvent::Ready(info));
+                }
+                Err(e) => {
+                    let (reason, stderr_tail) = match e {
+                        webterm_supervisor::SupervisorError::Failed { reason, stderr_tail } => {
+                            (reason, stderr_tail)
+                        }
+                        other => (other.to_string(), String::new()),
+                    };
+                    let _ = tx.send(SupervisorEvent::Failed { reason, stderr_tail });
+                }
+            }
+        });
+
+        // Observe events inside GPUI foreground executor
         cx.spawn(move |_view, cx: &mut AsyncApp| {
             let view_weak = view_weak.clone();
             let cx_handle = cx.clone();
             async move {
-                let mut supervisor = Supervisor::new();
-                let mut status_rx = supervisor.subscribe();
-
-                // Spawn status listener task
-                let view_weak_clone = view_weak.clone();
-                let cx_clone = cx_handle.clone();
-                tokio::spawn(async move {
-                    while status_rx.changed().await.is_ok() {
-                        let new_status = status_rx.borrow().clone();
-                        let view_weak_inner = view_weak_clone.clone();
-                        cx_clone.update(|cx: &mut App| {
-                            if let Some(entity) = view_weak_inner.upgrade() {
-                                entity.update(cx, |this, cx| {
-                                    this.backend_status = new_status;
-                                    cx.notify();
-                                });
-                            }
-                        });
-                    }
-                });
-
-                // Trigger spawn
-                match supervisor.spawn(spawn_opts).await {
-                    Ok(info) => {
-                        let client = BackendClient::new(info.base_url.clone());
-                        let view_weak_ready = view_weak.clone();
-                        cx_handle.update(|cx: &mut App| {
-                            if let Some(entity) = view_weak_ready.upgrade() {
-                                entity.update(cx, |this, cx| {
-                                    this.client = Some(client);
-                                    this.backend_status = BackendStatus::Ready;
-                                    cx.notify();
-                                });
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        let (reason, stderr_tail) = match e {
-                            webterm_supervisor::SupervisorError::Failed { reason, stderr_tail } => {
-                                (reason, stderr_tail)
-                            }
-                            other => (other.to_string(), String::new()),
-                        };
-                        let view_weak_err = view_weak.clone();
-                        cx_handle.update(|cx: &mut App| {
-                            if let Some(entity) = view_weak_err.upgrade() {
-                                entity.update(cx, |this, cx| {
-                                    this.backend_status = BackendStatus::Failed {
-                                        reason,
-                                        stderr_tail,
-                                    };
-                                    cx.notify();
-                                });
-                            }
-                        });
-                    }
+                while let Some(event) = rx.recv().await {
+                    let view_weak = view_weak.clone();
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(entity) = view_weak.upgrade() {
+                            entity.update(cx, |this, cx| {
+                                match event {
+                                    SupervisorEvent::Status(st) => {
+                                        this.backend_status = st;
+                                    }
+                                    SupervisorEvent::Ready(info) => {
+                                        this.client = Some(BackendClient::new(info.base_url));
+                                        this.backend_status = BackendStatus::Ready;
+                                    }
+                                    SupervisorEvent::Failed { reason, stderr_tail } => {
+                                        this.backend_status = BackendStatus::Failed {
+                                            reason,
+                                            stderr_tail,
+                                        };
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
                 }
             }
         }).detach();

@@ -42,7 +42,7 @@ pub struct WindowState {
 }
 
 /// Desktop settings store holding UI preferences and encryption key custody.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct DesktopSettings {
     #[serde(default)]
     pub backend_path: Option<PathBuf>,
@@ -59,19 +59,6 @@ pub struct DesktopSettings {
     pub custom_base: Option<PathBuf>,
 }
 
-impl Default for DesktopSettings {
-    fn default() -> Self {
-        Self {
-            backend_path: None,
-            encryption_key: None,
-            theme: Theme::default(),
-            window_state: None,
-            last_backend_url: None,
-            custom_base: None,
-        }
-    }
-}
-
 impl DesktopSettings {
     /// Load settings from the default config directory.
     pub fn load() -> Result<Self, SettingsError> {
@@ -83,8 +70,10 @@ impl DesktopSettings {
     pub fn load_from(base: &Path) -> Result<Self, SettingsError> {
         let file_path = paths::settings_path_with_base(base);
         if !file_path.exists() {
-            let mut settings = Self::default();
-            settings.custom_base = Some(base.to_path_buf());
+            let settings = Self {
+                custom_base: Some(base.to_path_buf()),
+                ..Default::default()
+            };
             return Ok(settings);
         }
 
@@ -103,8 +92,10 @@ impl DesktopSettings {
                 let bak_path = file_path.with_extension("json.bak");
                 let _ = fs::rename(&file_path, &bak_path);
 
-                let mut settings = Self::default();
-                settings.custom_base = Some(base.to_path_buf());
+                let settings = Self {
+                    custom_base: Some(base.to_path_buf()),
+                    ..Default::default()
+                };
                 let _ = settings.save_to(base);
                 Ok(settings)
             }

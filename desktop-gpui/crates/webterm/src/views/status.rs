@@ -53,7 +53,7 @@ pub fn redact_key_material(text: &str, key_secret: Option<&str>) -> Vec<String> 
 pub fn render_status_page<V: 'static>(
     status: &BackendStatus,
     key_secret: Option<&str>,
-    on_retry: impl Fn(&mut V, &ClickEvent, &mut Window, &mut Context<V>) + 'static + Clone,
+    on_retry: impl Fn(&mut V, &MouseDownEvent, &mut Window, &mut Context<V>) + 'static + Clone,
     cx: &mut Context<V>,
 ) -> AnyElement {
     match status {

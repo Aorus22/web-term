@@ -1,13 +1,9 @@
 //! Window state geometry restoration and debounced persistence.
 
 use std::sync::Arc;
-use std::time::Duration;
 use gpui::*;
 use parking_lot::Mutex;
 use webterm_settings::{DesktopSettings, WindowState};
-
-/// Debounce interval for window geometry saves.
-pub const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(1000);
 
 /// Restore window geometry from persisted settings.
 pub fn restore(settings: &DesktopSettings) -> Option<WindowBounds> {
@@ -46,16 +42,16 @@ pub fn restore(settings: &DesktopSettings) -> Option<WindowBounds> {
 /// Helper to extract WindowState from current Window state.
 pub fn extract_window_state(window: &Window) -> Option<WindowState> {
     let bounds = window.bounds();
-    let width = bounds.size.width.0 as u32;
-    let height = bounds.size.height.0 as u32;
+    let width = (bounds.size.width / px(1.0)) as u32;
+    let height = (bounds.size.height / px(1.0)) as u32;
 
     // Degenerate geometry guard
     if width == 0 || height == 0 {
         return None;
     }
 
-    let x = bounds.origin.x.0 as i32;
-    let y = bounds.origin.y.0 as i32;
+    let x = (bounds.origin.x / px(1.0)) as i32;
+    let y = (bounds.origin.y / px(1.0)) as i32;
     let maximized = window.is_maximized();
 
     Some(WindowState {

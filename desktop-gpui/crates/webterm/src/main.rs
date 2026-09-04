@@ -14,17 +14,6 @@ use webterm_settings::DesktopSettings;
 use webterm_supervisor::SpawnOptions;
 use app_state::AppState;
 
-/// Application wrapper helper providing `Application::new` compatibility.
-pub struct ApplicationHelper;
-
-impl ApplicationHelper {
-    /// Create a new GPUI application with the native platform.
-    pub fn new() -> Application {
-        let platform = gpui_platform::current_platform(false);
-        Application::with_platform(platform)
-    }
-}
-
 fn resolve_backend_path(settings: &DesktopSettings) -> PathBuf {
     if let Some(ref path) = settings.backend_path {
         return path.clone();
@@ -71,12 +60,11 @@ fn main() {
 
     let settings_arc = Arc::new(Mutex::new(settings.clone()));
 
-    // 3. Launch GPUI application via Application::new helper
-    ApplicationHelper::new().run(move |cx: &mut App| {
+    // 3. Launch GPUI application
+    Application::with_platform(gpui_platform::current_platform(false)).run(move |cx: &mut App| {
         // Register bundled monospace font asset
         let font_bytes: &'static [u8] = include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf");
-        let font_data = Arc::new(Cow::Borrowed(font_bytes));
-        let _ = cx.text_system().add_fonts(vec![font_data]);
+        let _ = cx.text_system().add_fonts(vec![Cow::Borrowed(font_bytes)]);
 
         // Initialize gpui-component subsystem
         gpui_component::init(cx);

@@ -401,7 +401,7 @@ impl Supervisor {
             if resp.status().is_success() {
                 let port = probe_url
                     .split(':')
-                    .last()?
+                    .next_back()?
                     .split('/')
                     .next()?
                     .parse::<u16>()
