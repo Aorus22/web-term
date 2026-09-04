@@ -1,7 +1,10 @@
 use std::time::Duration;
 use thiserror::Error;
 use crate::terminal_ws::{normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsConnectRequest};
-use crate::types::{Connection, SessionInfo, Settings};
+use crate::types::{
+    Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SessionInfo, Settings,
+    SshKey, UpdateConnectionRequest,
+};
 
 #[derive(Debug, Error)]
 pub enum ClientError {
@@ -103,6 +106,234 @@ impl BackendClient {
             url,
             source: e,
         })
+    }
+
+    /// Fetch single connection from GET /api/connections/:id.
+    pub async fn get_connection(&self, id: &str) -> Result<Connection, ClientError> {
+        let url = format!("{}/api/connections/{}", self.base_url, id);
+        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Connection>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Create new connection via POST /api/connections.
+    pub async fn create_connection(
+        &self,
+        req: &CreateConnectionRequest,
+    ) -> Result<Connection, ClientError> {
+        let url = format!("{}/api/connections", self.base_url);
+        let resp = self
+            .http
+            .post(&url)
+            .json(req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Connection>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Update existing connection via PUT /api/connections/:id.
+    pub async fn update_connection(
+        &self,
+        id: &str,
+        req: &UpdateConnectionRequest,
+    ) -> Result<Connection, ClientError> {
+        let url = format!("{}/api/connections/{}", self.base_url, id);
+        let resp = self
+            .http
+            .put(&url)
+            .json(req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Connection>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Delete connection via DELETE /api/connections/:id.
+    pub async fn delete_connection(&self, id: &str) -> Result<(), ClientError> {
+        let url = format!("{}/api/connections/{}", self.base_url, id);
+        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Export all connections via GET /api/connections/export.
+    pub async fn export_connections(&self) -> Result<Vec<Connection>, ClientError> {
+        let url = format!("{}/api/connections/export", self.base_url);
+        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Vec<Connection>>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Import connections via POST /api/connections/import.
+    pub async fn import_connections(
+        &self,
+        req: &[Connection],
+    ) -> Result<ImportResult, ClientError> {
+        let url = format!("{}/api/connections/import", self.base_url);
+        let resp = self
+            .http
+            .post(&url)
+            .json(req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<ImportResult>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Fetch SSH keys list from GET /api/keys.
+    pub async fn list_keys(&self) -> Result<Vec<SshKey>, ClientError> {
+        let url = format!("{}/api/keys", self.base_url);
+        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Vec<SshKey>>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Fetch single SSH key from GET /api/keys/:id.
+    pub async fn get_key(&self, id: &str) -> Result<SshKey, ClientError> {
+        let url = format!("{}/api/keys/{}", self.base_url, id);
+        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<SshKey>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Create new SSH key via POST /api/keys.
+    pub async fn create_key(&self, req: &CreateKeyRequest) -> Result<SshKey, ClientError> {
+        let url = format!("{}/api/keys", self.base_url);
+        let resp = self
+            .http
+            .post(&url)
+            .json(req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<SshKey>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Delete SSH key via DELETE /api/keys/:id.
+    pub async fn delete_key(&self, id: &str) -> Result<(), ClientError> {
+        let url = format!("{}/api/keys/{}", self.base_url, id);
+        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(())
     }
 
     /// Fetch active backend sessions from GET /api/sessions.

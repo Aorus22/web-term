@@ -13,7 +13,10 @@ pub use terminal_ws::{
     normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsAttachRequest,
     WsConnectRequest, WsServerResponse, WsStatus,
 };
-pub use types::{Connection, SessionInfo, Settings};
+pub use types::{
+    Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SessionInfo, Settings,
+    SshKey, UpdateConnectionRequest,
+};
 
 #[cfg(test)]
 mod tests {
