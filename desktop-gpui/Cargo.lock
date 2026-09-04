@@ -7716,6 +7716,7 @@ dependencies = [
  "webterm-backend-client",
  "webterm-settings",
  "webterm-supervisor",
+ "webterm-terminal",
 ]
 
 [[package]]

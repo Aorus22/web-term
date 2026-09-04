@@ -23,6 +23,20 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
     let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
 
+    if app.active_terminal.is_none() {
+        let term = cx.new(|cx| {
+            let mut terminal = webterm_terminal::Terminal::new(80, 24);
+            terminal.process_bytes(
+                b"\x1b[32m\x1b[1mWebTerm Desktop Terminal v0.5.0\x1b[0m\r\n\
+                \x1b[36mAlacritty GPUI rendering engine initialized.\x1b[0m\r\n\
+                \x1b[90mSession and SSH tab manager arrives in Phase 22.\x1b[0m\r\n\r\n$ ",
+            );
+            webterm_terminal::TerminalView::new(terminal, cx)
+        });
+        app.active_terminal = Some(term);
+    }
+    let active_terminal = app.active_terminal.clone();
+
     div()
         .flex()
         .size_full()
@@ -114,15 +128,19 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .child(if active_view == View::Settings {
                     crate::views::settings::render_settings_view(app, cx)
                 } else {
-                    render_content_pane(active_view, is_dark)
+                    render_content_pane(active_view, is_dark, active_terminal)
                 }),
         )
         .into_any_element()
 }
 
-fn render_content_pane(view: View, is_dark: bool) -> AnyElement {
+fn render_content_pane(
+    view: View,
+    is_dark: bool,
+    active_terminal: Option<Entity<webterm_terminal::TerminalView>>,
+) -> AnyElement {
     let (header, phase_note) = match view {
-        View::Hosts => ("Hosts", "Host connection catalog — arrives in Phase 23"),
+        View::Hosts => ("Hosts & Terminal", "Host connection catalog — arrives in Phase 23"),
         View::Keys => ("SSH Keys", "Key vault and passphrases — arrives in Phase 23"),
         View::Sftp => ("SFTP", "SFTP Dual-Pane File Manager — arrives in Phase 25"),
         View::Settings => ("Settings", "Settings"),
@@ -131,7 +149,7 @@ fn render_content_pane(view: View, is_dark: bool) -> AnyElement {
     let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
     let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
 
-    div()
+    let mut content = div()
         .flex()
         .flex_col()
         .size_full()
@@ -144,7 +162,7 @@ fn render_content_pane(view: View, is_dark: bool) -> AnyElement {
         .child(
             div()
                 .mt_4()
-                .p_6()
+                .p_4()
                 .rounded_lg()
                 .bg(card_bg)
                 .border_1()
@@ -155,6 +173,22 @@ fn render_content_pane(view: View, is_dark: bool) -> AnyElement {
                         .text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) })
                         .child(phase_note),
                 ),
-        )
-        .into_any_element()
+        );
+
+    if view == View::Hosts {
+        if let Some(terminal) = active_terminal {
+            content = content.child(
+                div()
+                    .flex_1()
+                    .mt_4()
+                    .rounded_lg()
+                    .border_1()
+                    .border_color(border_color)
+                    .overflow_hidden()
+                    .child(terminal),
+            );
+        }
+    }
+
+    content.into_any_element()
 }

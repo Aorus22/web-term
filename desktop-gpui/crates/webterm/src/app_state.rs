@@ -6,6 +6,8 @@ use webterm_settings::{DesktopSettings, Theme as SettingsTheme};
 use webterm_supervisor::{BackendStatus, SpawnOptions, Supervisor};
 use crate::views::{nav::render_nav_shell, status::render_status_page};
 
+use webterm_terminal::TerminalView;
+
 /// Active view in the main content area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
@@ -23,6 +25,7 @@ pub struct AppState {
     pub active_view: View,
     pub settings: DesktopSettings,
     pub spawn_opts: Option<SpawnOptions>,
+    pub active_terminal: Option<Entity<TerminalView>>,
 }
 
 use std::sync::LazyLock;
@@ -52,6 +55,7 @@ impl AppState {
             active_view: View::Hosts,
             settings,
             spawn_opts,
+            active_terminal: None,
         }
     }
 

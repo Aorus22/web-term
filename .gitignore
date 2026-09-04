@@ -34,4 +34,5 @@ Thumbs.db
 .env
 *.db
 .serenabe/storage/
+.freebuff/
 squashfs-root/
