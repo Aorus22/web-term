@@ -3,7 +3,7 @@
 use std::sync::LazyLock;
 use gpui::*;
 use webterm_backend_client::{
-    BackendClient, Connection, CreateConnectionRequest, ImportResult, SshKey,
+    BackendClient, Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SshKey,
     TerminalWsHandle, UpdateConnectionRequest, WsConnectRequest,
 };
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
@@ -11,6 +11,32 @@ use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
 
 use crate::session::{SessionStatus, TerminalSessionManager, TerminalTab};
 use crate::views::{nav::render_nav_shell, status::render_status_page};
+
+/// Standard RFC 4648 Base64 encoding for PEM payloads.
+pub fn encode_base64(bytes: &[u8]) -> String {
+    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = if chunk.len() > 1 { chunk[1] } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] } else { 0 };
+
+        let n = ((b0 as u32) << 16) | ((b1 as u32) << 8) | (b2 as u32);
+        out.push(CHARSET[((n >> 18) & 63) as usize] as char);
+        out.push(CHARSET[((n >> 12) & 63) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(CHARSET[((n >> 6) & 63) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if chunk.len() > 2 {
+            out.push(CHARSET[(n & 63) as usize] as char);
+        } else {
+            out.push('=');
+        }
+    }
+    out
+}
 
 /// Mode of the Connection modal: Create or Edit with connection ID.
 #[derive(Debug, Clone, PartialEq)]
@@ -183,6 +209,14 @@ pub struct AppState {
     pub show_import_modal: bool,
     pub import_payload: String,
     pub notification: Option<String>,
+    pub show_add_key_modal: bool,
+    pub new_key_name: String,
+    pub new_key_pem: String,
+    pub add_key_error: Option<String>,
+    pub pending_passphrase_conn: Option<(String, String)>,
+    pub passphrase_input: String,
+    pub passphrase_error: Option<String>,
+    pub passphrase_cache: std::collections::HashMap<String, String>,
 }
 
 impl AppState {
@@ -213,6 +247,14 @@ impl AppState {
             show_import_modal: false,
             import_payload: String::new(),
             notification: None,
+            show_add_key_modal: false,
+            new_key_name: String::new(),
+            new_key_pem: String::new(),
+            add_key_error: None,
+            pending_passphrase_conn: None,
+            passphrase_input: String::new(),
+            passphrase_error: None,
+            passphrase_cache: std::collections::HashMap::new(),
         }
     }
 
@@ -313,10 +355,225 @@ impl AppState {
             None => return,
         };
 
+        if conn.auth_method == "key" {
+            if let Some(key_id) = &conn.ssh_key_id {
+                if let Some(cached_pass) = self.passphrase_cache.get(key_id).cloned() {
+                    self.connect_to_host_with_passphrase(conn_id, Some(&cached_pass), cx);
+                    return;
+                }
+            }
+        }
+
+        self.connect_to_host_with_passphrase(conn_id, None, cx);
+    }
+
+    /// Connect to a saved host with an optional key passphrase.
+    pub fn connect_to_host_with_passphrase(
+        &mut self,
+        conn_id: &str,
+        passphrase: Option<&str>,
+        cx: &mut Context<Self>,
+    ) {
+        let conn = match self.connections.iter().find(|c| c.id == conn_id).cloned() {
+            Some(c) => c,
+            None => return,
+        };
+
         let title = format!("{} ({}:{})", conn.label, conn.host, conn.port);
-        let req = WsConnectRequest::for_saved_connection(&conn.id, 80, 24);
+        let mut req = WsConnectRequest::for_saved_connection(&conn.id, 80, 24);
+        if let Some(pass) = passphrase {
+            req.passphrase = Some(pass.to_string());
+        }
         self.show_hosts_catalog = false;
         self.open_ssh_tab(req, &title, cx);
+    }
+
+    /// Prompt user for passphrase before connecting with an encrypted SSH key.
+    pub fn prompt_passphrase_for_connection(
+        &mut self,
+        conn_id: &str,
+        key_id: &str,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(cached_pass) = self.passphrase_cache.get(key_id).cloned() {
+            self.connect_to_host_with_passphrase(conn_id, Some(&cached_pass), cx);
+            return;
+        }
+
+        self.pending_passphrase_conn = Some((conn_id.to_string(), key_id.to_string()));
+        self.passphrase_input.clear();
+        self.passphrase_error = None;
+        cx.notify();
+    }
+
+    /// Submit passphrase entered in PassphraseModal, caching it in memory for this session.
+    pub fn submit_passphrase(&mut self, cx: &mut Context<Self>) {
+        let (conn_id, key_id) = match self.pending_passphrase_conn.take() {
+            Some(pair) => pair,
+            None => return,
+        };
+
+        let pass = self.passphrase_input.trim().to_string();
+        if !pass.is_empty() {
+            self.passphrase_cache.insert(key_id, pass.clone());
+        }
+
+        self.passphrase_input.clear();
+        self.passphrase_error = None;
+        self.connect_to_host_with_passphrase(&conn_id, Some(&pass), cx);
+        cx.notify();
+    }
+
+    /// Cancel passphrase entry dialog.
+    pub fn cancel_passphrase(&mut self, cx: &mut Context<Self>) {
+        self.pending_passphrase_conn = None;
+        self.passphrase_input.clear();
+        self.passphrase_error = None;
+        cx.notify();
+    }
+
+    /// Open Add SSH Key modal dialog.
+    pub fn open_add_key_modal(&mut self, cx: &mut Context<Self>) {
+        self.show_add_key_modal = true;
+        self.new_key_name.clear();
+        self.new_key_pem.clear();
+        self.add_key_error = None;
+        cx.notify();
+    }
+
+    /// Close Add SSH Key modal dialog.
+    pub fn close_add_key_modal(&mut self, cx: &mut Context<Self>) {
+        self.show_add_key_modal = false;
+        self.new_key_name.clear();
+        self.new_key_pem.clear();
+        self.add_key_error = None;
+        cx.notify();
+    }
+
+    /// Upload and save new SSH Key to backend pool.
+    pub fn create_ssh_key(&mut self, cx: &mut Context<Self>) {
+        if self.new_key_name.trim().is_empty() {
+            self.add_key_error = Some("Key name is required".to_string());
+            cx.notify();
+            return;
+        }
+
+        if self.new_key_pem.trim().is_empty() {
+            self.add_key_error = Some("Private key PEM content is required".to_string());
+            cx.notify();
+            return;
+        }
+
+        self.add_key_error = None;
+
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => {
+                self.add_key_error = Some("Backend client is not connected".to_string());
+                cx.notify();
+                return;
+            }
+        };
+
+        let name = self.new_key_name.trim().to_string();
+        let key_base64 = encode_base64(self.new_key_pem.trim().as_bytes());
+        let req = CreateKeyRequest { name, key_base64 };
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<SshKey, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.create_key(&req).await {
+                Ok(k) => {
+                    let _ = tx.send(Ok(k));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(key) => {
+                                        this.show_add_key_modal = false;
+                                        this.new_key_name.clear();
+                                        this.new_key_pem.clear();
+                                        this.notification = Some(format!("SSH Key '{}' added", key.name));
+                                        this.fetch_ssh_keys(cx);
+                                    }
+                                    Err(e) => {
+                                        this.add_key_error = Some(format!("Failed to add key: {e}"));
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Delete SSH key by ID.
+    pub fn delete_ssh_key(&mut self, id: &str, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let id_str = id.to_string();
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.delete_key(&id_str).await {
+                Ok(_) => {
+                    let _ = tx.send(Ok(()));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        self.ssh_keys.retain(|k| k.id != id);
+        self.passphrase_cache.remove(id);
+        cx.notify();
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(()) => {
+                                        this.notification = Some("SSH Key deleted".to_string());
+                                    }
+                                    Err(e) => {
+                                        this.notification = Some(format!("Delete key failed: {e}"));
+                                        this.fetch_ssh_keys(cx);
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
     }
 
     /// Set search filter query.

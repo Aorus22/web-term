@@ -1,7 +1,9 @@
 pub mod connection_modal;
 pub mod hosts;
+pub mod keys;
 pub mod nav;
 pub mod new_tab_modal;
+pub mod passphrase_modal;
 pub mod reconnect_banner;
 pub mod settings;
 pub mod status;

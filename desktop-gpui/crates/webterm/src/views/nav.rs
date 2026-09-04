@@ -56,6 +56,18 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         None
     };
 
+    let add_key_modal_overlay = if app.show_add_key_modal {
+        Some(crate::views::keys::render_add_key_modal(app, cx))
+    } else {
+        None
+    };
+
+    let passphrase_modal_overlay = if app.pending_passphrase_conn.is_some() {
+        Some(crate::views::passphrase_modal::render_passphrase_modal(app, cx))
+    } else {
+        None
+    };
+
     let notification_toast = app.notification.clone().map(|msg| {
         div()
             .absolute()
@@ -227,6 +239,8 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .children(modal_overlay)
         .children(conn_modal_overlay)
         .children(import_modal_overlay)
+        .children(add_key_modal_overlay)
+        .children(passphrase_modal_overlay)
         .children(notification_toast)
         .into_any_element()
 }
@@ -292,6 +306,20 @@ fn render_content_pane(
                         .overflow_hidden()
                         .child(host_or_term)
                 }),
+        );
+    } else if view == View::Keys {
+        content = content.child(
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .mt_4()
+                .rounded_lg()
+                .bg(card_bg)
+                .border_1()
+                .border_color(border_color)
+                .overflow_hidden()
+                .child(crate::views::keys::render_keys_view(app, cx)),
         );
     } else {
         content = content.child(
