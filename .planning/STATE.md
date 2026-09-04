@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v0.5.0
 milestone_name: Desktop GPUI Client
-status: executing
-last_updated: "2026-09-05T00:10:00.000Z"
+status: completed
+last_updated: "2026-09-05T06:35:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 26
-  completed_plans: 23
-  percent: 88
+  completed_plans: 26
+  percent: 100
 ---
 
 performance_metrics:
   velocity:
-    total_plans_completed: 65
+    total_plans_completed: 68
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -33,6 +33,7 @@ performance_metrics:
     - { phase: "24-local-terminal-cross-platform-pty", plans: 3, total_min: 35, avg_min: 11.7 }
     - { phase: "25-sftp-dual-pane-manager", plans: 3, total_min: 45, avg_min: 15 }
     - { phase: "26-port-forwarding-settings-theme-polish", plans: 2, total_min: 30, avg_min: 15 }
+    - { phase: "27-parity-audit-desktop-hardening", plans: 3, total_min: 45, avg_min: 15 }
 
 quick_tasks:
   completed:
@@ -85,11 +86,16 @@ accumulated_context:
     - "Phase 26: Added port forwarding REST endpoints and GPUI management UI with live start/stop, presets, and directional port mapping"
     - "Phase 26: Enforced SET-01 architectural rule: Desktop settings features a fixed Alacritty Terminal card with strictly NO engine selector dropdown"
     - "Phase 26: Added TerminalView::set_palette for mid-session live color palette synchronization across all active terminal sessions"
+    - "Phase 27: Completed full parity audit matrix (PARITY-MATRIX.md) verifying 22/22 web features and 30/30 desktop requirements"
+    - "Phase 27: Added supervisor child exit monitor loop transitioning to BackendStatus::Crashed on process death"
+    - "Phase 27: Verified bounded memory under heavy burst streaming (>10,000 lines/sec) with fixed scrollback cap"
+    - "Phase 27: Enforced WEBTERM_HOST=127.0.0.1 loopback binding on backend supervisor"
+    - "Phase 27: Implemented adjacent binary bundle resolution and distribution packaging scripts for Windows and Linux"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
     - "v0.4.0: Local Terminal & SFTP"
-    - "v0.5.0: Desktop GPUI Client — roadmap created with Phases 20-27"
+    - "v0.5.0: Desktop GPUI Client — roadmap created with Phases 20-27 (ALL 8 PHASES COMPLETE)"
     - "Phase 17 added: Sync terminal theme selection to overall application theme"
     - "Phase 18 added: Terminal Engine Selector: Allow users to switch between @wterm/react and xterm.js in settings"
   pending_todos: []
@@ -97,14 +103,14 @@ accumulated_context:
 deferred_items: []
 session_continuity:
   last_session: 2026-09-05
-  stopped_at: Completed Phase 26
+  stopped_at: Completed Milestone v0.5.0 (All 8 phases completed and verified)
   resume_file: null
-  next_step: Plan Phase 27 — Parity Audit & Desktop Hardening
+  next_step: Milestone complete — ready for release or next milestone cycle
 
 ## Current Position
 
-Phase: Phase 27 (Parity Audit & Desktop Hardening)
-Plan: Ready to plan
-Status: Advancing to Phase 27
-Last activity: 2026-09-05 — Completed Phase 26 (Port Forwarding, Settings & Theme Polish)
+Phase: Complete (Milestone v0.5.0 Desktop GPUI Client — 100% complete)
+Plan: Complete (26/26 plans executed across 8 phases)
+Status: Milestone v0.5.0 Completed
+Last activity: 2026-09-05 — Completed Phase 27 (Parity Audit & Desktop Hardening)
 

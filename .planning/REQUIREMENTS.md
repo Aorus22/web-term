@@ -54,9 +54,9 @@ Requirements for the desktop client. Each maps to roadmap phases.
 
 ### Quality & Packaging
 
-- [ ] **QA-01**: App runs on Windows 10/11 and Linux (X11/Wayland)
-- [ ] **QA-02**: A parity audit verifies every validated v0.2–v0.4 requirement against the desktop app
-- [ ] **QA-03**: App ships as a single launchable bundle with the backend bound to loopback only
+- [x] **QA-01**: App runs on Windows 10/11 and Linux (X11/Wayland)
+- [x] **QA-02**: A parity audit verifies every validated v0.2–v0.4 requirement against the desktop app
+- [x] **QA-03**: App ships as a single launchable bundle with the backend bound to loopback only
 
 ## Future Requirements
 
@@ -121,9 +121,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SFTP-04 | Phase 25 | Satisfied |
 | FWD-01 | Phase 26 | Satisfied |
 | SET-01 | Phase 26 | Satisfied |
-| QA-01 | Phase 27 | Pending |
-| QA-02 | Phase 27 | Pending |
-| QA-03 | Phase 27 | Pending |
+| QA-01 | Phase 27 | Satisfied |
+| QA-02 | Phase 27 | Satisfied |
+| QA-03 | Phase 27 | Satisfied |
 
 **Coverage:**
 - v1 requirements: 30 total
@@ -132,4 +132,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-09-04*
-*Last updated: 2026-09-05 after Phase 26 completion*
+*Last updated: 2026-09-05 after Phase 27 completion (Milestone v0.5.0 Complete)*

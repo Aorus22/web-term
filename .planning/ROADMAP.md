@@ -192,13 +192,16 @@ Plans:
   2. Reconnection chaos tests pass (WS drop vs backend kill vs app restart)
   3. Performance holds under heavy terminal output (no UI stall, bounded memory)
   4. The app ships as a single launchable bundle per platform with the backend loopback-only
-- **Plans:** TBD
+- **Plans:** 3/3 plans executed
+- [x] 27-01-PLAN.md
+- [x] 27-02-PLAN.md
+- [x] 27-03-PLAN.md
 
 Plans:
 
-- [ ] 27-01: Parity audit matrix execution vs PROJECT.md validated list
-- [ ] 27-02: Chaos + performance testing pass
-- [ ] 27-03: Packaging/installers (Windows + Linux) + loopback enforcement verification
+- [x] 27-01: Parity audit matrix execution vs PROJECT.md validated list (QA-02)
+- [x] 27-02: Chaos + performance testing pass (QA-01)
+- [x] 27-03: Packaging/installers (Windows + Linux) + loopback enforcement verification (QA-03)
 
 ## Progress
 
@@ -211,7 +214,7 @@ Plans:
 | 24. Local Terminal (Cross-Platform PTY) | 3/3 | Complete | 2026-09-05 |
 | 25. SFTP Dual-Pane Manager | 3/3 | Complete | 2026-09-05 |
 | 26. Port Forwarding, Settings & Theme Polish | 2/2 | Complete | 2026-09-05 |
-| 27. Parity Audit & Desktop Hardening | 0/3 | Not started | - |
+| 27. Parity Audit & Desktop Hardening | 3/3 | Complete | 2026-09-05 |
 
 **Validation:** 30 requirements mapped across 8 phases — coverage complete, every REQ mapped to exactly one phase ✓ (TERM-05 primary mapping: Phase 24)
 
