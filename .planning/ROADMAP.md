@@ -67,10 +67,13 @@ Plans:
   3. Scrollback works (reviewable history after full-screen output)
   4. Resizing the view keeps the grid in sync (resize callback fires with cols/rows)
   5. Spike verdict recorded: gpui-terminal validated OR vendored Zed-pattern fallback implemented behind the terminal crate boundary
-- **Plans:** TBD
+- **Plans:** 3 plans
 
 Plans:
 
+- [ ] 21-01-PLAN.md
+- [ ] 21-02-PLAN.md
+- [ ] 21-03-PLAN.md
 - [ ] 21-01: Timeboxed spike on gpui-terminal (selection + scrollback against vim/htop) with go/no-go report
 - [ ] 21-02: Terminal state layer (alacritty_terminal Term, parser, scrollback) behind the crates/terminal boundary
 - [ ] 21-03: GPUI renderer (glyph batching, palette, cursor) + input mapping (keystroke → escape sequences)
