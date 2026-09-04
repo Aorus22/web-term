@@ -3,11 +3,13 @@
 mod app_state;
 mod theme;
 mod views;
+mod window_state;
 
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 use gpui::*;
+use parking_lot::Mutex;
 use webterm_settings::DesktopSettings;
 use webterm_supervisor::SpawnOptions;
 use app_state::AppState;
@@ -59,7 +61,17 @@ fn main() {
 
     let spawn_opts = SpawnOptions::new(backend_path, db_path, encryption_key).ok();
 
-    // 2. Launch GPUI application via Application::new helper
+    // 2. Initial window geometry restored via window_state module
+    let initial_bounds = window_state::restore(&settings).unwrap_or_else(|| {
+        WindowBounds::Windowed(Bounds {
+            origin: Point::default(),
+            size: size(px(1200.0), px(800.0)),
+        })
+    });
+
+    let settings_arc = Arc::new(Mutex::new(settings.clone()));
+
+    // 3. Launch GPUI application via Application::new helper
     ApplicationHelper::new().run(move |cx: &mut App| {
         // Register bundled monospace font asset
         let font_bytes: &'static [u8] = include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf");
@@ -71,10 +83,7 @@ fn main() {
         theme::apply_theme(settings.theme, cx);
 
         let window_options = WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(Bounds {
-                origin: Point::default(),
-                size: size(px(1200.0), px(800.0)),
-            })),
+            window_bounds: Some(initial_bounds),
             titlebar: Some(TitlebarOptions {
                 title: Some("WebTerm Desktop".into()),
                 ..Default::default()
@@ -82,7 +91,10 @@ fn main() {
             ..Default::default()
         };
 
-        let _ = cx.open_window(window_options, move |_window, cx| {
+        let settings_for_observe = settings_arc.clone();
+        let _ = cx.open_window(window_options, move |window, cx| {
+            window_state::observe(window, settings_for_observe, cx);
+
             let app_state = cx.new(|_cx| AppState::new(settings, spawn_opts));
             app_state.update(cx, |this, cx| {
                 this.start_supervisor(cx);
