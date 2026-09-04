@@ -7,6 +7,7 @@ use crate::actions::{
     JumpTab9, NewTab, NextTab, PrevTab,
 };
 use crate::app_state::{AppState, View};
+use crate::views::new_tab_modal::render_new_tab_modal;
 use crate::views::reconnect_banner::render_reconnect_banner;
 use crate::views::tab_strip::render_tab_strip;
 
@@ -29,7 +30,21 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
     let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
 
+    let show_modal = app.show_new_tab_modal;
+    let content_pane = if active_view == View::Settings {
+        crate::views::settings::render_settings_view(app, cx)
+    } else {
+        render_content_pane(app, active_view, is_dark, cx)
+    };
+
+    let modal_overlay = if show_modal {
+        Some(render_new_tab_modal(app, cx))
+    } else {
+        None
+    };
+
     div()
+        .relative()
         .flex()
         .size_full()
         .bg(bg_color)
@@ -37,7 +52,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .font_family("JetBrains Mono")
         // Tab shortcuts
         .on_action(cx.listener(|this, _: &NewTab, _window, cx| {
-            this.open_local_tab(cx);
+            this.toggle_new_tab_modal(cx);
         }))
         .on_action(cx.listener(|this, _: &CloseTab, _window, cx| {
             let idx = this.session_manager.active_index();
@@ -158,12 +173,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .flex_1()
                 .h_full()
                 .p_6()
-                .child(if active_view == View::Settings {
-                    crate::views::settings::render_settings_view(app, cx)
-                } else {
-                    render_content_pane(app, active_view, is_dark, cx)
-                }),
+                .child(content_pane),
         )
+        .children(modal_overlay)
         .into_any_element()
 }
 
@@ -244,7 +256,7 @@ fn render_content_pane(
                                             .text_color(if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) })
                                             .child("+ Open Terminal (Ctrl+T)")
                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                                this.open_local_tab(cx);
+                                                this.toggle_new_tab_modal(cx);
                                             })),
                                     )
                                     .into_any_element(),

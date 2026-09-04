@@ -122,7 +122,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) })
                 .child("+")
                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                    this.open_local_tab(cx);
+                    this.toggle_new_tab_modal(cx);
                 })),
         )
 }

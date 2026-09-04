@@ -7752,6 +7752,7 @@ dependencies = [
 name = "webterm"
 version = "0.5.0"
 dependencies = [
+ "futures-util",
  "gpui-component",
  "gpui-pre",
  "gpui-pre-platform",
@@ -7759,6 +7760,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tokio-tungstenite",
  "webterm-backend-client",
  "webterm-settings",
  "webterm-supervisor",

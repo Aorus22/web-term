@@ -40,6 +40,11 @@ pub struct AppState {
     pub settings: DesktopSettings,
     pub spawn_opts: Option<SpawnOptions>,
     pub session_manager: TerminalSessionManager,
+    pub show_new_tab_modal: bool,
+    pub new_tab_host: String,
+    pub new_tab_user: String,
+    pub new_tab_port: String,
+    pub new_tab_password: String,
 }
 
 impl AppState {
@@ -54,7 +59,49 @@ impl AppState {
             settings,
             spawn_opts,
             session_manager: TerminalSessionManager::new(),
+            show_new_tab_modal: false,
+            new_tab_host: String::new(),
+            new_tab_user: "root".to_string(),
+            new_tab_port: "22".to_string(),
+            new_tab_password: String::new(),
         }
+    }
+
+    /// Toggle new tab launcher modal.
+    pub fn toggle_new_tab_modal(&mut self, cx: &mut Context<Self>) {
+        self.show_new_tab_modal = !self.show_new_tab_modal;
+        cx.notify();
+    }
+
+    /// Close new tab launcher modal.
+    pub fn close_new_tab_modal(&mut self, cx: &mut Context<Self>) {
+        self.show_new_tab_modal = false;
+        cx.notify();
+    }
+
+    /// Open a quick SSH tab from the new tab launcher modal inputs.
+    pub fn open_quick_ssh_tab(&mut self, cx: &mut Context<Self>) {
+        self.show_new_tab_modal = false;
+        let host = if self.new_tab_host.trim().is_empty() {
+            "localhost".to_string()
+        } else {
+            self.new_tab_host.trim().to_string()
+        };
+        let user = if self.new_tab_user.trim().is_empty() {
+            "root".to_string()
+        } else {
+            self.new_tab_user.trim().to_string()
+        };
+        let port: u16 = self.new_tab_port.trim().parse().unwrap_or(22);
+        let password = if self.new_tab_password.is_empty() {
+            String::new()
+        } else {
+            self.new_tab_password.clone()
+        };
+
+        let title = format!("{user}@{host}:{port}");
+        let req = WsConnectRequest::for_quick_connect(host, port, user, password, 80, 24);
+        self.open_ssh_tab(req, &title, cx);
     }
 
     /// Spawn the supervisor lifecycle in a background thread and observe transitions.
