@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v0.5.0
 milestone_name: Desktop GPUI Client
 status: executing
-last_updated: "2026-09-04T23:30:00.000Z"
-last_activity: 2026-09-04
+last_updated: "2026-09-05T00:10:00.000Z"
+last_activity: 2026-09-05
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 26
-  completed_plans: 7
-  percent: 27
+  completed_plans: 11
+  percent: 42
 ---
 
 performance_metrics:
   velocity:
-    total_plans_completed: 49
+    total_plans_completed: 53
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -28,6 +28,7 @@ performance_metrics:
     - { phase: "19-review-fixes", plans: 1, total_min: 20, avg_min: 20 }
     - { phase: "20-desktop-foundation-backend-integration", plans: 4, total_min: 60, avg_min: 15 }
     - { phase: "21-terminal-rendering-alacritty-engine", plans: 3, total_min: 40, avg_min: 13.3 }
+    - { phase: "22-ssh-terminal-sessions-tabs", plans: 4, total_min: 50, avg_min: 12.5 }
 
 quick_tasks:
   completed:
@@ -57,6 +58,11 @@ accumulated_context:
     - "Phase 21: Used native GPUI clipboard API (cx.write_to_clipboard / cx.read_from_clipboard) for seamless terminal copy/paste"
     - "Phase 21: Implemented background quad coalescing and text run batching for 60+ FPS GPUI rendering"
     - "Phase 21: Mapped mouse click count (1 = simple, 2 = semantic word, 3+ = line) and keystroke escape sequence translation with APP_CURSOR support"
+    - "Phase 22: Pinned tokio-tungstenite = 0.26.2 and futures-util = 0.3.32 to match gpui-pre 0.3.3 futures tree"
+    - "Phase 22: TerminalWsHandle separates binary PTY frames from JSON control frames (ready, resize, get-cwd, disconnect)"
+    - "Phase 22: Exponential backoff reconnect loop (2s, 4s, 6s, 8s, 16s; max 5) paired with GPUI amber countdown banner and re-attachment"
+    - "Phase 22: App restart session persistence in settings.json with detached session re-attach discovery"
+    - "Phase 22: First-class Local Shell launcher modal with single-click start and Quick SSH connection option"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -68,14 +74,14 @@ accumulated_context:
   blockers_concerns: []
 deferred_items: []
 session_continuity:
-  last_session: 2026-09-04
-  stopped_at: Phase 21 completed and verified
+  last_session: 2026-09-05
+  stopped_at: Phase 22 completed and verified
   resume_file: null
-  next_step: Phase 22 — SSH Terminal Sessions & Tabs
+  next_step: Phase 23 — Hosts & SSH Keys Management
 
 ## Current Position
 
-Phase: Phase 22 (SSH Terminal Sessions & Tabs)
+Phase: Phase 23 (Hosts & SSH Keys Management)
 Plan: —
-Status: Ready for Phase 22
-Last activity: 2026-09-04 — Phase 21 (Terminal Rendering - Alacritty Engine) completed and verified
+Status: Ready for Phase 23
+Last activity: 2026-09-05 — Phase 22 (SSH Terminal Sessions & Tabs) completed and verified

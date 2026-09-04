@@ -23,7 +23,7 @@ Build the GPUI desktop client: app shell + backend integration, terminal renderi
 |-------|-----------|-------------|--------|--------|
 | **20. Desktop Foundation & Backend Integration** | v0.5.0 | Cargo workspace, pinned deps + CI, GPUI app shell, backend supervisor + client, startup UX. | ✓ Complete | 2026-09-08 |
 | **21. Terminal Rendering (Alacritty Engine)** | v0.5.0 | gpui-terminal spike with go/no-go; alacritty_terminal state + GPUI render; selection, scrollback, truecolor. | ✓ Complete | 2026-09-10 |
-| **22. SSH Terminal Sessions & Tabs** | v0.5.0 | SSH connect (password/key), multi-tab with status dots, resize sync, shortcuts, reconnection + re-attach. | ○ Not started | 2026-09-14 |
+| **22. SSH Terminal Sessions & Tabs** | v0.5.0 | SSH connect (password/key), multi-tab with status dots, resize sync, shortcuts, reconnection + re-attach. | ✓ Complete | 2026-09-14 |
 | **23. Hosts & SSH Keys Management** | v0.5.0 | Host cards, kebab menus, tags, search, quick-connect, import/export; key pool, passphrase flow, auth method. | ○ Not started | 2026-09-16 |
 | **24. Local Terminal (Cross-Platform PTY)** | v0.5.0 | Local terminal tab on Linux (backend path) + Windows (ConPTY decision with go/no-go). | ○ Not started | 2026-09-18 |
 | **25. SFTP Dual-Pane Manager** | v0.5.0 | Dual-pane browsing, local/remote sources, file ops with streaming, drag-and-drop incl. OS DnD. | ○ Not started | 2026-09-22 |
@@ -92,10 +92,14 @@ Plans:
 
 Plans:
 
-- [ ] 22-01: backend-client WS terminal channel (framing matched to backend protocol, contract tests)
-- [ ] 22-02: Session manager + tab strip with status dots and shortcuts
-- [ ] 22-03: Reconnection UX + session re-attach across app restart
-- [ ] 22-04: Local terminal tab baseline via backend WS (POSIX path; full cross-platform PTY finalization in Phase 24)
+- [x] 22-01-PLAN.md
+- [x] 22-02-PLAN.md
+- [x] 22-03-PLAN.md
+- [x] 22-04-PLAN.md
+- [x] 22-01: backend-client WS terminal channel (framing matched to backend protocol, contract tests)
+- [x] 22-02: Session manager + tab strip with status dots and shortcuts
+- [x] 22-03: Reconnection UX + session re-attach across app restart
+- [x] 22-04: Local terminal tab baseline via backend WS (POSIX path; full cross-platform PTY finalization in Phase 24)
 
 ### Phase 23: Hosts & SSH Keys Management
 

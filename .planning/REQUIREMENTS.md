@@ -12,7 +12,7 @@ Requirements for the desktop client. Each maps to roadmap phases.
 - [x] **SHELL-01**: User can launch WebTerm as a native desktop app that starts the Go backend automatically and reaches a ready window
 - [x] **SHELL-02**: User sees a visible startup state and a clear error if the backend fails to start
 - [x] **SHELL-03**: User can navigate Hosts, SSH Keys, SFTP, and Settings via the sidebar (2-page navigation parity)
-- [ ] **SHELL-04**: User can open, switch, and close multiple terminal tabs with status indicators
+- [x] **SHELL-04**: User can open, switch, and close multiple terminal tabs with status indicators
 - [x] **SHELL-05**: User's dark/light theme applies to the whole app and the terminal, persisting across restarts
 - [x] **SHELL-06**: User's window size/position persists across restarts
 
@@ -22,10 +22,10 @@ Requirements for the desktop client. Each maps to roadmap phases.
 - [x] **TERM-02**: User can select text with the mouse and copy it, and paste into the terminal
 - [x] **TERM-03**: User can scroll through scrollback history
 - [x] **TERM-04**: Terminal resizes with the window and keeps the PTY grid in sync
-- [ ] **TERM-05**: User can open a local terminal tab (shell on the desktop host), first-class in New Tab
-- [ ] **TERM-06**: Terminal sessions reconnect after a WebSocket drop, with reconnection UX
-- [ ] **TERM-07**: Terminal sessions survive an app restart via backend session re-attach
-- [ ] **TERM-08**: Keyboard shortcuts for new tab, close tab, and tab cycling (desktop conventions)
+- [x] **TERM-05**: User can open a local terminal tab (shell on the desktop host), first-class in New Tab
+- [x] **TERM-06**: Terminal sessions reconnect after a WebSocket drop, with reconnection UX
+- [x] **TERM-07**: Terminal sessions survive an app restart via backend session re-attach
+- [x] **TERM-08**: Keyboard shortcuts for new tab, close tab, and tab cycling (desktop conventions)
 
 ### Hosts
 
@@ -103,11 +103,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TERM-02 | Phase 21 | Satisfied |
 | TERM-03 | Phase 21 | Satisfied |
 | TERM-04 | Phase 21 | Satisfied |
-| TERM-05 | Phase 24 | Pending |
-| TERM-06 | Phase 22 | Pending |
-| TERM-07 | Phase 22 | Pending |
-| TERM-08 | Phase 22 | Pending |
-| SHELL-04 | Phase 22 | Pending |
+| TERM-05 | Phase 22 | Satisfied |
+| TERM-06 | Phase 22 | Satisfied |
+| TERM-07 | Phase 22 | Satisfied |
+| TERM-08 | Phase 22 | Satisfied |
+| SHELL-04 | Phase 22 | Satisfied |
 | HOSTS-01 | Phase 23 | Pending |
 | HOSTS-02 | Phase 23 | Pending |
 | HOSTS-03 | Phase 23 | Pending |
@@ -119,7 +119,6 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SFTP-02 | Phase 25 | Pending |
 | SFTP-03 | Phase 25 | Pending |
 | SFTP-04 | Phase 25 | Pending |
-| TERM-05 | Phase 24 | Pending |
 | FWD-01 | Phase 26 | Pending |
 | SET-01 | Phase 26 | Pending |
 | QA-01 | Phase 27 | Pending |
