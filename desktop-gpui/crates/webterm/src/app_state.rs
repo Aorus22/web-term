@@ -1206,8 +1206,13 @@ impl AppState {
         let _ = self.settings.save();
     }
 
-    /// Open a new local shell terminal tab.
+    /// Open a new local shell terminal tab using the default working directory.
     pub fn open_local_tab(&mut self, cx: &mut Context<Self>) {
+        self.open_local_tab_with_cwd(None, cx);
+    }
+
+    /// Open a new local shell terminal tab with an optional initial working directory.
+    pub fn open_local_tab_with_cwd(&mut self, cwd: Option<String>, cx: &mut Context<Self>) {
         let client = match self.client.clone() {
             Some(c) => c,
             None => return,
@@ -1215,7 +1220,7 @@ impl AppState {
 
         let tab_id = self.session_manager.alloc_tab_id();
         let is_dark = self.theme != SettingsTheme::Light;
-        let tab = TerminalTab::new(
+        let mut tab = TerminalTab::new(
             tab_id,
             "Local Shell",
             "local",
@@ -1223,6 +1228,8 @@ impl AppState {
             is_dark,
             cx,
         );
+        let connect_req = WsConnectRequest::for_local_with_cwd(80, 24, cwd);
+        tab.last_connect_req = Some(connect_req.clone());
         self.show_hosts_catalog = false;
         self.session_manager.add_tab(tab);
         cx.notify();
@@ -1231,8 +1238,7 @@ impl AppState {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<TerminalWsHandle, String>>();
 
         TOKIO_RT.spawn(async move {
-            let req = WsConnectRequest::for_local(80, 24);
-            match client.connect_terminal(req).await {
+            match client.connect_terminal(connect_req).await {
                 Ok(handle) => {
                     let _ = tx.send(Ok(handle));
                 }

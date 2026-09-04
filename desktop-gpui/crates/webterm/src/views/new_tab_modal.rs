@@ -100,22 +100,45 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .child(
                             div()
                                 .flex()
+                                .flex_row()
                                 .items_center()
-                                .gap_2()
-                                .child(div().text_lg().child("💻"))
+                                .justify_between()
                                 .child(
                                     div()
-                                        .text_base()
-                                        .font_weight(FontWeight::BOLD)
-                                        .text_color(text_color)
-                                        .child("Local Shell (Recommended)"),
+                                        .flex()
+                                        .items_center()
+                                        .gap_2()
+                                        .child(div().text_lg().child("💻"))
+                                        .child(
+                                            div()
+                                                .text_base()
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_color(text_color)
+                                                .child("Local Shell"),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .px_1p5()
+                                                .py_0p5()
+                                                .rounded_md()
+                                                .bg(if is_dark { rgb(0x0369a1) } else { rgb(0xe0f2fe) })
+                                                .text_color(if is_dark { rgb(0xe0f2fe) } else { rgb(0x0369a1) })
+                                                .child(if cfg!(windows) { "ConPTY" } else { "POSIX PTY" }),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
+                                        .child("Click to launch ➔"),
                                 ),
                         )
                         .child(
                             div()
                                 .text_xs()
                                 .text_color(muted_text)
-                                .child("Launch an interactive shell session directly on your desktop machine"),
+                                .child("Launch an interactive shell session directly on your host machine"),
                         ),
                 )
                 // Divider

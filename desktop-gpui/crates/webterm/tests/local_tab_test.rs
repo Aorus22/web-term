@@ -200,3 +200,47 @@ async fn test_local_shell_mock_ws_stream_and_resize() {
 
     server_task.await.unwrap();
 }
+
+#[test]
+fn test_local_tab_is_local_flag_and_restartability() {
+    let mut local_tab = TerminalTab::new_headless(
+        1,
+        "Local Shell",
+        "local",
+        Some("local".to_string()),
+    );
+    assert!(local_tab.is_local());
+    assert!(!local_tab.is_restartable());
+
+    local_tab.status = SessionStatus::Connected;
+    assert!(!local_tab.is_restartable());
+
+    local_tab.status = SessionStatus::Disconnected(Some("Process exited with code 0".to_string()));
+    assert!(local_tab.is_restartable());
+
+    let ssh_tab = TerminalTab::new_headless(
+        2,
+        "prod-server",
+        "ssh",
+        Some("conn-123".to_string()),
+    );
+    assert!(!ssh_tab.is_local());
+}
+
+#[test]
+fn test_local_tab_with_custom_cwd() {
+    let req = WsConnectRequest::for_local_with_cwd(100, 30, Some("/workspace/project".to_string()));
+    assert_eq!(req.cwd.as_deref(), Some("/workspace/project"));
+    assert_eq!(req.cols, 100);
+    assert_eq!(req.rows, 30);
+
+    let mut tab = TerminalTab::new_headless(
+        10,
+        "Local Shell",
+        "local",
+        Some("local".to_string()),
+    );
+    tab.last_connect_req = Some(req.clone());
+
+    assert_eq!(tab.last_connect_req.as_ref().unwrap().cwd.as_deref(), Some("/workspace/project"));
+}

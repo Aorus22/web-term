@@ -93,6 +93,16 @@ impl TerminalTab {
         self.status == SessionStatus::Connected
     }
 
+    /// Return true if this is a local shell terminal tab.
+    pub fn is_local(&self) -> bool {
+        self.session_type == "local"
+    }
+
+    /// Return true if the session is disconnected and can be restarted.
+    pub fn is_restartable(&self) -> bool {
+        matches!(self.status, SessionStatus::Disconnected(_))
+    }
+
     /// Explicitly disconnect this tab's transport.
     pub fn disconnect(&mut self) {
         if let Some(ref handle) = self.ws_handle {
