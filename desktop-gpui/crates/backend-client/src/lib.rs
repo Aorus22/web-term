@@ -15,7 +15,7 @@ pub use terminal_ws::{
 };
 pub use types::{
     Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SessionInfo, Settings,
-    SshKey, UpdateConnectionRequest,
+    SftpFileInfo, SftpTransferStatus, SshKey, UpdateConnectionRequest,
 };
 
 #[cfg(test)]

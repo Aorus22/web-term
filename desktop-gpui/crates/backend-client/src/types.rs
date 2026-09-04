@@ -114,3 +114,31 @@ pub struct ImportResult {
     pub imported: usize,
     pub skipped: usize,
 }
+
+/// Information about a remote or local file in SFTP browsing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SftpFileInfo {
+    pub name: String,
+    #[serde(default)]
+    pub size: i64,
+    #[serde(default)]
+    pub mode: u32,
+    #[serde(rename = "modTime", default)]
+    pub mod_time: String,
+    #[serde(rename = "isDir", default)]
+    pub is_dir: bool,
+}
+
+/// Status of an active or completed background file transfer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SftpTransferStatus {
+    pub id: String,
+    #[serde(default)]
+    pub bytes_transferred: i64,
+    #[serde(default)]
+    pub total_bytes: i64,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}

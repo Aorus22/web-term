@@ -1,10 +1,12 @@
 //! Root application state, session orchestration, and view routing.
 
+use std::collections::HashSet;
 use std::sync::LazyLock;
 use gpui::*;
 use webterm_backend_client::{
-    BackendClient, Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SshKey,
-    TerminalWsHandle, UpdateConnectionRequest, WsConnectRequest,
+    BackendClient, Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult,
+    SftpFileInfo, SftpTransferStatus, SshKey, TerminalWsHandle, UpdateConnectionRequest,
+    WsConnectRequest,
 };
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
 use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
@@ -171,6 +173,278 @@ pub enum View {
     Settings,
 }
 
+/// Active pane in the dual-pane SFTP manager.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SftpActivePane {
+    Left,
+    Right,
+}
+
+/// Sort column for SFTP file list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SftpSortColumn {
+    Name,
+    Size,
+    ModTime,
+}
+
+/// Sort direction for SFTP file list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SftpSortOrder {
+    Ascending,
+    Descending,
+}
+
+/// State of a single SFTP pane.
+#[derive(Debug, Clone)]
+pub struct SftpPaneState {
+    pub source_id: String,
+    pub source_label: String,
+    pub current_path: String,
+    pub files: Vec<SftpFileInfo>,
+    pub is_loading: bool,
+    pub error: Option<String>,
+    pub selected: HashSet<String>,
+    pub search_query: String,
+    pub show_hidden: bool,
+    pub sort_column: SftpSortColumn,
+    pub sort_order: SftpSortOrder,
+    pub show_source_picker: bool,
+}
+
+impl SftpPaneState {
+    pub fn new(source_id: impl Into<String>, source_label: impl Into<String>, initial_path: impl Into<String>) -> Self {
+        Self {
+            source_id: source_id.into(),
+            source_label: source_label.into(),
+            current_path: initial_path.into(),
+            files: Vec::new(),
+            is_loading: false,
+            error: None,
+            selected: HashSet::new(),
+            search_query: String::new(),
+            show_hidden: false,
+            sort_column: SftpSortColumn::Name,
+            sort_order: SftpSortOrder::Ascending,
+            show_source_picker: false,
+        }
+    }
+
+    /// Return filtered and sorted files according to search_query, show_hidden, and sort column/order.
+    pub fn visible_files(&self) -> Vec<SftpFileInfo> {
+        let mut list: Vec<SftpFileInfo> = self
+            .files
+            .iter()
+            .filter(|f| {
+                if !self.show_hidden && f.name.starts_with('.') {
+                    return false;
+                }
+                if !self.search_query.is_empty()
+                    && !f.name.to_lowercase().contains(&self.search_query.to_lowercase())
+                {
+                    return false;
+                }
+                true
+            })
+            .cloned()
+            .collect();
+
+        list.sort_by(|a, b| {
+            if a.is_dir != b.is_dir {
+                return b.is_dir.cmp(&a.is_dir);
+            }
+            let ord = match self.sort_column {
+                SftpSortColumn::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                SftpSortColumn::Size => a.size.cmp(&b.size),
+                SftpSortColumn::ModTime => a.mod_time.cmp(&b.mod_time),
+            };
+            match self.sort_order {
+                SftpSortOrder::Ascending => ord,
+                SftpSortOrder::Descending => ord.reverse(),
+            }
+        });
+
+        list
+    }
+}
+
+/// Modal state for SFTP file operations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SftpModalState {
+    NewFolder { pane: SftpActivePane, name: String },
+    Rename { pane: SftpActivePane, old_name: String, new_name: String },
+    DeleteConfirm { pane: SftpActivePane, targets: Vec<String> },
+    Conflict {
+        src_pane: SftpActivePane,
+        dst_pane: SftpActivePane,
+        conflict_name: String,
+        remaining_transfers: Vec<String>,
+    },
+}
+
+/// Transfer item tracking an active or past transfer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SftpTransferItem {
+    pub id: String,
+    pub name: String,
+    pub from_source: String,
+    pub to_source: String,
+    pub bytes_transferred: i64,
+    pub total_bytes: i64,
+    pub status: String,
+    pub error: Option<String>,
+}
+
+impl From<SftpTransferStatus> for SftpTransferItem {
+    fn from(st: SftpTransferStatus) -> Self {
+        Self {
+            id: st.id,
+            name: "Transfer".to_string(),
+            from_source: String::new(),
+            to_source: String::new(),
+            bytes_transferred: st.bytes_transferred,
+            total_bytes: st.total_bytes,
+            status: st.status,
+            error: st.error,
+        }
+    }
+}
+
+
+/// Manager state orchestrating both panes, modals, and transfers.
+#[derive(Debug, Clone)]
+pub struct SftpManager {
+    pub left_pane: SftpPaneState,
+    pub right_pane: SftpPaneState,
+    pub focused_pane: SftpActivePane,
+    pub modal: Option<SftpModalState>,
+    pub transfers: Vec<SftpTransferItem>,
+    pub transfers_drawer_open: bool,
+}
+
+impl Default for SftpManager {
+    fn default() -> Self {
+        Self {
+            left_pane: SftpPaneState::new("local", "Local Filesystem", "."),
+            right_pane: SftpPaneState::new("local", "Local Filesystem", "."),
+            focused_pane: SftpActivePane::Left,
+            modal: None,
+            transfers: Vec::new(),
+            transfers_drawer_open: false,
+        }
+    }
+}
+
+/// Split a file path into clickable breadcrumb (segment_label, absolute_path_to_segment) pairs.
+pub fn split_breadcrumbs(path: &str) -> Vec<(String, String)> {
+    let clean = path.trim();
+    if clean.is_empty() || clean == "." {
+        return vec![(".".to_string(), ".".to_string())];
+    }
+
+    let is_windows = clean.len() >= 2 && clean.chars().nth(1) == Some(':');
+    let normalized = clean.replace('\\', "/");
+    let is_unix_abs = normalized.starts_with('/');
+
+    let mut result = Vec::new();
+
+    if is_windows {
+        let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
+        if let Some(drive) = parts.first() {
+            let mut current_acc = format!("{}/", drive);
+            result.push((drive.to_string(), current_acc.clone()));
+            for part in &parts[1..] {
+                if !current_acc.ends_with('/') {
+                    current_acc.push('/');
+                }
+                current_acc.push_str(part);
+                result.push((part.to_string(), current_acc.clone()));
+            }
+        }
+    } else if is_unix_abs {
+        result.push(("/".to_string(), "/".to_string()));
+        let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
+        let mut current_acc = String::new();
+        for part in parts {
+            current_acc.push('/');
+            current_acc.push_str(part);
+            result.push((part.to_string(), current_acc.clone()));
+        }
+    } else {
+        let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
+        let mut current_acc = String::new();
+        for (i, part) in parts.iter().enumerate() {
+            if i > 0 {
+                current_acc.push('/');
+            }
+            current_acc.push_str(part);
+            result.push((part.to_string(), current_acc.clone()));
+        }
+    }
+
+    if result.is_empty() {
+        vec![(clean.to_string(), clean.to_string())]
+    } else {
+        result
+    }
+}
+
+/// Compute the parent directory for a path.
+pub fn parent_path(path: &str) -> String {
+    let clean = path.trim().replace('\\', "/");
+    if clean.is_empty() || clean == "." || clean == "/" {
+        return clean;
+    }
+    if clean.len() <= 3 && clean.chars().nth(1) == Some(':') {
+        return "/".to_string();
+    }
+    let trimmed = clean.trim_end_matches('/');
+    if let Some(pos) = trimmed.rfind('/') {
+        if pos == 0 {
+            "/".to_string()
+        } else {
+            trimmed[..pos].to_string()
+        }
+    } else if clean.len() >= 2 && clean.chars().nth(1) == Some(':') {
+        "/".to_string()
+    } else {
+        ".".to_string()
+    }
+}
+
+/// Join a base path and a child name cleanly with forward slashes.
+pub fn join_path(base: &str, child: &str) -> String {
+    let b = base.trim().replace('\\', "/");
+    if b.is_empty() || b == "." {
+        child.to_string()
+    } else if b.ends_with('/') {
+        format!("{}{}", b, child)
+    } else {
+        format!("{}/{}", b, child)
+    }
+}
+
+/// Format file size into a human-readable string (B, KB, MB, GB).
+pub fn format_file_size(bytes: i64) -> String {
+    if bytes < 0 {
+        return "-".to_string();
+    }
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let b = bytes as f64;
+    if b >= GB {
+        format!("{:.1} GB", b / GB)
+    } else if b >= MB {
+        format!("{:.1} MB", b / MB)
+    } else if b >= KB {
+        format!("{:.1} KB", b / KB)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+
 pub static TOKIO_RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -217,6 +491,7 @@ pub struct AppState {
     pub passphrase_input: String,
     pub passphrase_error: Option<String>,
     pub passphrase_cache: std::collections::HashMap<String, String>,
+    pub sftp_manager: SftpManager,
 }
 
 impl AppState {
@@ -255,6 +530,7 @@ impl AppState {
             passphrase_input: String::new(),
             passphrase_error: None,
             passphrase_cache: std::collections::HashMap::new(),
+            sftp_manager: SftpManager::default(),
         }
     }
 
@@ -1573,7 +1849,253 @@ impl AppState {
         let _ = self.settings.save();
         cx.notify();
     }
+
+    // ==========================================
+    // SFTP Dual-Pane File Manager Methods
+    // ==========================================
+
+    /// Get reference to pane state.
+    pub fn sftp_pane(&self, pane: SftpActivePane) -> &SftpPaneState {
+        match pane {
+            SftpActivePane::Left => &self.sftp_manager.left_pane,
+            SftpActivePane::Right => &self.sftp_manager.right_pane,
+        }
+    }
+
+    /// Get mutable reference to pane state.
+    pub fn sftp_pane_mut(&mut self, pane: SftpActivePane) -> &mut SftpPaneState {
+        match pane {
+            SftpActivePane::Left => &mut self.sftp_manager.left_pane,
+            SftpActivePane::Right => &mut self.sftp_manager.right_pane,
+        }
+    }
+
+    /// Set focused pane.
+    pub fn sftp_focus_pane(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        self.sftp_manager.focused_pane = pane;
+        cx.notify();
+    }
+
+    /// Toggle source picker dropdown for a pane.
+    pub fn sftp_toggle_source_picker(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        state.show_source_picker = !state.show_source_picker;
+        cx.notify();
+    }
+
+    /// Change source connection for a pane ("local" or connection ID).
+    pub fn sftp_set_source(&mut self, pane: SftpActivePane, conn_id: String, cx: &mut Context<Self>) {
+        let label = if conn_id == "local" || conn_id.is_empty() {
+            "Local Filesystem".to_string()
+        } else if let Some(conn) = self.connections.iter().find(|c| c.id == conn_id) {
+            conn.label.clone()
+        } else {
+            format!("Host ({})", conn_id)
+        };
+
+        let state = self.sftp_pane_mut(pane);
+        state.source_id = conn_id;
+        state.source_label = label;
+        state.current_path = ".".to_string();
+        state.selected.clear();
+        state.search_query.clear();
+        state.show_source_picker = false;
+        self.sftp_load_pane(pane, cx);
+    }
+
+    /// Navigate pane to a specified directory path.
+    pub fn sftp_navigate(&mut self, pane: SftpActivePane, path: String, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        state.current_path = path;
+        state.selected.clear();
+        state.search_query.clear();
+        self.sftp_load_pane(pane, cx);
+    }
+
+    /// Navigate pane to parent directory.
+    pub fn sftp_navigate_up(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let current = self.sftp_pane(pane).current_path.clone();
+        let parent = parent_path(&current);
+        self.sftp_navigate(pane, parent, cx);
+    }
+
+    /// Toggle sort order or switch sort column for a pane.
+    pub fn sftp_toggle_sort(&mut self, pane: SftpActivePane, col: SftpSortColumn, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        if state.sort_column == col {
+            state.sort_order = match state.sort_order {
+                SftpSortOrder::Ascending => SftpSortOrder::Descending,
+                SftpSortOrder::Descending => SftpSortOrder::Ascending,
+            };
+        } else {
+            state.sort_column = col;
+            state.sort_order = SftpSortOrder::Ascending;
+        }
+        cx.notify();
+    }
+
+    /// Toggle hidden files visibility in a pane.
+    pub fn sftp_toggle_hidden(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        state.show_hidden = !state.show_hidden;
+        cx.notify();
+    }
+
+    /// Toggle item selection in a pane.
+    pub fn sftp_toggle_selection(&mut self, pane: SftpActivePane, name: String, multi: bool, cx: &mut Context<Self>) {
+        self.sftp_manager.focused_pane = pane;
+        let state = self.sftp_pane_mut(pane);
+        if multi {
+            if state.selected.contains(&name) {
+                state.selected.remove(&name);
+            } else {
+                state.selected.insert(name);
+            }
+        } else {
+            let was_only_selected = state.selected.contains(&name) && state.selected.len() == 1;
+            state.selected.clear();
+            if !was_only_selected {
+                state.selected.insert(name);
+            }
+        }
+        cx.notify();
+    }
+
+    /// Clear selection in a pane.
+    pub fn sftp_clear_selection(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        self.sftp_pane_mut(pane).selected.clear();
+        cx.notify();
+    }
+
+    /// Set search/filter query in a pane.
+    pub fn sftp_set_search_query(&mut self, pane: SftpActivePane, query: String, cx: &mut Context<Self>) {
+        self.sftp_pane_mut(pane).search_query = query;
+        cx.notify();
+    }
+
+    /// Switch active view to SFTP Manager and load directory if needed.
+    pub fn navigate_to_sftp(&mut self, cx: &mut Context<Self>) {
+        self.active_view = View::Sftp;
+        if self.sftp_manager.left_pane.files.is_empty() && !self.sftp_manager.left_pane.is_loading {
+            self.sftp_load_pane(SftpActivePane::Left, cx);
+        }
+        if self.sftp_manager.right_pane.files.is_empty() && !self.sftp_manager.right_pane.is_loading {
+            self.sftp_load_pane(SftpActivePane::Right, cx);
+        }
+        cx.notify();
+    }
+
+    /// Toggle between SFTP manager and hosts view.
+    pub fn toggle_sftp_manager(&mut self, cx: &mut Context<Self>) {
+        if self.active_view == View::Sftp {
+            self.active_view = View::Hosts;
+            self.show_hosts_catalog = true;
+        } else {
+            self.navigate_to_sftp(cx);
+        }
+        cx.notify();
+    }
+
+    /// Open modal for creating a new folder in a pane.
+    pub fn sftp_open_new_folder_modal(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        self.sftp_manager.modal = Some(SftpModalState::NewFolder {
+            pane,
+            name: String::new(),
+        });
+        cx.notify();
+    }
+
+    /// Open modal for renaming a file/folder in a pane.
+    pub fn sftp_open_rename_modal(&mut self, pane: SftpActivePane, old_name: String, cx: &mut Context<Self>) {
+        self.sftp_manager.modal = Some(SftpModalState::Rename {
+            pane,
+            new_name: old_name.clone(),
+            old_name,
+        });
+        cx.notify();
+    }
+
+    /// Open modal confirming deletion of selected items in a pane.
+    pub fn sftp_open_delete_modal(&mut self, pane: SftpActivePane, targets: Vec<String>, cx: &mut Context<Self>) {
+        if targets.is_empty() {
+            return;
+        }
+        self.sftp_manager.modal = Some(SftpModalState::DeleteConfirm { pane, targets });
+        cx.notify();
+    }
+
+    /// Close any open SFTP modal.
+    pub fn sftp_close_modal(&mut self, cx: &mut Context<Self>) {
+        self.sftp_manager.modal = None;
+        cx.notify();
+    }
+
+    /// Toggle visibility of the transfers drawer.
+    pub fn sftp_toggle_transfers_drawer(&mut self, cx: &mut Context<Self>) {
+        self.sftp_manager.transfers_drawer_open = !self.sftp_manager.transfers_drawer_open;
+        cx.notify();
+    }
+
+    /// Asynchronously load directory contents for a pane.
+    pub fn sftp_load_pane(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let state = self.sftp_pane_mut(pane);
+        state.is_loading = true;
+        state.error = None;
+        cx.notify();
+
+        let conn_id = state.source_id.clone();
+        let path = state.current_path.clone();
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<Vec<SftpFileInfo>, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.sftp_list(&conn_id, &path).await {
+                Ok(files) => {
+                    let _ = tx.send(Ok(files));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                let pane_state = this.sftp_pane_mut(pane);
+                                pane_state.is_loading = false;
+                                match res {
+                                    Ok(files) => {
+                                        pane_state.files = files;
+                                        pane_state.error = None;
+                                    }
+                                    Err(e) => {
+                                        pane_state.error = Some(e);
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
 }
+
 
 impl Render for AppState {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {

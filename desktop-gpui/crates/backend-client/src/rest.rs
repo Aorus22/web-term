@@ -3,7 +3,7 @@ use thiserror::Error;
 use crate::terminal_ws::{normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsConnectRequest};
 use crate::types::{
     Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SessionInfo, Settings,
-    SshKey, UpdateConnectionRequest,
+    SftpFileInfo, SftpTransferStatus, SshKey, UpdateConnectionRequest,
 };
 
 #[derive(Debug, Error)]
@@ -392,4 +392,282 @@ impl BackendClient {
         let handle = TerminalWsClient::attach(&ws_url, session_id).await?;
         Ok(handle)
     }
+
+    /// List files in a directory via GET /api/sftp/ls?connectionId={id}&path={path}.
+    pub async fn sftp_list(
+        &self,
+        connection_id: &str,
+        path: &str,
+    ) -> Result<Vec<SftpFileInfo>, ClientError> {
+        let url = format!("{}/api/sftp/ls", self.base_url);
+        let resp = self
+            .http
+            .get(&url)
+            .query(&[("connectionId", connection_id), ("path", path)])
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Vec<SftpFileInfo>>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Create a directory via POST /api/sftp/mkdir?connectionId={id}&path={path}.
+    pub async fn sftp_mkdir(
+        &self,
+        connection_id: &str,
+        path: &str,
+    ) -> Result<(), ClientError> {
+        let url = format!("{}/api/sftp/mkdir", self.base_url);
+        let resp = self
+            .http
+            .post(&url)
+            .query(&[("connectionId", connection_id), ("path", path)])
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Rename or move a file/directory via POST /api/sftp/rename?connectionId={id}&oldPath={old}&newPath={new}.
+    pub async fn sftp_rename(
+        &self,
+        connection_id: &str,
+        old_path: &str,
+        new_path: &str,
+    ) -> Result<(), ClientError> {
+        let url = format!("{}/api/sftp/rename", self.base_url);
+        let resp = self
+            .http
+            .post(&url)
+            .query(&[
+                ("connectionId", connection_id),
+                ("oldPath", old_path),
+                ("newPath", new_path),
+            ])
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Remove a file or directory via DELETE /api/sftp/remove?connectionId={id}&path={path}.
+    pub async fn sftp_remove(
+        &self,
+        connection_id: &str,
+        path: &str,
+    ) -> Result<(), ClientError> {
+        let url = format!("{}/api/sftp/remove", self.base_url);
+        let resp = self
+            .http
+            .delete(&url)
+            .query(&[("connectionId", connection_id), ("path", path)])
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Download a file via GET /api/sftp/download?connectionId={id}&path={path}.
+    pub async fn sftp_download(
+        &self,
+        connection_id: &str,
+        path: &str,
+    ) -> Result<Vec<u8>, ClientError> {
+        let url = format!("{}/api/sftp/download", self.base_url);
+        let resp = self
+            .http
+            .get(&url)
+            .query(&[("connectionId", connection_id), ("path", path)])
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        let bytes = resp.bytes().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })?;
+        Ok(bytes.to_vec())
+    }
+
+    /// Upload a file via multipart POST /api/sftp/upload?connectionId={id}&path={path}.
+    /// Returns the background transfer ID.
+    pub async fn sftp_upload(
+        &self,
+        connection_id: &str,
+        path: &str,
+        filename: &str,
+        data: Vec<u8>,
+    ) -> Result<String, ClientError> {
+        let url = format!("{}/api/sftp/upload", self.base_url);
+        let part = reqwest::multipart::Part::bytes(data).file_name(filename.to_string());
+        let form = reqwest::multipart::Form::new().part("file", part);
+
+        let resp = self
+            .http
+            .post(&url)
+            .query(&[("connectionId", connection_id), ("path", path)])
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        #[derive(serde::Deserialize)]
+        struct UploadResp {
+            #[serde(rename = "transferId")]
+            transfer_id: String,
+        }
+
+        let parsed = resp.json::<UploadResp>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })?;
+        Ok(parsed.transfer_id)
+    }
+
+    /// Query all active and recent background transfers via GET /api/sftp/transfers.
+    pub async fn sftp_list_transfers(&self) -> Result<Vec<SftpTransferStatus>, ClientError> {
+        let url = format!("{}/api/sftp/transfers", self.base_url);
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Vec<SftpTransferStatus>>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Query status of a specific transfer via GET /api/sftp/transfer/status?transferId={id}.
+    pub async fn sftp_transfer_status(
+        &self,
+        transfer_id: &str,
+    ) -> Result<SftpTransferStatus, ClientError> {
+        let url = format!("{}/api/sftp/transfer/status", self.base_url);
+        let resp = self
+            .http
+            .get(&url)
+            .query(&[("transferId", transfer_id)])
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<SftpTransferStatus>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Get the home directory path via GET /api/sftp/home?connectionId={id}.
+    pub async fn sftp_home(&self, connection_id: &str) -> Result<String, ClientError> {
+        let url = format!("{}/api/sftp/home", self.base_url);
+        let resp = self
+            .http
+            .get(&url)
+            .query(&[("connectionId", connection_id)])
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        #[derive(serde::Deserialize)]
+        struct HomeResp {
+            path: String,
+        }
+
+        let parsed = resp.json::<HomeResp>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })?;
+        Ok(parsed.path)
+    }
 }
+

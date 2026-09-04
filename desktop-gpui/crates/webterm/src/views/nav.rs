@@ -21,7 +21,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let items = [
         (View::Hosts, "Hosts"),
         (View::Keys, "SSH Keys"),
-        (View::Sftp, "SFTP"),
+        (View::Sftp, "📁 Files"),
         (View::Settings, "Settings"),
     ];
 
@@ -193,11 +193,15 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
                                 .child(label)
                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                    this.active_view = view;
-                                    if view == View::Hosts {
-                                        this.show_hosts_catalog = true;
+                                    if view == View::Sftp {
+                                        this.navigate_to_sftp(cx);
+                                    } else {
+                                        this.active_view = view;
+                                        if view == View::Hosts {
+                                            this.show_hosts_catalog = true;
+                                        }
+                                        cx.notify();
                                     }
-                                    cx.notify();
                                 }))
                         })),
                 )
@@ -320,6 +324,20 @@ fn render_content_pane(
                 .border_color(border_color)
                 .overflow_hidden()
                 .child(crate::views::keys::render_keys_view(app, cx)),
+        );
+    } else if view == View::Sftp {
+        content = content.child(
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .mt_4()
+                .rounded_lg()
+                .bg(card_bg)
+                .border_1()
+                .border_color(border_color)
+                .overflow_hidden()
+                .child(crate::views::sftp::render_sftp_view(app, cx)),
         );
     } else {
         content = content.child(
