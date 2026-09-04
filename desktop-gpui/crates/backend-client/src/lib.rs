@@ -14,8 +14,9 @@ pub use terminal_ws::{
     WsConnectRequest, WsServerResponse, WsStatus,
 };
 pub use types::{
-    Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SessionInfo, Settings,
-    SftpFileInfo, SftpTransferStatus, SshKey, UpdateConnectionRequest,
+    Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
+    ForwardActionResponse, ImportResult, PortForward, SessionInfo, Settings, SftpFileInfo,
+    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest,
 };
 
 #[cfg(test)]

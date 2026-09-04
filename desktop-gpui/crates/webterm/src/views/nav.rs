@@ -21,6 +21,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let items = [
         (View::Hosts, "Hosts"),
         (View::Keys, "SSH Keys"),
+        (View::Forwards, "Port Forwards"),
         (View::Sftp, "📁 Files"),
         (View::Settings, "Settings"),
     ];
@@ -64,6 +65,18 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
 
     let passphrase_modal_overlay = if app.pending_passphrase_conn.is_some() {
         Some(crate::views::passphrase_modal::render_passphrase_modal(app, cx))
+    } else {
+        None
+    };
+
+    let forward_modal_overlay = if app.forward_modal.is_some() {
+        Some(crate::views::forwards::render_forward_modal(app, cx))
+    } else {
+        None
+    };
+
+    let delete_forward_modal_overlay = if app.delete_forward_target.is_some() {
+        Some(crate::views::forwards::render_delete_forward_modal(app, cx))
     } else {
         None
     };
@@ -245,6 +258,8 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .children(import_modal_overlay)
         .children(add_key_modal_overlay)
         .children(passphrase_modal_overlay)
+        .children(forward_modal_overlay)
+        .children(delete_forward_modal_overlay)
         .children(notification_toast)
         .into_any_element()
 }
@@ -258,6 +273,7 @@ fn render_content_pane(
     let (header, phase_note) = match view {
         View::Hosts => ("Hosts & Terminal", "Host connection catalog — arrives in Phase 23"),
         View::Keys => ("SSH Keys", "Key vault and passphrases — arrives in Phase 23"),
+        View::Forwards => ("Port Forwards", "Port forwarding rules — arrives in Phase 26"),
         View::Sftp => ("SFTP", "SFTP Dual-Pane File Manager — arrives in Phase 25"),
         View::Settings => ("Settings", "Settings"),
     };
@@ -324,6 +340,20 @@ fn render_content_pane(
                 .border_color(border_color)
                 .overflow_hidden()
                 .child(crate::views::keys::render_keys_view(app, cx)),
+        );
+    } else if view == View::Forwards {
+        content = content.child(
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .mt_4()
+                .rounded_lg()
+                .bg(card_bg)
+                .border_1()
+                .border_color(border_color)
+                .overflow_hidden()
+                .child(crate::views::forwards::render_forwards_view(app, cx)),
         );
     } else if view == View::Sftp {
         content = content.child(

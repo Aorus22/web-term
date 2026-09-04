@@ -2,8 +2,9 @@ use std::time::Duration;
 use thiserror::Error;
 use crate::terminal_ws::{normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsConnectRequest};
 use crate::types::{
-    Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult, SessionInfo, Settings,
-    SftpFileInfo, SftpTransferStatus, SshKey, UpdateConnectionRequest,
+    Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
+    ForwardActionResponse, ImportResult, PortForward, SessionInfo, Settings, SftpFileInfo,
+    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest,
 };
 
 #[derive(Debug, Error)]
@@ -683,5 +684,155 @@ impl BackendClient {
         })?;
         Ok(parsed.path)
     }
+
+    // ==========================================
+    // Port Forwarding Endpoints
+    // ==========================================
+
+    /// List all port forwards via GET /api/forwards.
+    pub async fn list_forwards(&self) -> Result<Vec<PortForward>, ClientError> {
+        let url = format!("{}/api/forwards", self.base_url);
+        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        // Deserialize as Option<Vec<PortForward>> to handle Go null slice gracefully
+        let forwards = resp
+            .json::<Option<Vec<PortForward>>>()
+            .await
+            .map_err(|e| ClientError::Decode {
+                url,
+                source: e,
+            })?;
+        Ok(forwards.unwrap_or_default())
+    }
+
+    /// Create a new port forward rule via POST /api/forwards.
+    pub async fn create_forward(
+        &self,
+        req: &CreateForwardRequest,
+    ) -> Result<PortForward, ClientError> {
+        let url = format!("{}/api/forwards", self.base_url);
+        let resp = self
+            .http
+            .post(&url)
+            .json(req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<PortForward>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Update an existing port forward rule via PUT /api/forwards/:id.
+    pub async fn update_forward(
+        &self,
+        id: &str,
+        req: &UpdateForwardRequest,
+    ) -> Result<PortForward, ClientError> {
+        let url = format!("{}/api/forwards/{}", self.base_url, id);
+        let resp = self
+            .http
+            .put(&url)
+            .json(req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<PortForward>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Delete a port forward rule via DELETE /api/forwards/:id.
+    pub async fn delete_forward(&self, id: &str) -> Result<(), ClientError> {
+        let url = format!("{}/api/forwards/{}", self.base_url, id);
+        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Start a port forward tunnel via POST /api/forwards/:id/start.
+    pub async fn start_forward(&self, id: &str) -> Result<ForwardActionResponse, ClientError> {
+        let url = format!("{}/api/forwards/{}/start", self.base_url, id);
+        let resp = self.http.post(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<ForwardActionResponse>()
+            .await
+            .map_err(|e| ClientError::Decode {
+                url,
+                source: e,
+            })
+    }
+
+    /// Stop an active port forward tunnel via POST /api/forwards/:id/stop.
+    pub async fn stop_forward(&self, id: &str) -> Result<ForwardActionResponse, ClientError> {
+        let url = format!("{}/api/forwards/{}/stop", self.base_url, id);
+        let resp = self.http.post(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<ForwardActionResponse>()
+            .await
+            .map_err(|e| ClientError::Decode {
+                url,
+                source: e,
+            })
+    }
 }
+
 

@@ -142,3 +142,72 @@ pub struct SftpTransferStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
+
+fn default_forward_type() -> String {
+    "local".to_string()
+}
+
+/// Port Forward definition returned by GET /api/forwards.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PortForward {
+    pub id: String,
+    pub name: String,
+    pub connection_id: String,
+    pub local_port: u16,
+    pub remote_port: u16,
+    #[serde(rename = "type", default = "default_forward_type")]
+    pub forward_type: String, // "local" | "reverse"
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default)]
+    pub auto_start: bool,
+    #[serde(default)]
+    pub error: String,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
+impl PortForward {
+    pub fn is_reverse(&self) -> bool {
+        self.forward_type == "reverse"
+    }
+
+    pub fn mapping_display(&self) -> String {
+        if self.is_reverse() {
+            format!(":{} \u{2190} localhost:{}", self.remote_port, self.local_port)
+        } else {
+            format!("localhost:{} \u{2192} :{}", self.local_port, self.remote_port)
+        }
+    }
+}
+
+/// Request body for POST /api/forwards.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CreateForwardRequest {
+    pub name: String,
+    pub connection_id: String,
+    pub local_port: u16,
+    pub remote_port: u16,
+    #[serde(rename = "type", default = "default_forward_type")]
+    pub forward_type: String, // "local" | "reverse"
+}
+
+/// Request body for PUT /api/forwards/:id.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UpdateForwardRequest {
+    pub name: String,
+    pub connection_id: String,
+    pub local_port: u16,
+    pub remote_port: u16,
+    #[serde(rename = "type", default = "default_forward_type")]
+    pub forward_type: String, // "local" | "reverse"
+}
+
+/// Response returned by POST /api/forwards/:id/start or /stop.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ForwardActionResponse {
+    pub status: String,
+}
+

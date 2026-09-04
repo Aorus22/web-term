@@ -4,9 +4,9 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 use gpui::*;
 use webterm_backend_client::{
-    BackendClient, Connection, CreateConnectionRequest, CreateKeyRequest, ImportResult,
-    SftpFileInfo, SftpTransferStatus, SshKey, TerminalWsHandle, UpdateConnectionRequest,
-    WsConnectRequest,
+    BackendClient, Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
+    ImportResult, PortForward, SftpFileInfo, SftpTransferStatus, SshKey, TerminalWsHandle,
+    UpdateConnectionRequest, UpdateForwardRequest, WsConnectRequest,
 };
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
 use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
@@ -164,11 +164,118 @@ impl ConnectionFormState {
     }
 }
 
+/// Mode of the Port Forward modal: Create or Edit with forward ID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ForwardModalMode {
+    Create,
+    Edit(String),
+}
+
+/// Form state for Creating or Editing a Port Forward rule.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForwardFormState {
+    pub mode: ForwardModalMode,
+    pub name: String,
+    pub connection_id: String,
+    pub local_port: String,
+    pub remote_port: String,
+    pub forward_type: String, // "local" | "reverse"
+    pub error_message: Option<String>,
+}
+
+impl ForwardFormState {
+    pub fn new_create(default_conn_id: Option<String>) -> Self {
+        Self {
+            mode: ForwardModalMode::Create,
+            name: String::new(),
+            connection_id: default_conn_id.unwrap_or_default(),
+            local_port: String::new(),
+            remote_port: String::new(),
+            forward_type: "local".to_string(),
+            error_message: None,
+        }
+    }
+
+    pub fn new_edit(forward: &PortForward) -> Self {
+        Self {
+            mode: ForwardModalMode::Edit(forward.id.clone()),
+            name: forward.name.clone(),
+            connection_id: forward.connection_id.clone(),
+            local_port: forward.local_port.to_string(),
+            remote_port: forward.remote_port.to_string(),
+            forward_type: forward.forward_type.clone(),
+            error_message: None,
+        }
+    }
+
+    pub fn parse_local_port(&self) -> Result<u16, String> {
+        let p = self
+            .local_port
+            .trim()
+            .parse::<u16>()
+            .map_err(|_| "Local port must be a valid number (1-65535)".to_string())?;
+        if p == 0 {
+            return Err("Local port must be between 1 and 65535".to_string());
+        }
+        Ok(p)
+    }
+
+    pub fn parse_remote_port(&self) -> Result<u16, String> {
+        let p = self
+            .remote_port
+            .trim()
+            .parse::<u16>()
+            .map_err(|_| "Remote port must be a valid number (1-65535)".to_string())?;
+        if p == 0 {
+            return Err("Remote port must be between 1 and 65535".to_string());
+        }
+        Ok(p)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() {
+            return Err("Forward rule name is required".to_string());
+        }
+        if self.connection_id.trim().is_empty() {
+            return Err("Please select a SSH connection".to_string());
+        }
+        self.parse_local_port()?;
+        self.parse_remote_port()?;
+        if self.forward_type != "local" && self.forward_type != "reverse" {
+            return Err("Forward type must be 'local' or 'reverse'".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn to_create_request(&self) -> Result<CreateForwardRequest, String> {
+        self.validate()?;
+        Ok(CreateForwardRequest {
+            name: self.name.trim().to_string(),
+            connection_id: self.connection_id.clone(),
+            local_port: self.parse_local_port()?,
+            remote_port: self.parse_remote_port()?,
+            forward_type: self.forward_type.clone(),
+        })
+    }
+
+    pub fn to_update_request(&self) -> Result<UpdateForwardRequest, String> {
+        self.validate()?;
+        Ok(UpdateForwardRequest {
+            name: self.name.trim().to_string(),
+            connection_id: self.connection_id.clone(),
+            local_port: self.parse_local_port()?,
+            remote_port: self.parse_remote_port()?,
+            forward_type: self.forward_type.clone(),
+        })
+    }
+}
+
 /// Active view in the main navigation sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Hosts,
     Keys,
+    Forwards,
     Sftp,
     Settings,
 }
@@ -533,6 +640,10 @@ pub struct AppState {
     pub passphrase_error: Option<String>,
     pub passphrase_cache: std::collections::HashMap<String, String>,
     pub sftp_manager: SftpManager,
+    pub forwards: Vec<PortForward>,
+    pub is_loading_forwards: bool,
+    pub forward_modal: Option<ForwardFormState>,
+    pub delete_forward_target: Option<PortForward>,
 }
 
 impl AppState {
@@ -572,6 +683,10 @@ impl AppState {
             passphrase_error: None,
             passphrase_cache: std::collections::HashMap::new(),
             sftp_manager: SftpManager::default(),
+            forwards: Vec::new(),
+            is_loading_forwards: false,
+            forward_modal: None,
+            delete_forward_target: None,
         }
     }
 
@@ -1408,6 +1523,7 @@ impl AppState {
                                         this.restore_sessions_or_default(cx);
                                         this.fetch_connections(cx);
                                         this.fetch_ssh_keys(cx);
+                                        this.fetch_forwards(cx);
                                     }
                                     SupervisorEvent::Failed { reason, stderr_tail } => {
                                         this.backend_status = BackendStatus::Failed {
@@ -2771,6 +2887,361 @@ impl AppState {
             }
         })
         .detach();
+    }
+
+    // ==========================================
+    // Port Forwarding Methods
+    // ==========================================
+
+    /// Fetch all port forward rules from the backend.
+    pub fn fetch_forwards(&mut self, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        self.is_loading_forwards = true;
+        cx.notify();
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<Vec<PortForward>, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.list_forwards().await {
+                Ok(forwards) => {
+                    let _ = tx.send(Ok(forwards));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                this.is_loading_forwards = false;
+                                match res {
+                                    Ok(forwards) => {
+                                        this.forwards = forwards;
+                                    }
+                                    Err(err) => {
+                                        eprintln!("Failed to fetch forwards: {err}");
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Open create port forward modal.
+    pub fn open_create_forward_modal(&mut self, cx: &mut Context<Self>) {
+        let default_conn_id = self.connections.first().map(|c| c.id.clone());
+        self.forward_modal = Some(ForwardFormState::new_create(default_conn_id));
+        cx.notify();
+    }
+
+    /// Open edit port forward modal.
+    pub fn open_edit_forward_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+        if let Some(forward) = self.forwards.iter().find(|f| f.id == id).cloned() {
+            self.forward_modal = Some(ForwardFormState::new_edit(&forward));
+            cx.notify();
+        }
+    }
+
+    /// Close port forward modal.
+    pub fn close_forward_modal(&mut self, cx: &mut Context<Self>) {
+        self.forward_modal = None;
+        cx.notify();
+    }
+
+    /// Save port forward modal form (Create or Update).
+    pub fn save_forward_form(&mut self, cx: &mut Context<Self>) {
+        let form = match &mut self.forward_modal {
+            Some(f) => f,
+            None => return,
+        };
+
+        let mode = form.mode.clone();
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => {
+                form.error_message = Some("Backend client unavailable".to_string());
+                cx.notify();
+                return;
+            }
+        };
+
+        match mode {
+            ForwardModalMode::Create => match form.to_create_request() {
+                Ok(req) => {
+                    let view_weak = cx.entity().downgrade();
+                    let (tx, mut rx) =
+                        tokio::sync::mpsc::unbounded_channel::<Result<PortForward, String>>();
+
+                    TOKIO_RT.spawn(async move {
+                        match client.create_forward(&req).await {
+                            Ok(f) => {
+                                let _ = tx.send(Ok(f));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Err(e.to_string()));
+                            }
+                        }
+                    });
+
+                    cx.spawn(move |_view, cx: &mut AsyncApp| {
+                        let view_weak = view_weak.clone();
+                        let cx_handle = cx.clone();
+                        async move {
+                            if let Some(res) = rx.recv().await {
+                                cx_handle.update(|cx: &mut App| {
+                                    if let Some(app) = view_weak.upgrade() {
+                                        app.update(cx, |this, cx| {
+                                            match res {
+                                                Ok(f) => {
+                                                    this.forward_modal = None;
+                                                    this.notification =
+                                                        Some(format!("Port forward '{}' created successfully", f.name));
+                                                    this.fetch_forwards(cx);
+                                                }
+                                                Err(err) => {
+                                                    if let Some(f) = &mut this.forward_modal {
+                                                        f.error_message = Some(err);
+                                                    }
+                                                }
+                                            }
+                                            cx.notify();
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    })
+                    .detach();
+                }
+                Err(err) => {
+                    form.error_message = Some(err);
+                    cx.notify();
+                }
+            },
+            ForwardModalMode::Edit(id) => match form.to_update_request() {
+                Ok(req) => {
+                    let view_weak = cx.entity().downgrade();
+                    let id_clone = id.clone();
+                    let (tx, mut rx) =
+                        tokio::sync::mpsc::unbounded_channel::<Result<PortForward, String>>();
+
+                    TOKIO_RT.spawn(async move {
+                        match client.update_forward(&id_clone, &req).await {
+                            Ok(f) => {
+                                let _ = tx.send(Ok(f));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Err(e.to_string()));
+                            }
+                        }
+                    });
+
+                    cx.spawn(move |_view, cx: &mut AsyncApp| {
+                        let view_weak = view_weak.clone();
+                        let cx_handle = cx.clone();
+                        async move {
+                            if let Some(res) = rx.recv().await {
+                                cx_handle.update(|cx: &mut App| {
+                                    if let Some(app) = view_weak.upgrade() {
+                                        app.update(cx, |this, cx| {
+                                            match res {
+                                                Ok(f) => {
+                                                    this.forward_modal = None;
+                                                    this.notification =
+                                                        Some(format!("Port forward '{}' updated successfully", f.name));
+                                                    this.fetch_forwards(cx);
+                                                }
+                                                Err(err) => {
+                                                    if let Some(f) = &mut this.forward_modal {
+                                                        f.error_message = Some(err);
+                                                    }
+                                                }
+                                            }
+                                            cx.notify();
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    })
+                    .detach();
+                }
+                Err(err) => {
+                    form.error_message = Some(err);
+                    cx.notify();
+                }
+            },
+        }
+    }
+
+    /// Toggle port forward tunnel active status (start if inactive, stop if active).
+    pub fn toggle_forward_active(&mut self, id: &str, cx: &mut Context<Self>) {
+        let forward = match self.forwards.iter().find(|f| f.id == id) {
+            Some(f) => f.clone(),
+            None => return,
+        };
+
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let id_str = id.to_string();
+        let was_active = forward.active;
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<String, String>>();
+
+        TOKIO_RT.spawn(async move {
+            let res = if was_active {
+                client.stop_forward(&id_str).await.map(|r| r.status)
+            } else {
+                client.start_forward(&id_str).await.map(|r| r.status)
+            };
+
+            match res {
+                Ok(st) => {
+                    let _ = tx.send(Ok(st));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(status) => {
+                                        this.notification = Some(format!(
+                                            "Port forward '{}' is now {}",
+                                            forward.name, status
+                                        ));
+                                        this.fetch_forwards(cx);
+                                    }
+                                    Err(err) => {
+                                        this.notification = Some(format!(
+                                            "Failed to toggle forward '{}': {err}",
+                                            forward.name
+                                        ));
+                                        this.fetch_forwards(cx);
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Open delete confirmation dialog for a port forward rule.
+    pub fn open_delete_forward_modal(&mut self, forward: PortForward, cx: &mut Context<Self>) {
+        self.delete_forward_target = Some(forward);
+        cx.notify();
+    }
+
+    /// Close delete confirmation dialog.
+    pub fn close_delete_forward_modal(&mut self, cx: &mut Context<Self>) {
+        self.delete_forward_target = None;
+        cx.notify();
+    }
+
+    /// Confirm and delete targeted port forward rule.
+    pub fn confirm_delete_forward(&mut self, cx: &mut Context<Self>) {
+        let target = match self.delete_forward_target.take() {
+            Some(t) => t,
+            None => return,
+        };
+
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let id_str = target.id.clone();
+        let name_str = target.name.clone();
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.delete_forward(&id_str).await {
+                Ok(_) => {
+                    let _ = tx.send(Ok(()));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(_) => {
+                                        this.notification = Some(format!(
+                                            "Port forward '{}' deleted",
+                                            name_str
+                                        ));
+                                        this.fetch_forwards(cx);
+                                    }
+                                    Err(err) => {
+                                        this.notification = Some(format!(
+                                            "Failed to delete forward '{}': {err}",
+                                            name_str
+                                        ));
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Navigate to port forwards view.
+    pub fn navigate_to_forwards(&mut self, cx: &mut Context<Self>) {
+        self.active_view = View::Forwards;
+        if self.forwards.is_empty() && !self.is_loading_forwards {
+            self.fetch_forwards(cx);
+        }
+        cx.notify();
     }
 }
 

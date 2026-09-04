@@ -173,12 +173,14 @@ Plans:
   1. User can create and manage local port forwarding rules from the desktop app
   2. Settings page offers themes and desktop preferences (backend path override); no terminal engine selector
   3. Theme change applies to app and terminal palette live, mid-session
-- **Plans:** TBD
+- **Plans:** 0/2 plans executed
+- [ ] 26-01-PLAN.md
+- [ ] 26-02-PLAN.md
 
 Plans:
 
-- [ ] 26-01: Port forwarding management UI
-- [ ] 26-02: Settings page (desktop scope) + live theme application incl. terminal palette sync
+- [ ] 26-01: Port forwarding management UI (FWD-01)
+- [ ] 26-02: Settings page (desktop scope) + live theme application incl. terminal palette sync (SET-01)
 
 ### Phase 27: Parity Audit & Desktop Hardening
 
@@ -207,8 +209,8 @@ Plans:
 | 22. SSH Terminal Sessions & Tabs | 4/4 | Complete | 2026-09-05 |
 | 23. Hosts & SSH Keys Management | 4/4 | Complete | 2026-09-05 |
 | 24. Local Terminal (Cross-Platform PTY) | 3/3 | Complete | 2026-09-05 |
-| 25. SFTP Dual-Pane Manager | 0/3 | Ready | - |
-| 26. Port Forwarding, Settings & Theme Polish | 0/2 | Not started | - |
+| 25. SFTP Dual-Pane Manager | 3/3 | Complete | 2026-09-05 |
+| 26. Port Forwarding, Settings & Theme Polish | 0/2 | In progress | - |
 | 27. Parity Audit & Desktop Hardening | 0/3 | Not started | - |
 
 **Validation:** 30 requirements mapped across 8 phases — coverage complete, every REQ mapped to exactly one phase ✓ (TERM-05 primary mapping: Phase 24)
