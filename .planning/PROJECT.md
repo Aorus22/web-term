@@ -97,23 +97,19 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
-## Current Milestone: v0.4.0 Local Terminal & SFTP
+## Current Milestone: v0.5.0 Desktop GPUI Client
 
-**Goal:** Add support for local terminal sessions and a dual-pane SFTP file manager.
+**Goal:** Ship a native desktop WebTerm built with GPUI (Rust) that reuses the existing Go backend as a local process, reaching full feature parity with the web app on Windows and Linux.
 
 **Target features:**
-- **Local Terminal:**
-    - Option in "New Tab" view to open a local shell on the backend host.
-    - Local terminal should be the first/primary option in New Tab.
-    - Full PTY support (ANSI colors, window resizing).
-- **Dual-Pane SFTP Manager:**
-    - New "SFTP" navigation item in the sidebar.
-    - Split-screen view allowing two independent directory browsers.
-    - Each pane can select a "Source": Local Filesystem or Remote Host (via SSH/SFTP).
-    - File operations: List, Upload, Download, Delete, Rename.
-    - Drag-and-drop support between panes.
-    - High-quality UI inspired by Termius.
+- **GPUI Shell:** Native window, multi-tab sessions, 2-page navigation (Hosts + SSH Keys), dark/light theming.
+- **Terminal:** SSH + local sessions rendered via alacritty_terminal (the engine proven in Zed); resize sync, reconnection, keyboard shortcuts.
+- **Hosts Management:** Card layout, kebab menus, tags, quick-connect, import/export.
+- **SSH Keys:** Key pool, upload, passphrase handling, per-connection auth method selection.
+- **SFTP Manager:** Dual-pane layout, streaming operations, drag-and-drop, local/remote panes.
+- **Settings & Port Forwarding:** Themes, UI options, port-forward management.
+- **Backend Integration:** Spawn the existing Go backend as a local process; reuse the proven WebSocket SSH proxy.
 
 ---
 
-*Last updated: 2026-05-03 after Milestone v0.3.0 complete*
+*Last updated: 2026-09-04 at start of Milestone v0.5.0 Desktop GPUI Client*

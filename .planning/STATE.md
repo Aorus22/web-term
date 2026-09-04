@@ -1,3 +1,18 @@
+---
+gsd_state_version: 1.0
+milestone: v0.5.0
+milestone_name: Desktop GPUI Client
+status: planning
+last_updated: "2026-09-04T13:50:24.560Z"
+last_activity: 2026-09-04
+progress:
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Local Terminal & SFTP
@@ -59,3 +74,10 @@ session_continuity:
   stopped_at: Phase 15 context gathered
   resume_file: .planning/phases/15-sftp-operations-dnd/15-CONTEXT.md
   next_step: Plan Phase 15: SFTP Operations & DND
+
+## Current Position
+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-04 — Milestone v0.5.0 started
