@@ -47,6 +47,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libasound2-dev libx11-xcb-dev libssl-dev libxkbcommon-x11-dev libxkbcommon-dev
 
+      - name: Run Go tests
+        run: |
+          cd be
+          go test ./...
+
       - name: Build Go backend fixture (Linux)
         if: runner.os == 'Linux'
         run: |

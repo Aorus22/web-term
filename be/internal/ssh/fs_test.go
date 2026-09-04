@@ -55,8 +55,8 @@ func TestLocalFS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	defer r.Close()
 	readContent, err := io.ReadAll(r)
+	_ = r.Close()
 	if err != nil {
 		t.Fatalf("ReadAll failed: %v", err)
 	}

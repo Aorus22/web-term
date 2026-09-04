@@ -7759,6 +7759,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-tungstenite",
  "webterm-backend-client",

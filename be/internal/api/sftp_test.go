@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 	"webterm/internal/config"
 	"webterm/internal/ssh"
 )
@@ -21,8 +22,15 @@ func TestSFTPHandler_Local(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	cfg := &config.Config{}
+	stagingDir := filepath.Join(tmpDir, "staging")
+	sm, err := ssh.NewStagingManager(stagingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	h := &SFTPHandler{
 		Cfg: cfg,
+		SM:  sm,
+		TM:  ssh.NewTransferManager(),
 	}
 
 	// 1. Test Mkdir
@@ -48,6 +56,17 @@ func TestSFTPHandler_Local(t *testing.T) {
 	h.Upload(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Errorf("Upload failed: %d %s", rr.Code, rr.Body.String())
+	}
+
+	var uploadResp map[string]string
+	_ = json.Unmarshal(rr.Body.Bytes(), &uploadResp)
+	transferID := uploadResp["transferId"]
+	for i := 0; i < 100; i++ {
+		st, _ := h.TM.GetStatus(transferID)
+		if st != nil && (st.Status == ssh.TransferPhaseCompleted || st.Status == ssh.TransferPhaseError) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// 3. Test List
