@@ -1,0 +1,70 @@
+name: Desktop GPUI CI
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'desktop-gpui/**'
+      - 'be/**'
+      - '.github/workflows/desktop-ci.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'desktop-gpui/**'
+      - 'be/**'
+      - '.github/workflows/desktop-ci.yml'
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: be/go.sum
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-gpui
+
+      - name: Install Linux GUI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-xcb-dev libssl-dev libxkbcommon-x11-dev libxkbcommon-dev
+
+      - name: Build Go backend fixture (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p desktop-gpui/test-support
+          cd be && go build -o ../desktop-gpui/test-support/backend ./cmd/server
+
+      - name: Build Go backend fixture (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "desktop-gpui/test-support")) { New-Item -ItemType Directory -Path "desktop-gpui/test-support" }
+          cd be
+          go build -o ../desktop-gpui/test-support/backend.exe ./cmd/server
+
+      - name: Run workspace tests
+        run: cargo test --workspace --manifest-path desktop-gpui/Cargo.toml
+        env:
+          TEST_BACKEND_PATH: ${{ runner.os == 'Windows' && 'desktop-gpui/test-support/backend.exe' || 'desktop-gpui/test-support/backend' }}
+
+      - name: Build workspace release
+        run: cargo build --workspace --manifest-path desktop-gpui/Cargo.toml --release
