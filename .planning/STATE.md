@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v0.5.0
 milestone_name: Desktop GPUI Client
-status: planning
-last_updated: "2026-09-04T13:50:24.560Z"
+status: executing
+last_updated: "2026-09-04T22:57:00.000Z"
 last_activity: 2026-09-04
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 26
-  completed_plans: 0
-  percent: 0
+  completed_plans: 4
+  percent: 15
 ---
 
 performance_metrics:
   velocity:
-    total_plans_completed: 42
+    total_plans_completed: 46
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -26,6 +26,7 @@ performance_metrics:
     - { phase: "17-terminal-theme-sync", plans: 3, total_min: 45, avg_min: 15 }
     - { phase: "18-terminal-engine-selector", plans: 3, total_min: 45, avg_min: 15 }
     - { phase: "19-review-fixes", plans: 1, total_min: 20, avg_min: 20 }
+    - { phase: "20-desktop-foundation-backend-integration", plans: 4, total_min: 60, avg_min: 15 }
 
 quick_tasks:
   completed:
@@ -45,9 +46,12 @@ accumulated_context:
     - "D-01: Standalone SSH connections for SFTP"
     - "D-06: Streaming for file uploads/downloads"
     - "Phase 14: Use shadcn/ui Resizable for dual-pane SFTP layout"
-    - "Used internal path resolution (getParentPath) for \`..\` navigation to avoid unnecessary backend calls."
-    - "Prepended \`..\` virtual entry in frontend logic to ensure consistency across connections."
+    - "Used internal path resolution (getParentPath) for `..` navigation to avoid unnecessary backend calls."
+    - "Prepended `..` virtual entry in frontend logic to ensure consistency across connections."
     - "v0.5.0: Desktop client uses GPUI + alacritty_terminal (Zed-proven engine) frontend over the existing Go backend spawned as a local child process"
+    - "Phase 20: Pinned gpui-pre 0.3.3 and gpui-pre-platform 0.3.3 to guarantee exact binary compatibility with gpui-component 0.6.0"
+    - "Phase 20: Decoupled Tokio supervisor runner from GPUI async executor using an unbounded MPSC channel (SupervisorEvent)"
+    - "Phase 20: Stored window bounds dividing Pixels by px(1.0) and persisting on close with degenerate geometry protection"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -60,13 +64,13 @@ accumulated_context:
 deferred_items: []
 session_continuity:
   last_session: 2026-09-04
-  stopped_at: Milestone v0.5.0 roadmap created
+  stopped_at: Phase 20 completed and verified
   resume_file: null
-  next_step: Plan Phase 20 — Desktop Foundation & Backend Integration
+  next_step: Phase 21 — Terminal Rendering (Alacritty Engine)
 
 ## Current Position
 
-Phase: Not started (Phase 20 of 8, roadmap created)
+Phase: Phase 21 (Terminal Rendering - Alacritty Engine)
 Plan: —
-Status: Ready to plan Phase 20
-Last activity: 2026-09-04 — Milestone v0.5.0 roadmap created (8 phases, 30 requirements)
+Status: Ready for Phase 21
+Last activity: 2026-09-04 — Phase 20 (Desktop Foundation & Backend Integration) completed and verified
