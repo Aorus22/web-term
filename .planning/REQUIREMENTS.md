@@ -9,12 +9,12 @@ Requirements for the desktop client. Each maps to roadmap phases.
 
 ### Desktop Shell
 
-- [ ] **SHELL-01**: User can launch WebTerm as a native desktop app that starts the Go backend automatically and reaches a ready window
-- [ ] **SHELL-02**: User sees a visible startup state and a clear error if the backend fails to start
-- [ ] **SHELL-03**: User can navigate Hosts, SSH Keys, SFTP, and Settings via the sidebar (2-page navigation parity)
+- [x] **SHELL-01**: User can launch WebTerm as a native desktop app that starts the Go backend automatically and reaches a ready window
+- [x] **SHELL-02**: User sees a visible startup state and a clear error if the backend fails to start
+- [x] **SHELL-03**: User can navigate Hosts, SSH Keys, SFTP, and Settings via the sidebar (2-page navigation parity)
 - [ ] **SHELL-04**: User can open, switch, and close multiple terminal tabs with status indicators
-- [ ] **SHELL-05**: User's dark/light theme applies to the whole app and the terminal, persisting across restarts
-- [ ] **SHELL-06**: User's window size/position persists across restarts
+- [x] **SHELL-05**: User's dark/light theme applies to the whole app and the terminal, persisting across restarts
+- [x] **SHELL-06**: User's window size/position persists across restarts
 
 ### Terminal
 
@@ -94,11 +94,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SHELL-01 | Phase 20 | Pending |
-| SHELL-02 | Phase 20 | Pending |
-| SHELL-03 | Phase 20 | Pending |
-| SHELL-05 | Phase 20 | Pending |
-| SHELL-06 | Phase 20 | Pending |
+| SHELL-01 | Phase 20 | Satisfied |
+| SHELL-02 | Phase 20 | Satisfied |
+| SHELL-03 | Phase 20 | Satisfied |
+| SHELL-05 | Phase 20 | Satisfied |
+| SHELL-06 | Phase 20 | Satisfied |
 | TERM-01 | Phase 21 | Pending |
 | TERM-02 | Phase 21 | Pending |
 | TERM-03 | Phase 21 | Pending |
