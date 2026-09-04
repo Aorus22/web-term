@@ -417,10 +417,13 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<Vec<SftpFileInfo>>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<Option<Vec<SftpFileInfo>>>()
+            .await
+            .map(|opt| opt.unwrap_or_default())
+            .map_err(|e| ClientError::Decode {
+                url,
+                source: e,
+            })
     }
 
     /// Create a directory via POST /api/sftp/mkdir?connectionId={id}&path={path}.
@@ -553,10 +556,18 @@ impl BackendClient {
         let part = reqwest::multipart::Part::bytes(data).file_name(filename.to_string());
         let form = reqwest::multipart::Form::new().part("file", part);
 
+        let full_path = if path.ends_with(filename) {
+            path.to_string()
+        } else if path.ends_with('/') || path.ends_with('\\') {
+            format!("{}{}", path, filename)
+        } else {
+            format!("{}/{}", path, filename)
+        };
+
         let resp = self
             .http
             .post(&url)
-            .query(&[("connectionId", connection_id), ("path", path)])
+            .query(&[("connectionId", connection_id), ("path", &full_path)])
             .multipart(form)
             .send()
             .await
@@ -603,10 +614,13 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<Vec<SftpTransferStatus>>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<Option<Vec<SftpTransferStatus>>>()
+            .await
+            .map(|opt| opt.unwrap_or_default())
+            .map_err(|e| ClientError::Decode {
+                url,
+                source: e,
+            })
     }
 
     /// Query status of a specific transfer via GET /api/sftp/transfer/status?transferId={id}.

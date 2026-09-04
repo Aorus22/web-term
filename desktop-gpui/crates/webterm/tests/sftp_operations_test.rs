@@ -1,7 +1,8 @@
 //! Unit tests for SFTP file operations: folder creation, rename, delete modals and transfer tracking.
 
 use webterm::app_state::{
-    format_file_size, SftpActivePane, SftpModalState, SftpPaneState, SftpTransferItem,
+    format_file_size, SftpActivePane, SftpContextMenu, SftpDraggedItem, SftpModalState,
+    SftpPaneState, SftpTransferItem,
 };
 use webterm::backend_client::SftpTransferStatus;
 
@@ -174,4 +175,27 @@ fn test_transfer_status_conversion() {
     assert_eq!(item.total_bytes, 4194304);
     assert_eq!(item.status, "completed");
     assert!(item.error.is_none());
+}
+
+#[test]
+fn test_context_menu_state_and_dragged_item() {
+    let menu = SftpContextMenu {
+        pane: SftpActivePane::Left,
+        filename: "document.pdf".to_string(),
+        is_dir: false,
+        position: (150.0, 300.0),
+    };
+    assert_eq!(menu.pane, SftpActivePane::Left);
+    assert_eq!(menu.filename, "document.pdf");
+    assert!(!menu.is_dir);
+    assert_eq!(menu.position, (150.0, 300.0));
+
+    let drag = SftpDraggedItem {
+        source_pane: SftpActivePane::Right,
+        filenames: vec!["file1.txt".to_string(), "file2.txt".to_string()],
+    };
+    assert_eq!(drag.source_pane, SftpActivePane::Right);
+    assert_eq!(drag.filenames.len(), 2);
+    assert_eq!(drag.filenames[0], "file1.txt");
+    assert_eq!(drag.filenames[1], "file2.txt");
 }

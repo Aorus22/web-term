@@ -6,8 +6,29 @@ use webterm_settings::Theme as SettingsTheme;
 
 use crate::app_state::{
     format_file_size, join_path, split_breadcrumbs, AppState, SftpActivePane,
-    SftpModalState, SftpSortColumn, SftpSortOrder,
+    SftpDraggedItem, SftpModalState, SftpSortColumn, SftpSortOrder,
 };
+
+/// Drag preview element displayed under mouse during drag-and-drop.
+#[derive(Clone)]
+pub struct SftpDragPreview {
+    pub label: String,
+}
+
+impl Render for SftpDragPreview {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .px_3()
+            .py_1p5()
+            .rounded_md()
+            .bg(rgb(0x0284c7))
+            .text_color(rgb(0xffffff))
+            .text_xs()
+            .font_weight(FontWeight::BOLD)
+            .shadow_lg()
+            .child(format!("📄 {}", self.label))
+    }
+}
 
 /// Renders the complete dual-pane SFTP file manager view.
 pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
@@ -17,12 +38,26 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
     let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
 
+    let focus_handle = app
+        .sftp_manager
+        .focus_handle
+        .get_or_insert_with(|| cx.focus_handle())
+        .clone();
+
     let left_pane = render_pane(app, SftpActivePane::Left, is_dark, cx);
     let right_pane = render_pane(app, SftpActivePane::Right, is_dark, cx);
     let modal_overlay = render_sftp_modal(app, is_dark, cx);
+    let context_menu_overlay = render_sftp_context_menu(app, is_dark, cx);
     let transfers_drawer = render_transfers_drawer(app, is_dark, cx);
 
     div()
+        .track_focus(&focus_handle)
+        .key_context("Sftp")
+        .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _window, cx| {
+            let key = ev.keystroke.key.to_lowercase();
+            let is_alt = ev.keystroke.modifiers.alt;
+            this.sftp_handle_key(&key, is_alt, cx);
+        }))
         .flex()
         .flex_col()
         .size_full()
@@ -85,7 +120,8 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                     rgb(0x27272a)
                                 } else {
                                     rgb(0xe2e8f0)
-                                })
+                                }
+                                )
                                 .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
                                 .cursor_pointer()
                                 .text_xs()
@@ -115,6 +151,51 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         .border_color(border_color)
                         .child(left_pane),
                 )
+                // Central divider toolbar with transfer actions
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .justify_center()
+                        .gap_3()
+                        .px_2()
+                        .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) })
+                        .border_r_1()
+                        .border_color(border_color)
+                        .child(
+                            div()
+                                .px_3()
+                                .py_2()
+                                .rounded_md()
+                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
+                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                .cursor_pointer()
+                                .text_xs()
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(rgb(0xffffff))
+                                .child("Transfer ➔")
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                    this.sftp_transfer_selected(SftpActivePane::Left, cx);
+                                })),
+                        )
+                        .child(
+                            div()
+                                .px_3()
+                                .py_2()
+                                .rounded_md()
+                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
+                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                .cursor_pointer()
+                                .text_xs()
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(rgb(0xffffff))
+                                .child("⬅ Transfer")
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                    this.sftp_transfer_selected(SftpActivePane::Right, cx);
+                                })),
+                        ),
+                )
                 .child(
                     div()
                         .flex_1()
@@ -124,6 +205,8 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         )
         // Collapsible Bottom Transfers Drawer
         .children(transfers_drawer)
+        // Context Menu Overlay
+        .children(context_menu_overlay)
         // Modal Overlay
         .children(modal_overlay)
         .into_any_element()
@@ -163,8 +246,27 @@ fn render_pane(
         .bg(card_bg)
         .border_t_2()
         .border_color(focus_indicator)
-        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
             this.sftp_focus_pane(pane, cx);
+            if let Some(ref fh) = this.sftp_manager.focus_handle {
+                window.focus(fh, cx);
+            }
+        }))
+        .on_drop::<SftpDraggedItem>(cx.listener(move |this, dragged: &SftpDraggedItem, _window, cx| {
+            if dragged.source_pane != pane {
+                this.sftp_transfer_between_panes(dragged.source_pane, pane, dragged.filenames.clone(), cx);
+            }
+        }))
+        .on_drop::<ExternalPaths>(cx.listener(move |this, paths: &ExternalPaths, _window, cx| {
+            for path in paths.paths() {
+                if path.is_file() {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if let Ok(data) = std::fs::read(path) {
+                            this.sftp_upload_file(pane, name.to_string(), data, cx);
+                        }
+                    }
+                }
+            }
         }))
         // Pane Header: Source Selector & Focus Badge
         .child(
@@ -632,12 +734,19 @@ fn render_file_rows(
     let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
     let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
 
+    let pane_u64 = match pane {
+        SftpActivePane::Left => 0u64,
+        SftpActivePane::Right => 1u64,
+    };
+
     let rows: Vec<AnyElement> = files
         .iter()
-        .map(|file| {
+        .enumerate()
+        .map(|(idx, file)| {
             let is_selected = selected.contains(&file.name);
             let is_dir = file.is_dir;
             let file_name = file.name.clone();
+            let file_name_right = file.name.clone();
             let row_name = file.name.clone();
             let target_path = if is_dir {
                 join_path(current_path, &file.name)
@@ -657,7 +766,31 @@ fn render_file_rows(
                 &file.mod_time
             };
 
+            let drag_filenames = if selected.contains(&file.name) && selected.len() > 1 {
+                selected.iter().cloned().collect()
+            } else {
+                vec![file.name.clone()]
+            };
+
             div()
+                .id(ElementId::NamedInteger(
+                    "sftp-row".into(),
+                    (pane_u64 << 32) | (idx as u64),
+                ))
+                .on_drag(
+                    SftpDraggedItem {
+                        source_pane: pane,
+                        filenames: drag_filenames,
+                    },
+                    move |dragged: &SftpDraggedItem, _offset, _window, cx: &mut App| {
+                        let label = if dragged.filenames.len() == 1 {
+                            dragged.filenames[0].clone()
+                        } else {
+                            format!("{} items", dragged.filenames.len())
+                        };
+                        cx.new(|_| SftpDragPreview { label })
+                    },
+                )
                 .flex()
                 .flex_row()
                 .items_center()
@@ -698,13 +831,26 @@ fn render_file_rows(
                         .text_color(muted_text)
                         .child(formatted_date.to_string()),
                 )
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _window, cx| {
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                    this.sftp_focus_pane(pane, cx);
+                    if let Some(ref fh) = this.sftp_manager.focus_handle {
+                        window.focus(fh, cx);
+                    }
                     if is_dir && ev.click_count >= 2 {
                         this.sftp_navigate(pane, target_path.clone(), cx);
                     } else {
                         let multi = ev.modifiers.control || ev.modifiers.shift;
                         this.sftp_toggle_selection(pane, file_name.clone(), multi, cx);
                     }
+                }))
+                .on_mouse_down(MouseButton::Right, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                    let x = ev.position.x / px(1.0);
+                    let y = ev.position.y / px(1.0);
+                    this.sftp_select_single(pane, file_name_right.clone(), cx);
+                    if let Some(ref fh) = this.sftp_manager.focus_handle {
+                        window.focus(fh, cx);
+                    }
+                    this.sftp_open_context_menu(pane, file_name_right.clone(), is_dir, (x, y), cx);
                 }))
                 .into_any_element()
         })
@@ -1256,4 +1402,148 @@ fn render_sftp_modal(
         }
         _ => None,
     }
+}
+
+/// Render SFTP right-click context menu overlay.
+fn render_sftp_context_menu(
+    app: &AppState,
+    is_dark: bool,
+    cx: &mut Context<AppState>,
+) -> Option<AnyElement> {
+    let menu = app.sftp_manager.context_menu.as_ref()?;
+    let pane = menu.pane;
+    let filename = menu.filename.clone();
+    let other_pane = match pane {
+        SftpActivePane::Left => SftpActivePane::Right,
+        SftpActivePane::Right => SftpActivePane::Left,
+    };
+    let transfer_target_label = match other_pane {
+        SftpActivePane::Left => "Left Pane",
+        SftpActivePane::Right => "Right Pane",
+    };
+
+    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
+    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
+    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
+    let hover_bg = if is_dark { rgb(0x3f3f46) } else { rgb(0xf1f5f9) };
+
+    let x = (menu.position.0 - 10.0).max(10.0);
+    let y = (menu.position.1 - 10.0).max(10.0);
+
+    let fn_transfer = filename.clone();
+    let fn_rename = filename.clone();
+    let fn_delete = filename.clone();
+    let fn_copy = filename.clone();
+
+    Some(
+        div()
+            .absolute()
+            .inset_0()
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                this.sftp_close_context_menu(cx);
+            }))
+            .on_mouse_down(MouseButton::Right, cx.listener(|this, _, _window, cx| {
+                this.sftp_close_context_menu(cx);
+            }))
+            .child(
+                div()
+                    .absolute()
+                    .top(px(y))
+                    .left(px(x))
+                    .w(px(220.0))
+                    .rounded_lg()
+                    .bg(card_bg)
+                    .border_1()
+                    .border_color(border_color)
+                    .shadow_xl()
+                    .p_1()
+                    .flex()
+                    .flex_col()
+                    .gap_0p5()
+                    .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                    // 1. Transfer to opposite pane
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(hover_bg))
+                            .text_xs()
+                            .text_color(text_color)
+                            .child(format!("➡️ Transfer to {}", transfer_target_label))
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                this.sftp_close_context_menu(cx);
+                                this.sftp_transfer_between_panes(pane, other_pane, vec![fn_transfer.clone()], cx);
+                            })),
+                    )
+                    // 2. Rename
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(hover_bg))
+                            .text_xs()
+                            .text_color(text_color)
+                            .child("✏️ Rename")
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                this.sftp_close_context_menu(cx);
+                                this.sftp_open_rename_modal(pane, fn_rename.clone(), cx);
+                            })),
+                    )
+                    // 3. Delete
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(hover_bg))
+                            .text_xs()
+                            .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
+                            .child("🗑️ Delete")
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                this.sftp_close_context_menu(cx);
+                                this.sftp_open_delete_modal(pane, vec![fn_delete.clone()], cx);
+                            })),
+                    )
+                    // Divider
+                    .child(div().h_px().w_full().bg(border_color).my_0p5())
+                    // 4. Copy Path
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(hover_bg))
+                            .text_xs()
+                            .text_color(text_color)
+                            .child("📋 Copy Path")
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                this.sftp_copy_path(pane, &fn_copy, cx);
+                                this.sftp_close_context_menu(cx);
+                            })),
+                    ),
+            )
+            .into_any_element(),
+    )
 }

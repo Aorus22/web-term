@@ -7,15 +7,15 @@ last_updated: "2026-09-05T00:10:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 26
-  completed_plans: 18
-  percent: 69
+  completed_plans: 21
+  percent: 81
 ---
 
 performance_metrics:
   velocity:
-    total_plans_completed: 60
+    total_plans_completed: 63
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -31,6 +31,7 @@ performance_metrics:
     - { phase: "22-ssh-terminal-sessions-tabs", plans: 4, total_min: 50, avg_min: 12.5 }
     - { phase: "23-hosts-ssh-keys-management", plans: 4, total_min: 50, avg_min: 12.5 }
     - { phase: "24-local-terminal-cross-platform-pty", plans: 3, total_min: 35, avg_min: 11.7 }
+    - { phase: "25-sftp-dual-pane-manager", plans: 3, total_min: 45, avg_min: 15 }
 
 quick_tasks:
   completed:
@@ -73,6 +74,13 @@ accumulated_context:
     - "Phase 24: Extended WsConnectRequest::for_local_with_cwd supporting custom/inherited working directories across Windows ConPTY and Linux POSIX PTY"
     - "Phase 24: Elevated Local Shell to prominent first position in New Tab modal with OS-specific PTY badge (ConPTY / POSIX PTY)"
     - "Phase 24: Automated CI smoke test exercising real backend supervisor, local PTY connect, echo I/O, and resize on Windows and Linux"
+    - "Phase 25: Pinned reqwest multipart feature in desktop-gpui Cargo.toml for streaming SFTP file upload"
+    - "Phase 25: Implemented dual-pane manager with independent source selector dropdowns (Local Filesystem vs saved SSH connections)"
+    - "Phase 25: Added interactive New Folder, Rename, and Delete modals with presets, input validation, and permanent deletion confirmation"
+    - "Phase 25: Collapsible bottom transfer drawer displaying streaming byte counts, transfer direction, percentages, and status tags"
+    - "Phase 25: Wired inter-pane drag-and-drop (.on_drag + .on_drop::<SftpDraggedItem>) and host OS file manager drop (.on_drop::<ExternalPaths>)"
+    - "Phase 25: Right-click context menu and desktop keyboard shortcuts (Enter, Backspace, Alt+Up, F2, Delete, F5)"
+    - "Phase 25: Automated end-to-end integration test exercising real supervisor backend local filesystem lifecycle"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -85,13 +93,13 @@ accumulated_context:
 deferred_items: []
 session_continuity:
   last_session: 2026-09-05
-  stopped_at: Phase 24 completed and verified
+  stopped_at: Phase 25 completed and verified
   resume_file: null
-  next_step: Phase 25 — SFTP Dual-Pane Manager
+  next_step: Phase 26 — Port Forwarding, Settings & Theme Polish
 
 ## Current Position
 
-Phase: Phase 25 (SFTP Dual-Pane Manager)
+Phase: Phase 26 (Port Forwarding, Settings & Theme Polish)
 Plan: —
-Status: Ready for Phase 25
-Last activity: 2026-09-05 — Phase 24 (Local Terminal (Cross-Platform PTY)) completed and verified
+Status: Ready for Phase 26
+Last activity: 2026-09-05 — Phase 25 (SFTP Dual-Pane Manager) completed and verified

@@ -153,13 +153,16 @@ Plans:
   2. Directory browsing with breadcrumbs, metadata columns, and sorting in both panes
   3. Upload/download/delete/rename/new-folder work with progress indicators; transfers stream
   4. Drag-and-drop works within/between panes and from the OS file manager (Windows Explorer + Linux)
-- **Plans:** TBD
+- **Plans:** 3/3 plans executed
 
 Plans:
 
-- [ ] 25-01: Dual-pane layout + directory browsers (source selection, breadcrumbs, metadata, sorting)
-- [ ] 25-02: File operations (upload/download/delete/rename/new folder) with transfer progress
-- [ ] 25-03: Drag-and-drop (inter-pane + OS DnD) + context menus + keyboard shortcuts
+- [x] 25-01-PLAN.md
+- [x] 25-02-PLAN.md
+- [x] 25-03-PLAN.md
+- [x] 25-01: Dual-pane layout + directory browsers (source selection, breadcrumbs, metadata, sorting)
+- [x] 25-02: File operations (upload/download/delete/rename/new folder) with transfer progress
+- [x] 25-03: Drag-and-drop (inter-pane + OS DnD) + context menus + keyboard shortcuts
 
 ### Phase 26: Port Forwarding, Settings & Theme Polish
 

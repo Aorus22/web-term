@@ -332,6 +332,22 @@ impl From<SftpTransferStatus> for SftpTransferItem {
 }
 
 
+/// Context menu state for a file/folder row.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SftpContextMenu {
+    pub pane: SftpActivePane,
+    pub filename: String,
+    pub is_dir: bool,
+    pub position: (f32, f32),
+}
+
+/// Dragged item payload for inter-pane drag and drop.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SftpDraggedItem {
+    pub source_pane: SftpActivePane,
+    pub filenames: Vec<String>,
+}
+
 /// Manager state orchestrating both panes, modals, and transfers.
 #[derive(Debug, Clone)]
 pub struct SftpManager {
@@ -339,8 +355,10 @@ pub struct SftpManager {
     pub right_pane: SftpPaneState,
     pub focused_pane: SftpActivePane,
     pub modal: Option<SftpModalState>,
+    pub context_menu: Option<SftpContextMenu>,
     pub transfers: Vec<SftpTransferItem>,
     pub transfers_drawer_open: bool,
+    pub focus_handle: Option<FocusHandle>,
 }
 
 impl Default for SftpManager {
@@ -350,8 +368,10 @@ impl Default for SftpManager {
             right_pane: SftpPaneState::new("local", "Local Filesystem", "."),
             focused_pane: SftpActivePane::Left,
             modal: None,
+            context_menu: None,
             transfers: Vec::new(),
             transfers_drawer_open: false,
+            focus_handle: None,
         }
     }
 }
@@ -1986,6 +2006,105 @@ impl AppState {
     pub fn sftp_clear_selection(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
         self.sftp_pane_mut(pane).selected.clear();
         cx.notify();
+    }
+
+    /// Select exactly one item in a pane.
+    pub fn sftp_select_single(&mut self, pane: SftpActivePane, name: String, cx: &mut Context<Self>) {
+        self.sftp_manager.focused_pane = pane;
+        let state = self.sftp_pane_mut(pane);
+        state.selected.clear();
+        state.selected.insert(name);
+        cx.notify();
+    }
+
+    /// Open context menu for an item in a pane.
+    pub fn sftp_open_context_menu(
+        &mut self,
+        pane: SftpActivePane,
+        filename: String,
+        is_dir: bool,
+        position: (f32, f32),
+        cx: &mut Context<Self>,
+    ) {
+        self.sftp_manager.focused_pane = pane;
+        self.sftp_manager.context_menu = Some(SftpContextMenu {
+            pane,
+            filename,
+            is_dir,
+            position,
+        });
+        cx.notify();
+    }
+
+    /// Close SFTP context menu.
+    pub fn sftp_close_context_menu(&mut self, cx: &mut Context<Self>) {
+        self.sftp_manager.context_menu = None;
+        cx.notify();
+    }
+
+    /// Copy item path to clipboard.
+    pub fn sftp_copy_path(&mut self, pane: SftpActivePane, filename: &str, cx: &mut Context<Self>) {
+        let current_path = self.sftp_pane(pane).current_path.clone();
+        let full_path = join_path(&current_path, filename);
+        cx.write_to_clipboard(ClipboardItem::new_string(full_path.clone()));
+        self.notification = Some(format!("Copied '{}' to clipboard", full_path));
+        cx.notify();
+    }
+
+    /// Transfer all selected items from `from_pane` to the opposite pane.
+    pub fn sftp_transfer_selected(&mut self, from_pane: SftpActivePane, cx: &mut Context<Self>) {
+        let targets: Vec<String> = self.sftp_pane(from_pane).selected.iter().cloned().collect();
+        if targets.is_empty() {
+            self.notification = Some("No files selected to transfer".to_string());
+            cx.notify();
+            return;
+        }
+        let to_pane = match from_pane {
+            SftpActivePane::Left => SftpActivePane::Right,
+            SftpActivePane::Right => SftpActivePane::Left,
+        };
+        self.sftp_transfer_between_panes(from_pane, to_pane, targets, cx);
+    }
+
+    /// Handle SFTP keyboard shortcuts: Enter, Backspace, Alt+Up, F2, Delete, F5.
+    pub fn sftp_handle_key(&mut self, key: &str, is_alt: bool, cx: &mut Context<Self>) {
+        let focused = self.sftp_manager.focused_pane;
+        match key {
+            "f5" => {
+                self.sftp_load_pane(focused, cx);
+            }
+            "f2" => {
+                let pane_state = self.sftp_pane(focused);
+                if pane_state.selected.len() == 1 {
+                    let target = pane_state.selected.iter().next().unwrap().clone();
+                    self.sftp_open_rename_modal(focused, target, cx);
+                }
+            }
+            "delete" => {
+                let pane_state = self.sftp_pane(focused);
+                if !pane_state.selected.is_empty() {
+                    let targets: Vec<String> = pane_state.selected.iter().cloned().collect();
+                    self.sftp_open_delete_modal(focused, targets, cx);
+                }
+            }
+            "backspace" => {
+                self.sftp_navigate_up(focused, cx);
+            }
+            "up" if is_alt => {
+                self.sftp_navigate_up(focused, cx);
+            }
+            "enter" => {
+                let pane_state = self.sftp_pane(focused);
+                if pane_state.selected.len() == 1 {
+                    let name = pane_state.selected.iter().next().unwrap().clone();
+                    if let Some(f) = pane_state.files.iter().find(|item| item.name == name && item.is_dir) {
+                        let target_path = join_path(&pane_state.current_path, &f.name);
+                        self.sftp_navigate(focused, target_path, cx);
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Set search/filter query in a pane.

@@ -115,10 +115,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KEYS-01 | Phase 23 | Satisfied |
 | KEYS-02 | Phase 23 | Satisfied |
 | KEYS-03 | Phase 23 | Satisfied |
-| SFTP-01 | Phase 25 | Pending |
-| SFTP-02 | Phase 25 | Pending |
-| SFTP-03 | Phase 25 | Pending |
-| SFTP-04 | Phase 25 | Pending |
+| SFTP-01 | Phase 25 | Satisfied |
+| SFTP-02 | Phase 25 | Satisfied |
+| SFTP-03 | Phase 25 | Satisfied |
+| SFTP-04 | Phase 25 | Satisfied |
 | FWD-01 | Phase 26 | Pending |
 | SET-01 | Phase 26 | Pending |
 | QA-01 | Phase 27 | Pending |
