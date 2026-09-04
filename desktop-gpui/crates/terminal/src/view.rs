@@ -175,6 +175,25 @@ impl TerminalView {
         &mut self.renderer
     }
 
+    /// Dynamically update the color palette used by this terminal view.
+    pub fn set_palette(&mut self, palette: ColorPalette, cx: &mut Context<Self>) {
+        self.renderer.palette = palette;
+        cx.notify();
+    }
+
+    /// Return reference to the current color palette.
+    pub fn palette(&self) -> &ColorPalette {
+        &self.renderer.palette
+    }
+
+    /// Dynamically update the font size used by this terminal view.
+    pub fn set_font_size(&mut self, size: Pixels, cx: &mut Context<Self>) {
+        self.renderer.font_size = size;
+        self.renderer.cell_width = size * 0.6;
+        self.renderer.cell_height = size * self.renderer.line_height_multiplier;
+        cx.notify();
+    }
+
     /// Focus handle for keyboard input routing.
     pub fn focus_handle(&self) -> &FocusHandle {
         &self.focus_handle

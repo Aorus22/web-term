@@ -644,12 +644,20 @@ pub struct AppState {
     pub is_loading_forwards: bool,
     pub forward_modal: Option<ForwardFormState>,
     pub delete_forward_target: Option<PortForward>,
+    pub terminal_font_size: f32,
+    pub backend_path_input: String,
 }
 
 impl AppState {
     /// Create initial AppState from desktop settings.
     pub fn new(settings: DesktopSettings, spawn_opts: Option<SpawnOptions>) -> Self {
         let theme = settings.theme;
+        let backend_path_input = settings
+            .backend_path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
         Self {
             backend_status: BackendStatus::Starting,
             client: None,
@@ -687,6 +695,8 @@ impl AppState {
             is_loading_forwards: false,
             forward_modal: None,
             delete_forward_target: None,
+            terminal_font_size: 14.0,
+            backend_path_input,
         }
     }
 
@@ -1999,11 +2009,78 @@ impl AppState {
         }
     }
 
-    /// Toggle theme between Dark and Light and persist to settings store.
-    pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
-        self.theme = crate::theme::toggle_theme(self.theme);
+    /// Set application theme, apply to GPUI context, propagate palette across all terminal tabs, and persist.
+    pub fn set_theme(&mut self, theme: SettingsTheme, cx: &mut Context<Self>) {
+        self.theme = theme;
         self.settings.theme = self.theme;
         let _ = self.settings.save();
+
+        crate::theme::apply_theme(self.theme, cx);
+
+        let is_dark = self.theme != SettingsTheme::Light;
+        let palette = if is_dark {
+            webterm_terminal::ColorPalette::dark_default()
+        } else {
+            webterm_terminal::ColorPalette::light_default()
+        };
+
+        for session in self.session_manager.tabs_mut() {
+            if let Some(ref view) = session.view {
+                let p = palette.clone();
+                view.update(cx, |this, cx| {
+                    this.set_palette(p, cx);
+                });
+            }
+        }
+
+        cx.notify();
+    }
+
+    /// Toggle theme between Dark and Light.
+    pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
+        let next = crate::theme::toggle_theme(self.theme);
+        self.set_theme(next, cx);
+    }
+
+    /// Update terminal font size and propagate to all active terminal sessions.
+    pub fn set_terminal_font_size(&mut self, size: f32, cx: &mut Context<Self>) {
+        self.terminal_font_size = size.clamp(10.0, 24.0);
+        let px_size = px(self.terminal_font_size);
+        for session in self.session_manager.tabs_mut() {
+            if let Some(ref view) = session.view {
+                view.update(cx, |this, cx| {
+                    this.set_font_size(px_size, cx);
+                });
+            }
+        }
+        cx.notify();
+    }
+
+    /// Set a custom backend executable path override and save to settings.
+    pub fn set_backend_path_override(&mut self, path_str: &str, cx: &mut Context<Self>) {
+        let trimmed = path_str.trim();
+        if trimmed.is_empty() {
+            self.settings.backend_path = None;
+            self.backend_path_input.clear();
+            self.notification = Some("Reset backend path to default bundled binary".to_string());
+        } else {
+            self.settings.backend_path = Some(std::path::PathBuf::from(trimmed));
+            self.backend_path_input = trimmed.to_string();
+            self.notification = Some(
+                "Backend path override saved. Restart app to launch with updated binary."
+                    .to_string(),
+            );
+        }
+        let _ = self.settings.save();
+        cx.notify();
+    }
+
+    /// Reset backend executable path override to default bundled binary.
+    pub fn reset_backend_path_override(&mut self, cx: &mut Context<Self>) {
+        self.settings.backend_path = None;
+        self.backend_path_input.clear();
+        let _ = self.settings.save();
+        self.notification = Some("Reset backend path to default bundled binary".to_string());
         cx.notify();
     }
 
