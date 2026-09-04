@@ -2,6 +2,7 @@
 
 pub mod actions;
 pub mod app_state;
+pub mod bundle;
 pub mod session;
 pub mod theme;
 pub mod views;

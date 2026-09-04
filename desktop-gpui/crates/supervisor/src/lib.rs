@@ -102,6 +102,7 @@ impl SpawnOptions {
     /// Return the environment variable pairs injected into the child process.
     pub fn env_vars(&self) -> Vec<(&'static str, String)> {
         vec![
+            ("WEBTERM_HOST", "127.0.0.1".to_string()),
             ("WEBTERM_PORT", ":0".to_string()),
             ("WEBTERM_DB_PATH", self.db_path.to_string_lossy().to_string()),
             ("WEBTERM_ENCRYPTION_KEY", self.encryption_key.clone()),

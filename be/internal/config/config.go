@@ -12,6 +12,7 @@ import (
 )
 
 type Config struct {
+	Host            string
 	Port            string
 	DBPath          string
 	EncryptionKey   []byte
@@ -23,6 +24,7 @@ func Load() (*Config, error) {
 	godotenv.Load()
 
 	cfg := &Config{
+		Host:           getEnv("WEBTERM_HOST", "0.0.0.0"),
 		Port:           getEnv("WEBTERM_PORT", ":8080"),
 		DBPath:         getEnv("WEBTERM_DB_PATH", "data/webterm.db"),
 		SSRFAllowlist:  splitEnv("WEBTERM_SSRF_ALLOWLIST", ""),

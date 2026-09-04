@@ -80,9 +80,11 @@ func main() {
 	handler := corsMux(mux, cfg.AllowedOrigins)
 
 	// Create listener first to support port 0 (dynamic port)
-	ln, err := net.Listen("tcp", "0.0.0.0"+cfg.Port)
+	portStr := strings.TrimPrefix(cfg.Port, ":")
+	bindAddr := net.JoinHostPort(cfg.Host, portStr)
+	ln, err := net.Listen("tcp", bindAddr)
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		log.Fatalf("Failed to listen on %s: %v", bindAddr, err)
 	}
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 

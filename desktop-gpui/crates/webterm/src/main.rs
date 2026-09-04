@@ -1,42 +1,16 @@
 //! WebTerm desktop client (GPUI).
 
 use std::borrow::Cow;
-use std::path::PathBuf;
 use std::sync::Arc;
 use gpui::*;
 use parking_lot::Mutex;
 use webterm::actions;
 use webterm::app_state::AppState;
+use webterm::bundle::resolve_backend_path;
 use webterm::theme;
 use webterm::window_state;
 use webterm_settings::DesktopSettings;
 use webterm_supervisor::SpawnOptions;
-
-fn resolve_backend_path(settings: &DesktopSettings) -> PathBuf {
-    if let Some(ref path) = settings.backend_path {
-        return path.clone();
-    }
-
-    // Default resolution candidates
-    let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
-    let bin_name = format!("backend{}", exe_suffix);
-
-    let candidates = [
-        PathBuf::from("test-support").join(&bin_name),
-        PathBuf::from("desktop-gpui/test-support").join(&bin_name),
-        PathBuf::from("../../desktop-gpui/test-support").join(&bin_name),
-        PathBuf::from("../test-support").join(&bin_name),
-    ];
-
-    for c in candidates {
-        if c.exists() {
-            return c.canonicalize().unwrap_or(c);
-        }
-    }
-
-    // Fallback path
-    PathBuf::from(format!("test-support/{}", bin_name))
-}
 
 fn main() {
     // 1. Headless bootstrap: load settings, ensure encryption key, resolve paths
