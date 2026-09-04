@@ -6,6 +6,10 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[lib]
+name = "webterm"
+path = "src/lib.rs"
+
 [[bin]]
 name = "webterm"
 path = "src/main.rs"

@@ -140,6 +140,26 @@ impl TerminalView {
         self
     }
 
+    /// Update callback invoked when terminal generates input bytes.
+    pub fn set_input_callback<F: Fn(&[u8]) + Send + Sync + 'static>(&mut self, f: F) {
+        self.input_callback = Some(Arc::new(f));
+    }
+
+    /// Update callback invoked when terminal grid dimensions change.
+    pub fn set_resize_callback<F: Fn(usize, usize) + Send + Sync + 'static>(&mut self, f: F) {
+        self.resize_callback = Some(Arc::new(f));
+    }
+
+    /// Update callback invoked when terminal title changes.
+    pub fn set_title_callback<F: Fn(&str) + Send + Sync + 'static>(&mut self, f: F) {
+        self.title_callback = Some(Arc::new(f));
+    }
+
+    /// Update callback invoked when terminal bell triggers.
+    pub fn set_bell_callback<F: Fn() + Send + Sync + 'static>(&mut self, f: F) {
+        self.bell_callback = Some(Arc::new(f));
+    }
+
     /// Access the underlying `Terminal` mutex.
     pub fn terminal(&self) -> Arc<Mutex<Terminal>> {
         Arc::clone(&self.terminal)

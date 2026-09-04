@@ -1,18 +1,16 @@
 //! WebTerm desktop client (GPUI).
 
-mod app_state;
-mod theme;
-mod views;
-mod window_state;
-
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 use gpui::*;
 use parking_lot::Mutex;
+use webterm::actions;
+use webterm::app_state::AppState;
+use webterm::theme;
+use webterm::window_state;
 use webterm_settings::DesktopSettings;
 use webterm_supervisor::SpawnOptions;
-use app_state::AppState;
 
 fn resolve_backend_path(settings: &DesktopSettings) -> PathBuf {
     if let Some(ref path) = settings.backend_path {
@@ -66,9 +64,10 @@ fn main() {
         let font_bytes: &'static [u8] = include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf");
         let _ = cx.text_system().add_fonts(vec![Cow::Borrowed(font_bytes)]);
 
-        // Initialize gpui-component subsystem
+        // Initialize gpui-component subsystem and keybindings
         gpui_component::init(cx);
         theme::apply_theme(settings.theme, cx);
+        actions::bind_tab_keys(cx);
 
         let window_options = WindowOptions {
             window_bounds: Some(initial_bounds),
