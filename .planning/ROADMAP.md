@@ -22,7 +22,7 @@ Build the GPUI desktop client: app shell + backend integration, terminal renderi
 | Phase | Milestone | Description | Status | Target |
 |-------|-----------|-------------|--------|--------|
 | **20. Desktop Foundation & Backend Integration** | v0.5.0 | Cargo workspace, pinned deps + CI, GPUI app shell, backend supervisor + client, startup UX. | ✓ Complete | 2026-09-08 |
-| **21. Terminal Rendering (Alacritty Engine)** | v0.5.0 | gpui-terminal spike with go/no-go; alacritty_terminal state + GPUI render; selection, scrollback, truecolor. | ○ Not started | 2026-09-10 |
+| **21. Terminal Rendering (Alacritty Engine)** | v0.5.0 | gpui-terminal spike with go/no-go; alacritty_terminal state + GPUI render; selection, scrollback, truecolor. | ✓ Complete | 2026-09-10 |
 | **22. SSH Terminal Sessions & Tabs** | v0.5.0 | SSH connect (password/key), multi-tab with status dots, resize sync, shortcuts, reconnection + re-attach. | ○ Not started | 2026-09-14 |
 | **23. Hosts & SSH Keys Management** | v0.5.0 | Host cards, kebab menus, tags, search, quick-connect, import/export; key pool, passphrase flow, auth method. | ○ Not started | 2026-09-16 |
 | **24. Local Terminal (Cross-Platform PTY)** | v0.5.0 | Local terminal tab on Linux (backend path) + Windows (ConPTY decision with go/no-go). | ○ Not started | 2026-09-18 |

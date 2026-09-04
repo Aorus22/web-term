@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v0.5.0
 milestone_name: Desktop GPUI Client
 status: executing
-last_updated: "2026-09-04T22:57:00.000Z"
+last_updated: "2026-09-04T23:30:00.000Z"
 last_activity: 2026-09-04
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 26
-  completed_plans: 4
-  percent: 15
+  completed_plans: 7
+  percent: 27
 ---
 
 performance_metrics:
   velocity:
-    total_plans_completed: 46
+    total_plans_completed: 49
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -27,6 +27,7 @@ performance_metrics:
     - { phase: "18-terminal-engine-selector", plans: 3, total_min: 45, avg_min: 15 }
     - { phase: "19-review-fixes", plans: 1, total_min: 20, avg_min: 20 }
     - { phase: "20-desktop-foundation-backend-integration", plans: 4, total_min: 60, avg_min: 15 }
+    - { phase: "21-terminal-rendering-alacritty-engine", plans: 3, total_min: 40, avg_min: 13.3 }
 
 quick_tasks:
   completed:
@@ -52,6 +53,10 @@ accumulated_context:
     - "Phase 20: Pinned gpui-pre 0.3.3 and gpui-pre-platform 0.3.3 to guarantee exact binary compatibility with gpui-component 0.6.0"
     - "Phase 20: Decoupled Tokio supervisor runner from GPUI async executor using an unbounded MPSC channel (SupervisorEvent)"
     - "Phase 20: Stored window bounds dividing Pixels by px(1.0) and persisting on close with degenerate geometry protection"
+    - "Phase 21: Recorded explicit NO-GO on crates.io gpui-terminal 0.1.0 due to unresolvable gpui 0.2.2 vs gpui-pre 0.3.3 dependency conflict; vendored clean in-tree engine in desktop-gpui/crates/terminal"
+    - "Phase 21: Used native GPUI clipboard API (cx.write_to_clipboard / cx.read_from_clipboard) for seamless terminal copy/paste"
+    - "Phase 21: Implemented background quad coalescing and text run batching for 60+ FPS GPUI rendering"
+    - "Phase 21: Mapped mouse click count (1 = simple, 2 = semantic word, 3+ = line) and keystroke escape sequence translation with APP_CURSOR support"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -64,13 +69,13 @@ accumulated_context:
 deferred_items: []
 session_continuity:
   last_session: 2026-09-04
-  stopped_at: Phase 20 completed and verified
+  stopped_at: Phase 21 completed and verified
   resume_file: null
-  next_step: Phase 21 — Terminal Rendering (Alacritty Engine)
+  next_step: Phase 22 — SSH Terminal Sessions & Tabs
 
 ## Current Position
 
-Phase: Phase 21 (Terminal Rendering - Alacritty Engine)
+Phase: Phase 22 (SSH Terminal Sessions & Tabs)
 Plan: —
-Status: Ready for Phase 21
-Last activity: 2026-09-04 — Phase 20 (Desktop Foundation & Backend Integration) completed and verified
+Status: Ready for Phase 22
+Last activity: 2026-09-04 — Phase 21 (Terminal Rendering - Alacritty Engine) completed and verified

@@ -18,10 +18,10 @@ Requirements for the desktop client. Each maps to roadmap phases.
 
 ### Terminal
 
-- [ ] **TERM-01**: User can work in SSH sessions rendered by the alacritty engine (vim, htop, tmux, curses apps, truecolor)
-- [ ] **TERM-02**: User can select text with the mouse and copy it, and paste into the terminal
-- [ ] **TERM-03**: User can scroll through scrollback history
-- [ ] **TERM-04**: Terminal resizes with the window and keeps the PTY grid in sync
+- [x] **TERM-01**: User can work in SSH sessions rendered by the alacritty engine (vim, htop, tmux, curses apps, truecolor)
+- [x] **TERM-02**: User can select text with the mouse and copy it, and paste into the terminal
+- [x] **TERM-03**: User can scroll through scrollback history
+- [x] **TERM-04**: Terminal resizes with the window and keeps the PTY grid in sync
 - [ ] **TERM-05**: User can open a local terminal tab (shell on the desktop host), first-class in New Tab
 - [ ] **TERM-06**: Terminal sessions reconnect after a WebSocket drop, with reconnection UX
 - [ ] **TERM-07**: Terminal sessions survive an app restart via backend session re-attach
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHELL-03 | Phase 20 | Satisfied |
 | SHELL-05 | Phase 20 | Satisfied |
 | SHELL-06 | Phase 20 | Satisfied |
-| TERM-01 | Phase 21 | Pending |
-| TERM-02 | Phase 21 | Pending |
-| TERM-03 | Phase 21 | Pending |
-| TERM-04 | Phase 21 | Pending |
+| TERM-01 | Phase 21 | Satisfied |
+| TERM-02 | Phase 21 | Satisfied |
+| TERM-03 | Phase 21 | Satisfied |
+| TERM-04 | Phase 21 | Satisfied |
 | TERM-05 | Phase 24 | Pending |
 | TERM-06 | Phase 22 | Pending |
 | TERM-07 | Phase 22 | Pending |
