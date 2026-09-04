@@ -388,7 +388,74 @@ fn render_pane(
                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                     this.sftp_open_new_folder_modal(pane, cx);
                                 })),
-                        ),
+                        )
+                        .children(if state.selected.len() == 1 {
+                            let item_to_rename = state.selected.iter().next().unwrap().clone();
+                            Some(
+                                div()
+                                    .px_2()
+                                    .py_0p5()
+                                    .rounded_sm()
+                                    .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
+                                    .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
+                                    .cursor_pointer()
+                                    .text_xs()
+                                    .child("✏️ Rename")
+                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                        this.sftp_open_rename_modal(pane, item_to_rename.clone(), cx);
+                                    })),
+                            )
+                        } else {
+                            None
+                        })
+                        .children(if !state.selected.is_empty() {
+                            let targets: Vec<String> = state.selected.iter().cloned().collect();
+                            Some(
+                                div()
+                                    .px_2()
+                                    .py_0p5()
+                                    .rounded_sm()
+                                    .bg(if is_dark { rgb(0x450a0a) } else { rgb(0xfee2e2) })
+                                    .hover(|s| s.bg(if is_dark { rgb(0x7f1d1d) } else { rgb(0xfecaca) }))
+                                    .cursor_pointer()
+                                    .text_xs()
+                                    .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
+                                    .child(format!("🗑️ Delete ({})", state.selected.len()))
+                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                        this.sftp_open_delete_modal(pane, targets.clone(), cx);
+                                    })),
+                            )
+                        } else {
+                            None
+                        })
+                        .children(if !state.selected.is_empty() {
+                            let targets: Vec<String> = state.selected.iter().cloned().collect();
+                            let other_pane = match pane {
+                                SftpActivePane::Left => SftpActivePane::Right,
+                                SftpActivePane::Right => SftpActivePane::Left,
+                            };
+                            let transfer_label = match pane {
+                                SftpActivePane::Left => "➡️ Copy Right",
+                                SftpActivePane::Right => "⬅️ Copy Left",
+                            };
+                            Some(
+                                div()
+                                    .px_2()
+                                    .py_0p5()
+                                    .rounded_sm()
+                                    .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
+                                    .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                    .cursor_pointer()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(format!("{} ({})", transfer_label, state.selected.len()))
+                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                        this.sftp_transfer_between_panes(pane, other_pane, targets.clone(), cx);
+                                    })),
+                            )
+                        } else {
+                            None
+                        }),
                 ),
         )
         // Table Header: Name, Size, Modified
@@ -840,11 +907,17 @@ fn render_sftp_modal(
 
     let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
     let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
+    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
     let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let input_bg = if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) };
 
     match modal {
-        SftpModalState::NewFolder { pane, name: _ } => {
+        SftpModalState::NewFolder { pane, name, error } => {
             let pane = *pane;
+            let folder_name = name.clone();
+            let err_opt = error.clone();
+            let presets = ["docs", "assets", "src", "build", "backup", "temp"];
+
             Some(
                 div()
                     .absolute()
@@ -860,7 +933,7 @@ fn render_sftp_modal(
                         div()
                             .flex()
                             .flex_col()
-                            .w(px(380.0))
+                            .w(px(400.0))
                             .rounded_xl()
                             .bg(card_bg)
                             .border_1()
@@ -868,13 +941,67 @@ fn render_sftp_modal(
                             .p_6()
                             .gap_4()
                             .on_mouse_down(MouseButton::Left, |_, _, _| {})
-                            .child(div().text_base().font_weight(FontWeight::BOLD).child("Create New Directory"))
+                            .child(div().text_base().font_weight(FontWeight::BOLD).text_color(text_color).child("Create New Directory"))
                             .child(
                                 div()
                                     .text_xs()
                                     .text_color(muted_text)
-                                    .child("Enter the name of the new folder to create in the current directory:"),
+                                    .child("Folder name:"),
                             )
+                            // Input field
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_md()
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(border_color)
+                                    .text_sm()
+                                    .text_color(text_color)
+                                    .child(if folder_name.is_empty() {
+                                        "new-folder".to_string()
+                                    } else {
+                                        folder_name.clone()
+                                    }),
+                            )
+                            // Quick presets
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .flex_wrap()
+                                    .gap_1()
+                                    .children(presets.iter().map(|preset| {
+                                        let p = preset.to_string();
+                                        div()
+                                            .px_2()
+                                            .py_1()
+                                            .rounded_sm()
+                                            .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
+                                            .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .text_color(text_color)
+                                            .child(format!("+ {}", p))
+                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                this.sftp_set_modal_input(p.clone(), cx);
+                                            }))
+                                    })),
+                            )
+                            // Error banner
+                            .children(err_opt.map(|err| {
+                                div()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(if is_dark { rgb(0x450a0a) } else { rgb(0xfee2e2) })
+                                    .border_1()
+                                    .border_color(rgb(0xef4444))
+                                    .text_xs()
+                                    .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
+                                    .child(format!("⚠️ {err}"))
+                            }))
                             .child(
                                 div()
                                     .flex()
@@ -905,17 +1032,7 @@ fn render_sftp_modal(
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child("Create")
                                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                let target = "new-folder".to_string();
-                                                let curr = this.sftp_pane(pane).current_path.clone();
-                                                let full = join_path(&curr, &target);
-                                                let conn = this.sftp_pane(pane).source_id.clone();
-                                                if let Some(client) = this.client.clone() {
-                                                    crate::app_state::TOKIO_RT.spawn(async move {
-                                                        let _ = client.sftp_mkdir(&conn, &full).await;
-                                                    });
-                                                }
-                                                this.sftp_close_modal(cx);
-                                                this.sftp_load_pane(pane, cx);
+                                                this.sftp_create_folder(pane, &folder_name, cx);
                                             })),
                                     ),
                             ),
@@ -923,10 +1040,116 @@ fn render_sftp_modal(
                     .into_any_element(),
             )
         }
-        SftpModalState::DeleteConfirm { pane, targets } => {
+        SftpModalState::Rename { pane, old_name, new_name, error } => {
+            let pane = *pane;
+            let old_name_clone = old_name.clone();
+            let new_name_clone = new_name.clone();
+            let err_opt = error.clone();
+
+            Some(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .bg(rgba(0x00000088))
+                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                        this.sftp_close_modal(cx);
+                    }))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .w(px(400.0))
+                            .rounded_xl()
+                            .bg(card_bg)
+                            .border_1()
+                            .border_color(border_color)
+                            .p_6()
+                            .gap_4()
+                            .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                            .child(div().text_base().font_weight(FontWeight::BOLD).text_color(text_color).child("Rename Item"))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted_text)
+                                    .child(format!("Original name: {}", old_name_clone)),
+                            )
+                            // Input field
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_md()
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(border_color)
+                                    .text_sm()
+                                    .text_color(text_color)
+                                    .child(if new_name_clone.is_empty() {
+                                        "new-name".to_string()
+                                    } else {
+                                        new_name_clone.clone()
+                                    }),
+                            )
+                            // Error banner
+                            .children(err_opt.map(|err| {
+                                div()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(if is_dark { rgb(0x450a0a) } else { rgb(0xfee2e2) })
+                                    .border_1()
+                                    .border_color(rgb(0xef4444))
+                                    .text_xs()
+                                    .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
+                                    .child(format!("⚠️ {err}"))
+                            }))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .justify_end()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .px_4()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .child("Cancel")
+                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                                this.sftp_close_modal(cx);
+                                            })),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_4()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child("Rename")
+                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                this.sftp_rename_entry(pane, &old_name_clone, &new_name_clone, cx);
+                                            })),
+                                    ),
+                            ),
+                    )
+                    .into_any_element(),
+            )
+        }
+        SftpModalState::DeleteConfirm { pane, targets, error } => {
             let pane = *pane;
             let targets_count = targets.len();
             let targets_clone = targets.clone();
+            let err_opt = error.clone();
+
             Some(
                 div()
                     .absolute()
@@ -960,6 +1183,38 @@ fn render_sftp_modal(
                                         targets_count
                                     )),
                             )
+                            // Targets list
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .max_h(px(120.0))
+                                    .overflow_hidden()
+                                    .children(targets_clone.iter().map(|name| {
+                                        div()
+                                            .px_2()
+                                            .py_1()
+                                            .rounded_sm()
+                                            .bg(input_bg)
+                                            .text_xs()
+                                            .text_color(text_color)
+                                            .child(format!("• {}", name))
+                                    })),
+                            )
+                            // Error banner
+                            .children(err_opt.map(|err| {
+                                div()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(if is_dark { rgb(0x450a0a) } else { rgb(0xfee2e2) })
+                                    .border_1()
+                                    .border_color(rgb(0xef4444))
+                                    .text_xs()
+                                    .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
+                                    .child(format!("⚠️ {err}"))
+                            }))
                             .child(
                                 div()
                                     .flex()
@@ -991,20 +1246,7 @@ fn render_sftp_modal(
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child("Delete Permanently")
                                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                let curr = this.sftp_pane(pane).current_path.clone();
-                                                let conn = this.sftp_pane(pane).source_id.clone();
-                                                let targets = targets_clone.clone();
-                                                if let Some(client) = this.client.clone() {
-                                                    crate::app_state::TOKIO_RT.spawn(async move {
-                                                        for item in targets {
-                                                            let full = join_path(&curr, &item);
-                                                            let _ = client.sftp_remove(&conn, &full).await;
-                                                        }
-                                                    });
-                                                }
-                                                this.sftp_close_modal(cx);
-                                                this.sftp_clear_selection(pane, cx);
-                                                this.sftp_load_pane(pane, cx);
+                                                this.sftp_delete_selected(pane, targets_clone.clone(), cx);
                                             })),
                                     ),
                             ),
