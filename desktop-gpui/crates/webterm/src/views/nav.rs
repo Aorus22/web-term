@@ -111,7 +111,11 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .flex_1()
                 .h_full()
                 .p_8()
-                .child(render_content_pane(active_view, is_dark)),
+                .child(if active_view == View::Settings {
+                    crate::views::settings::render_settings_view(app, cx)
+                } else {
+                    render_content_pane(active_view, is_dark)
+                }),
         )
         .into_any_element()
 }
@@ -121,7 +125,7 @@ fn render_content_pane(view: View, is_dark: bool) -> AnyElement {
         View::Hosts => ("Hosts", "Host connection catalog — arrives in Phase 23"),
         View::Keys => ("SSH Keys", "Key vault and passphrases — arrives in Phase 23"),
         View::Sftp => ("SFTP", "SFTP Dual-Pane File Manager — arrives in Phase 25"),
-        View::Settings => ("Settings", "Desktop configuration and engine selection — arrives in Phase 26"),
+        View::Settings => ("Settings", "Settings"),
     };
 
     let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
