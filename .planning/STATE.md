@@ -7,15 +7,15 @@ last_updated: "2026-09-05T00:10:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 26
-  completed_plans: 15
-  percent: 58
+  completed_plans: 18
+  percent: 69
 ---
 
 performance_metrics:
   velocity:
-    total_plans_completed: 57
+    total_plans_completed: 60
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -30,6 +30,7 @@ performance_metrics:
     - { phase: "21-terminal-rendering-alacritty-engine", plans: 3, total_min: 40, avg_min: 13.3 }
     - { phase: "22-ssh-terminal-sessions-tabs", plans: 4, total_min: 50, avg_min: 12.5 }
     - { phase: "23-hosts-ssh-keys-management", plans: 4, total_min: 50, avg_min: 12.5 }
+    - { phase: "24-local-terminal-cross-platform-pty", plans: 3, total_min: 35, avg_min: 11.7 }
 
 quick_tasks:
   completed:
@@ -68,6 +69,10 @@ accumulated_context:
     - "Phase 23: Persistent Hosts Catalog tab in tab strip with reactive switching to/from terminal sessions"
     - "Phase 23: Session-scoped SSH key passphrase caching in memory strictly excluding sensitive passphrases from settings disk storage"
     - "Phase 23: Self-contained RFC 4648 Base64 encoder avoiding external dependency version churn"
+    - "Phase 24: Formalized architecture decision (CONPTY-DECISION.md) standardizing on Go backend ConPTY path over portable-pty to preserve unified WebSocket pipeline and cross-restart durability"
+    - "Phase 24: Extended WsConnectRequest::for_local_with_cwd supporting custom/inherited working directories across Windows ConPTY and Linux POSIX PTY"
+    - "Phase 24: Elevated Local Shell to prominent first position in New Tab modal with OS-specific PTY badge (ConPTY / POSIX PTY)"
+    - "Phase 24: Automated CI smoke test exercising real backend supervisor, local PTY connect, echo I/O, and resize on Windows and Linux"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -80,13 +85,13 @@ accumulated_context:
 deferred_items: []
 session_continuity:
   last_session: 2026-09-05
-  stopped_at: Phase 23 completed and verified
+  stopped_at: Phase 24 completed and verified
   resume_file: null
-  next_step: Phase 24 — Local Terminal (Cross-Platform PTY)
+  next_step: Phase 25 — SFTP Dual-Pane Manager
 
 ## Current Position
 
-Phase: Phase 24 (Local Terminal (Cross-Platform PTY))
+Phase: Phase 25 (SFTP Dual-Pane Manager)
 Plan: —
-Status: Ready for Phase 24
-Last activity: 2026-09-05 — Phase 23 (Hosts & SSH Keys Management) completed and verified
+Status: Ready for Phase 25
+Last activity: 2026-09-05 — Phase 24 (Local Terminal (Cross-Platform PTY)) completed and verified

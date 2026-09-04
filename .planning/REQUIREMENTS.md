@@ -103,7 +103,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TERM-02 | Phase 21 | Satisfied |
 | TERM-03 | Phase 21 | Satisfied |
 | TERM-04 | Phase 21 | Satisfied |
-| TERM-05 | Phase 22 | Satisfied |
+| TERM-05 | Phase 24 | Satisfied |
 | TERM-06 | Phase 22 | Satisfied |
 | TERM-07 | Phase 22 | Satisfied |
 | TERM-08 | Phase 22 | Satisfied |

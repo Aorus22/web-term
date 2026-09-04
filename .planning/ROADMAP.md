@@ -132,13 +132,16 @@ Plans:
   1. Local terminal opens from New Tab as a first-class option on Linux (backend PTY path)
   2. Local terminal opens on Windows via the chosen ConPTY path (Go-side extension or Rust-side portable-pty), with a recorded decision
   3. A Windows CI smoke test exercises the local terminal path
-- **Plans:** TBD
+- **Plans:** 3/3 plans executed
+- [x] 24-01-PLAN.md
+- [x] 24-02-PLAN.md
+- [x] 24-03-PLAN.md
 
 Plans:
 
-- [ ] 24-01: ConPTY spike + decision record (Go wrapper vs portable-pty bypass)
-- [ ] 24-02: Implement chosen path + New Tab ordering parity
-- [ ] 24-03: Windows CI smoke test for local terminal
+- [x] 24-01: ConPTY spike + decision record (Go wrapper vs portable-pty bypass)
+- [x] 24-02: Implement chosen path + New Tab ordering parity
+- [x] 24-03: Windows CI smoke test for local terminal
 
 ### Phase 25: SFTP Dual-Pane Manager
 
@@ -196,12 +199,12 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Desktop Foundation & Backend Integration | 0/4 | Not started | - |
-| 21. Terminal Rendering (Alacritty Engine) | 0/3 | Not started | - |
-| 22. SSH Terminal Sessions & Tabs | 0/4 | Not started | - |
-| 23. Hosts & SSH Keys Management | 0/4 | Not started | - |
-| 24. Local Terminal (Cross-Platform PTY) | 0/3 | Not started | - |
-| 25. SFTP Dual-Pane Manager | 0/3 | Not started | - |
+| 20. Desktop Foundation & Backend Integration | 4/4 | Complete | 2026-09-04 |
+| 21. Terminal Rendering (Alacritty Engine) | 3/3 | Complete | 2026-09-04 |
+| 22. SSH Terminal Sessions & Tabs | 4/4 | Complete | 2026-09-05 |
+| 23. Hosts & SSH Keys Management | 4/4 | Complete | 2026-09-05 |
+| 24. Local Terminal (Cross-Platform PTY) | 3/3 | Complete | 2026-09-05 |
+| 25. SFTP Dual-Pane Manager | 0/3 | Ready | - |
 | 26. Port Forwarding, Settings & Theme Polish | 0/2 | Not started | - |
 | 27. Parity Audit & Desktop Hardening | 0/3 | Not started | - |
 
