@@ -1,13 +1,19 @@
 //! Typed HTTP/WS client for the local WebTerm backend.
 //!
-//! Provides DTO definitions mirroring backend models and a typed REST client
-//! for interacting with backend endpoints.
+//! Provides DTO definitions mirroring backend models, a typed REST client
+//! for interacting with backend endpoints, and a WebSocket client for
+//! terminal streaming and PTY control.
 
 pub mod rest;
+pub mod terminal_ws;
 pub mod types;
 
 pub use rest::{BackendClient, ClientError};
-pub use types::{Connection, Settings};
+pub use terminal_ws::{
+    normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsAttachRequest,
+    WsConnectRequest, WsServerResponse, WsStatus,
+};
+pub use types::{Connection, SessionInfo, Settings};
 
 #[cfg(test)]
 mod tests {
@@ -78,5 +84,39 @@ mod tests {
         assert_eq!(list[1].id, "c2");
         assert_eq!(list[1].label, "Dev Box");
         assert_eq!(list[1].port, 2222);
+    }
+
+    #[tokio::test]
+    async fn test_list_sessions_parses() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener.accept().await {
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let body = r#"[
+                    {"id":"sess-1","type":"ssh","host":"10.0.0.1","user":"admin","port":22,"connection_id":"c1","status":"active","cwd":"/home/admin"},
+                    {"id":"sess-2","type":"local","host":"local","user":"local","port":0,"connection_id":"local","status":"detached"}
+                ]"#;
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = socket.write_all(response.as_bytes()).await;
+            }
+        });
+
+        let client = BackendClient::new(format!("http://127.0.0.1:{}", port));
+        let list = client.list_sessions().await.expect("should list sessions");
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].id, "sess-1");
+        assert_eq!(list[0].session_type, "ssh");
+        assert_eq!(list[0].status, "active");
+        assert_eq!(list[0].cwd.as_deref(), Some("/home/admin"));
+        assert_eq!(list[1].id, "sess-2");
+        assert_eq!(list[1].session_type, "local");
+        assert_eq!(list[1].status, "detached");
     }
 }

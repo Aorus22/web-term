@@ -16,9 +16,6 @@ pub struct Settings {
 }
 
 /// Connection definition mirrored from the backend db.Connection model.
-///
-/// Fields match JSON tags in be/internal/db/models.go.
-/// TODO: Expand in Phase 22/23 as connection management and terminal views mature.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Connection {
     pub id: String,
@@ -37,4 +34,20 @@ pub struct Connection {
     pub created_at: Option<String>,
     #[serde(default)]
     pub updated_at: Option<String>,
+}
+
+/// Active or detached session returned by GET /api/sessions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionInfo {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub session_type: String, // "ssh" | "local"
+    pub host: String,
+    pub user: String,
+    pub port: u16,
+    #[serde(default)]
+    pub connection_id: Option<String>,
+    pub status: String, // "active" | "detached"
+    #[serde(default)]
+    pub cwd: Option<String>,
 }

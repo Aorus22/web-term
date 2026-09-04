@@ -1,6 +1,7 @@
 use std::time::Duration;
 use thiserror::Error;
-use crate::types::{Connection, Settings};
+use crate::terminal_ws::{normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsConnectRequest};
+use crate::types::{Connection, SessionInfo, Settings};
 
 #[derive(Debug, Error)]
 pub enum ClientError {
@@ -22,9 +23,11 @@ pub enum ClientError {
         #[source]
         source: reqwest::Error,
     },
+    #[error("WebSocket terminal error: {0}")]
+    WebSocket(#[from] TerminalWsError),
 }
 
-/// Client for communicating with the local WebTerm backend REST API.
+/// Client for communicating with the local WebTerm backend REST and WebSocket APIs.
 #[derive(Debug, Clone)]
 pub struct BackendClient {
     base_url: String,
@@ -100,5 +103,62 @@ impl BackendClient {
             url,
             source: e,
         })
+    }
+
+    /// Fetch active backend sessions from GET /api/sessions.
+    pub async fn list_sessions(&self) -> Result<Vec<SessionInfo>, ClientError> {
+        let url = format!("{}/api/sessions", self.base_url);
+        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Vec<SessionInfo>>().await.map_err(|e| ClientError::Decode {
+            url,
+            source: e,
+        })
+    }
+
+    /// Terminate an active backend session via DELETE /api/sessions/:id.
+    pub async fn delete_session(&self, session_id: &str) -> Result<(), ClientError> {
+        let url = format!("{}/api/sessions/{}", self.base_url, session_id);
+        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
+            url: url.clone(),
+            source: e,
+        })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Open a WebSocket terminal connection to the backend.
+    pub async fn connect_terminal(
+        &self,
+        request: WsConnectRequest,
+    ) -> Result<TerminalWsHandle, ClientError> {
+        let ws_url = normalize_ws_url(&self.base_url);
+        let handle = TerminalWsClient::connect(&ws_url, request).await?;
+        Ok(handle)
+    }
+
+    /// Re-attach to an existing backend terminal session by session ID.
+    pub async fn attach_terminal(
+        &self,
+        session_id: &str,
+    ) -> Result<TerminalWsHandle, ClientError> {
+        let ws_url = normalize_ws_url(&self.base_url);
+        let handle = TerminalWsClient::attach(&ws_url, session_id).await?;
+        Ok(handle)
     }
 }

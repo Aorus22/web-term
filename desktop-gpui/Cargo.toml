@@ -24,6 +24,8 @@ webterm-terminal = { path = "crates/terminal" }
 alacritty_terminal = "=0.25.1"
 flume = "=0.12.0"
 anyhow = "=1.0.104"
+tokio-tungstenite = { version = "=0.26.2", default-features = false, features = ["connect", "handshake"] }
+futures-util = "=0.3.32"
 
 # Exact pins — see .planning/phases/20-desktop-foundation-backend-integration/20-RESEARCH.md
 # gpui is pre-1.0 with real breaking-change churn; every core dep is pinned exactly
