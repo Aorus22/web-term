@@ -158,7 +158,7 @@ pub struct Supervisor {
     status_tx: tokio::sync::watch::Sender<BackendStatus>,
     status_rx: tokio::sync::watch::Receiver<BackendStatus>,
     info: Option<BackendInfo>,
-    child: Option<Child>,
+    child: Arc<Mutex<Option<Child>>>,
     stderr_tail: Arc<Mutex<String>>,
 }
 
@@ -176,7 +176,7 @@ impl Supervisor {
             status_tx,
             status_rx,
             info: None,
-            child: None,
+            child: Arc::new(Mutex::new(None)),
             stderr_tail: Arc::new(Mutex::new(String::new())),
         }
     }
@@ -352,20 +352,47 @@ impl Supervisor {
         // Ready!
         let _ = self.status_tx.send(BackendStatus::Ready);
         self.info = Some(info.clone());
-        self.child = Some(child);
+        *self.child.lock() = Some(child);
 
         // Spawn child exit monitor
-        let _status_tx = self.status_tx.clone();
+        let child_arc = Arc::clone(&self.child);
+        let status_tx = self.status_tx.clone();
         tokio::spawn(async move {
-            // Note: child handle is held in self.child, but wait() in stop will reap.
+            loop {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                let mut lock = child_arc.lock();
+                if let Some(child) = lock.as_mut() {
+                    match child.try_wait() {
+                        Ok(Some(exit_status)) => {
+                            let code = exit_status.code();
+                            let _ = status_tx.send(BackendStatus::Crashed { exit_code: code });
+                            break;
+                        }
+                        Ok(None) => continue,
+                        Err(_) => {
+                            let _ = status_tx.send(BackendStatus::Crashed { exit_code: None });
+                            break;
+                        }
+                    }
+                } else {
+                    // Stopped cleanly
+                    break;
+                }
+            }
         });
 
         Ok(info)
     }
 
+    /// Return child PID if currently spawned.
+    pub fn child_pid(&self) -> Option<u32> {
+        self.child.lock().as_ref().and_then(|c| c.id())
+    }
+
     /// Stop the backend process: graceful terminate with grace duration, then hard kill.
     pub async fn stop(&mut self, grace: Duration) -> Result<(), SupervisorError> {
-        if let Some(mut child) = self.child.take() {
+        let child_opt = self.child.lock().take();
+        if let Some(mut child) = child_opt {
             // Attempt graceful stop if platform permits, else hard kill
             #[cfg(unix)]
             {
