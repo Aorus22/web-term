@@ -110,14 +110,18 @@ Plans:
   1. User can create/edit/delete connections and browse them as cards with kebab menus, tags, and search
   2. Quick-connect works from the New Tab view; export/import JSON roundtrips with the web app
   3. Key pool supports upload/management; passphrase prompts cache session-scoped (never stored); per-connection auth method selectable
-- **Plans:** TBD
+- **Plans:** 4/4 plans executed
 
 Plans:
 
-- [ ] 23-01: Hosts view (cards, kebab menus, tags, search/filter)
-- [ ] 23-02: Connection form (CRUD + per-connection auth method) + quick-connect
-- [ ] 23-03: SSH Keys view (pool, upload, passphrase flow)
-- [ ] 23-04: Import/export JSON roundtrip (web-app compatible)
+- [x] 23-01-PLAN.md
+- [x] 23-02-PLAN.md
+- [x] 23-03-PLAN.md
+- [x] 23-04-PLAN.md
+- [x] 23-01: REST Client Surface for Connections and Keys (HOSTS-01, HOSTS-04, KEYS-01)
+- [x] 23-02: Hosts View, Card Grid, Search & Tag Filter, Quick-Connect (HOSTS-02, HOSTS-03)
+- [x] 23-03: Connection Modal (Create/Edit) & JSON Import/Export (HOSTS-01, HOSTS-04, KEYS-03)
+- [x] 23-04: SSH Keys View, Key Upload Modal, and Session Passphrase Prompt (KEYS-01, KEYS-02)
 
 ### Phase 24: Local Terminal (Cross-Platform PTY)
 

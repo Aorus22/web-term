@@ -29,16 +29,16 @@ Requirements for the desktop client. Each maps to roadmap phases.
 
 ### Hosts
 
-- [ ] **HOSTS-01**: User can create, edit, and delete SSH connections
-- [ ] **HOSTS-02**: User can browse connections as cards with kebab menus, tags, and search/filter
-- [ ] **HOSTS-03**: User can quick-connect from the New Tab view
-- [ ] **HOSTS-04**: User can export/import connections as JSON, roundtripping with the web app
+- [x] **HOSTS-01**: User can create, edit, and delete SSH connections
+- [x] **HOSTS-02**: User can browse connections as cards with kebab menus, tags, and search/filter
+- [x] **HOSTS-03**: User can quick-connect from the New Tab view
+- [x] **HOSTS-04**: User can export/import connections as JSON, roundtripping with the web app
 
 ### SSH Keys
 
-- [ ] **KEYS-01**: User can upload and manage SSH keys in the key pool
-- [ ] **KEYS-02**: User is prompted for key passphrases with session-scoped caching (never stored)
-- [ ] **KEYS-03**: User can choose password vs key authentication per connection
+- [x] **KEYS-01**: User can upload and manage SSH keys in the key pool
+- [x] **KEYS-02**: User is prompted for key passphrases with session-scoped caching (never stored)
+- [x] **KEYS-03**: User can choose password vs key authentication per connection
 
 ### SFTP
 
@@ -108,13 +108,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TERM-07 | Phase 22 | Satisfied |
 | TERM-08 | Phase 22 | Satisfied |
 | SHELL-04 | Phase 22 | Satisfied |
-| HOSTS-01 | Phase 23 | Pending |
-| HOSTS-02 | Phase 23 | Pending |
-| HOSTS-03 | Phase 23 | Pending |
-| HOSTS-04 | Phase 23 | Pending |
-| KEYS-01 | Phase 23 | Pending |
-| KEYS-02 | Phase 23 | Pending |
-| KEYS-03 | Phase 23 | Pending |
+| HOSTS-01 | Phase 23 | Satisfied |
+| HOSTS-02 | Phase 23 | Satisfied |
+| HOSTS-03 | Phase 23 | Satisfied |
+| HOSTS-04 | Phase 23 | Satisfied |
+| KEYS-01 | Phase 23 | Satisfied |
+| KEYS-02 | Phase 23 | Satisfied |
+| KEYS-03 | Phase 23 | Satisfied |
 | SFTP-01 | Phase 25 | Pending |
 | SFTP-02 | Phase 25 | Pending |
 | SFTP-03 | Phase 25 | Pending |
@@ -132,4 +132,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-09-04*
-*Last updated: 2026-09-04 after initial definition*
+*Last updated: 2026-09-05 after Phase 23 completion*

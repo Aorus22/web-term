@@ -7,15 +7,15 @@ last_updated: "2026-09-05T00:10:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 26
-  completed_plans: 11
-  percent: 42
+  completed_plans: 15
+  percent: 58
 ---
 
 performance_metrics:
   velocity:
-    total_plans_completed: 53
+    total_plans_completed: 57
     average_duration_min: 14
   by_phase:
     - { phase: "12-local-terminal-foundation", plans: 2, total_min: 45, avg_min: 22.5 }
@@ -29,6 +29,7 @@ performance_metrics:
     - { phase: "20-desktop-foundation-backend-integration", plans: 4, total_min: 60, avg_min: 15 }
     - { phase: "21-terminal-rendering-alacritty-engine", plans: 3, total_min: 40, avg_min: 13.3 }
     - { phase: "22-ssh-terminal-sessions-tabs", plans: 4, total_min: 50, avg_min: 12.5 }
+    - { phase: "23-hosts-ssh-keys-management", plans: 4, total_min: 50, avg_min: 12.5 }
 
 quick_tasks:
   completed:
@@ -63,6 +64,10 @@ accumulated_context:
     - "Phase 22: Exponential backoff reconnect loop (2s, 4s, 6s, 8s, 16s; max 5) paired with GPUI amber countdown banner and re-attachment"
     - "Phase 22: App restart session persistence in settings.json with detached session re-attach discovery"
     - "Phase 22: First-class Local Shell launcher modal with single-click start and Quick SSH connection option"
+    - "Phase 23: Mirrored backend connection and key models with serde defaults matching Go backend"
+    - "Phase 23: Persistent Hosts Catalog tab in tab strip with reactive switching to/from terminal sessions"
+    - "Phase 23: Session-scoped SSH key passphrase caching in memory strictly excluding sensitive passphrases from settings disk storage"
+    - "Phase 23: Self-contained RFC 4648 Base64 encoder avoiding external dependency version churn"
   roadmap_evolution:
     - "v0.2.0: MVP Terminal & Connections"
     - "v0.3.0: SSH Key Auth & UI Redesign"
@@ -75,13 +80,13 @@ accumulated_context:
 deferred_items: []
 session_continuity:
   last_session: 2026-09-05
-  stopped_at: Phase 22 completed and verified
+  stopped_at: Phase 23 completed and verified
   resume_file: null
-  next_step: Phase 23 — Hosts & SSH Keys Management
+  next_step: Phase 24 — Local Terminal (Cross-Platform PTY)
 
 ## Current Position
 
-Phase: Phase 23 (Hosts & SSH Keys Management)
+Phase: Phase 24 (Local Terminal (Cross-Platform PTY))
 Plan: —
-Status: Ready for Phase 23
-Last activity: 2026-09-05 — Phase 22 (SSH Terminal Sessions & Tabs) completed and verified
+Status: Ready for Phase 24
+Last activity: 2026-09-05 — Phase 23 (Hosts & SSH Keys Management) completed and verified

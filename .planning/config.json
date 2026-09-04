@@ -5,7 +5,6 @@
   "commit_docs": true,
   "model_profile": "balanced",
   "search_gitignored": false,
-  "branching_strategy": "none",
   "phase_branch_template": "gsd/phase-{phase}-{slug}",
   "milestone_branch_template": "gsd/{milestone}-{slug}",
   "quick_branch_template": null,
@@ -19,7 +18,8 @@
     "text_mode": false,
     "brave_search": false,
     "firecrawl": false,
-    "exa_search": false
+    "exa_search": false,
+    "_auto_chain_active": false
   },
   "resolve_model_ids": "omit",
   "context_window": 200000,
@@ -27,5 +27,8 @@
   "subagent_timeout": 300000,
   "security_enforcement": true,
   "security_asvs_level": 1,
-  "security_block_on": "high"
+  "security_block_on": "high",
+  "git": {
+    "branching_strategy": "none"
+  }
 }
