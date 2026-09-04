@@ -6,3 +6,5 @@ pub mod session;
 pub mod theme;
 pub mod views;
 pub mod window_state;
+
+pub use webterm_backend_client as backend_client;

@@ -7,6 +7,7 @@ use crate::actions::{
     JumpTab9, NewTab, NextTab, PrevTab,
 };
 use crate::app_state::{AppState, View};
+use crate::views::hosts::render_hosts_view;
 use crate::views::new_tab_modal::render_new_tab_modal;
 use crate::views::reconnect_banner::render_reconnect_banner;
 use crate::views::tab_strip::render_tab_strip;
@@ -136,6 +137,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 .child(label)
                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                     this.active_view = view;
+                                    if view == View::Hosts {
+                                        this.show_hosts_catalog = true;
+                                    }
                                     cx.notify();
                                 }))
                         })),
@@ -224,45 +228,22 @@ fn render_content_pane(
                 .child(render_tab_strip(app, cx))
                 // Reconnection banner (when active tab is reconnecting or disconnected)
                 .children(render_reconnect_banner(app, cx))
-                // Active Terminal or Empty State
-                .child(
+                // Active Terminal or Hosts Catalog
+                .child({
+                    let host_or_term = if app.show_hosts_catalog || active_tab_view.is_none() {
+                        render_hosts_view(app, cx)
+                    } else if let Some(term_view) = active_tab_view {
+                        div().size_full().child(term_view).into_any_element()
+                    } else {
+                        render_hosts_view(app, cx)
+                    };
+
                     div()
                         .flex_1()
                         .w_full()
                         .overflow_hidden()
-                        .children(if let Some(term_view) = active_tab_view {
-                            vec![div().size_full().child(term_view).into_any_element()]
-                        } else {
-                            vec![
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .items_center()
-                                    .justify_center()
-                                    .size_full()
-                                    .gap_3()
-                                    .text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) })
-                                    .child("No open terminal tabs.")
-                                    .child(
-                                        div()
-                                            .px_4()
-                                            .py_2()
-                                            .rounded_md()
-                                            .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
-                                            .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
-                                            .cursor_pointer()
-                                            .text_sm()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) })
-                                            .child("+ Open Terminal (Ctrl+T)")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                                this.toggle_new_tab_modal(cx);
-                                            })),
-                                    )
-                                    .into_any_element(),
-                            ]
-                        }),
-                ),
+                        .child(host_or_term)
+                }),
         );
     } else {
         content = content.child(

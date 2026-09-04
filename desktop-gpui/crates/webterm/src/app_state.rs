@@ -2,7 +2,7 @@
 
 use std::sync::LazyLock;
 use gpui::*;
-use webterm_backend_client::{BackendClient, TerminalWsHandle, WsConnectRequest};
+use webterm_backend_client::{BackendClient, Connection, TerminalWsHandle, WsConnectRequest};
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
 use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
 
@@ -45,6 +45,11 @@ pub struct AppState {
     pub new_tab_user: String,
     pub new_tab_port: String,
     pub new_tab_password: String,
+    pub show_hosts_catalog: bool,
+    pub connections: Vec<Connection>,
+    pub search_query: String,
+    pub selected_tag: Option<String>,
+    pub is_loading_connections: bool,
 }
 
 impl AppState {
@@ -64,6 +69,11 @@ impl AppState {
             new_tab_user: "root".to_string(),
             new_tab_port: "22".to_string(),
             new_tab_password: String::new(),
+            show_hosts_catalog: true,
+            connections: Vec::new(),
+            search_query: String::new(),
+            selected_tag: None,
+            is_loading_connections: false,
         }
     }
 
@@ -101,7 +111,121 @@ impl AppState {
 
         let title = format!("{user}@{host}:{port}");
         let req = WsConnectRequest::for_quick_connect(host, port, user, password, 80, 24);
+        self.show_hosts_catalog = false;
         self.open_ssh_tab(req, &title, cx);
+    }
+
+    /// Fetch all saved connections from the backend.
+    pub fn fetch_connections(&mut self, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        self.is_loading_connections = true;
+        cx.notify();
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<Vec<Connection>, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.list_connections().await {
+                Ok(conns) => {
+                    let _ = tx.send(Ok(conns));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                this.is_loading_connections = false;
+                                match res {
+                                    Ok(conns) => {
+                                        this.connections = conns;
+                                    }
+                                    Err(err) => {
+                                        eprintln!("Failed to fetch connections: {err}");
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Single-click connect to a saved host connection.
+    pub fn connect_to_host(&mut self, conn_id: &str, cx: &mut Context<Self>) {
+        let conn = match self.connections.iter().find(|c| c.id == conn_id).cloned() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let title = format!("{} ({}:{})", conn.label, conn.host, conn.port);
+        let req = WsConnectRequest::for_saved_connection(&conn.id, 80, 24);
+        self.show_hosts_catalog = false;
+        self.open_ssh_tab(req, &title, cx);
+    }
+
+    /// Set search filter query.
+    pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
+        self.search_query = query;
+        cx.notify();
+    }
+
+    /// Select tag filter pill.
+    pub fn select_tag_filter(&mut self, tag: Option<String>, cx: &mut Context<Self>) {
+        self.selected_tag = tag;
+        cx.notify();
+    }
+
+    /// Open create connection modal.
+    pub fn open_create_connection_modal(&mut self, cx: &mut Context<Self>) {
+        cx.notify();
+    }
+
+    /// Open edit connection modal.
+    pub fn open_edit_connection_modal(&mut self, _id: &str, cx: &mut Context<Self>) {
+        cx.notify();
+    }
+
+    /// Delete connection by ID.
+    pub fn delete_connection(&mut self, id: &str, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let id_str = id.to_string();
+        TOKIO_RT.spawn(async move {
+            let _ = client.delete_connection(&id_str).await;
+        });
+
+        self.connections.retain(|c| c.id != id);
+        cx.notify();
+    }
+
+    /// Export connections to disk.
+    pub fn export_connections_to_disk(&mut self, cx: &mut Context<Self>) {
+        cx.notify();
+    }
+
+    /// Open import connections modal.
+    pub fn open_import_modal(&mut self, cx: &mut Context<Self>) {
+        cx.notify();
     }
 
     /// Spawn the supervisor lifecycle in a background thread and observe transitions.
@@ -173,6 +297,7 @@ impl AppState {
                                         this.client = Some(BackendClient::new(info.base_url));
                                         this.backend_status = BackendStatus::Ready;
                                         this.restore_sessions_or_default(cx);
+                                        this.fetch_connections(cx);
                                     }
                                     SupervisorEvent::Failed { reason, stderr_tail } => {
                                         this.backend_status = BackendStatus::Failed {
@@ -305,6 +430,7 @@ impl AppState {
             is_dark,
             cx,
         );
+        self.show_hosts_catalog = false;
         self.session_manager.add_tab(tab);
         cx.notify();
 
@@ -379,6 +505,7 @@ impl AppState {
             cx,
         );
         tab.last_connect_req = Some(req.clone());
+        self.show_hosts_catalog = false;
         self.session_manager.add_tab(tab);
         cx.notify();
 
@@ -603,12 +730,16 @@ impl AppState {
     /// Close tab at given index and persist open sessions.
     pub fn close_tab(&mut self, index: usize, cx: &mut Context<Self>) {
         self.session_manager.close_tab(index);
+        if self.session_manager.tab_count() == 0 {
+            self.show_hosts_catalog = true;
+        }
         self.persist_open_sessions();
         cx.notify();
     }
 
     /// Switch active tab to given index.
     pub fn switch_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.show_hosts_catalog = false;
         if self.session_manager.switch_tab(index) {
             cx.notify();
         }
@@ -616,18 +747,21 @@ impl AppState {
 
     /// Cycle to next tab (Ctrl+Tab).
     pub fn cycle_next_tab(&mut self, cx: &mut Context<Self>) {
+        self.show_hosts_catalog = false;
         self.session_manager.cycle_next();
         cx.notify();
     }
 
     /// Cycle to previous tab (Ctrl+Shift+Tab).
     pub fn cycle_prev_tab(&mut self, cx: &mut Context<Self>) {
+        self.show_hosts_catalog = false;
         self.session_manager.cycle_prev();
         cx.notify();
     }
 
     /// Jump directly to tab (Alt+1..9).
     pub fn jump_to_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.show_hosts_catalog = false;
         if self.session_manager.jump_to(index) {
             cx.notify();
         }

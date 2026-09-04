@@ -25,9 +25,56 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
         .border_color(border_color)
         .px_2()
         .gap_1()
+        // Persistent Hosts Catalog Tab
+        .child({
+            let is_active = app.show_hosts_catalog;
+            let tab_bg = if is_active {
+                if is_dark { rgb(0x27272a) } else { rgb(0xffffff) }
+            } else {
+                if is_dark { rgb(0x1f1f23) } else { rgb(0xe2e8f0) }
+            };
+            let text_color = if is_active {
+                if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) }
+            } else {
+                if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) }
+            };
+
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .h(px(30.0))
+                .px_3()
+                .gap_2()
+                .rounded_t_md()
+                .bg(tab_bg)
+                .border_t_2()
+                .border_color(if is_active {
+                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                } else {
+                    rgba(0x00000000)
+                })
+                .cursor_pointer()
+                .hover(|s| s.bg(if is_active {
+                    tab_bg
+                } else {
+                    if is_dark { rgb(0x2d2d32) } else { rgb(0xd8e0e9) }
+                }))
+                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                    this.show_hosts_catalog = true;
+                    cx.notify();
+                }))
+                .child(
+                    div()
+                        .text_xs()
+                        .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
+                        .text_color(text_color)
+                        .child("🖥️ Hosts"),
+                )
+        })
         // Tabs container
         .children((0..tabs_len).map(|idx| {
-            let is_active = idx == active_index;
+            let is_active = !app.show_hosts_catalog && idx == active_index;
             let tab = &app.session_manager.tabs()[idx];
             let title = tab.title.clone();
             let status = tab.status.clone();
@@ -72,6 +119,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                     if is_dark { rgb(0x2d2d32) } else { rgb(0xd8e0e9) }
                 }))
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    this.show_hosts_catalog = false;
                     this.switch_tab(idx, cx);
                 }))
                 // Status dot

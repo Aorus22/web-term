@@ -1,3 +1,4 @@
+pub mod hosts;
 pub mod nav;
 pub mod new_tab_modal;
 pub mod reconnect_banner;
