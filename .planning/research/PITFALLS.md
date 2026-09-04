@@ -1,303 +1,192 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** Adding SSH key authentication and 2-page UI navigation to an existing web-based SSH terminal (WebTerm v0.3.0)
-**Researched:** 2026-04-28
-**Codebase analyzed:** 53 source files, ~5,007 LOC (Go backend + React frontend)
-**Confidence:** HIGH (codebase fully analyzed, Go x/crypto/ssh v0.50.0 API verified via pkg.go.dev)
-
----
+**Domain:** Native desktop SSH client (GPUI frontend over existing Go backend)
+**Researched:** 2026-09-04
+**Confidence:** MEDIUM (mix of documented crate gaps, platform quirks, and pattern-level inference)
+**Note:** Produced inline by the orchestrator (generic inline workaround — no subagent runtime in this session).
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data loss, or security breaches.
+### Pitfall 1: gpui-terminal feature gaps (scrollback, mouse selection)
 
-### Pitfall 1: Passphrase-Encrypted Key Silent Failure on ParsePrivateKey
-
-**What goes wrong:** Calling `ssh.ParsePrivateKey()` on an encrypted key returns a `*PassphraseMissingError` — but developers often treat it as a generic parse error ("invalid key format") and show the user "key is invalid" instead of "this key needs a passphrase."
-
-**Why it happens:** `ParsePrivateKey` returns `error` interface. The `PassphraseMissingError` type is not widely known and requires a type assertion to detect. The error message string doesn't explicitly say "try ParsePrivateKeyWithPassphrase" — it just says the key needs a passphrase.
-
-**Consequences:** Users with encrypted keys (very common — `ssh-keygen -p` encrypts by default) upload a valid key but get told it's broken. They re-generate keys, try different formats, or abandon the feature.
-
-**Prevention:**
-1. Always try `ssh.ParsePrivateKey()` first
-2. Check `errors.As(err, &ssh.PassphraseMissingError{})` — if true, the key is valid but encrypted
-3. Only then try `ssh.ParsePrivateKeyWithPassphrase(keyBytes, []byte(passphrase))`
-4. If that fails with `x509.IncorrectPasswordError`, the passphrase is wrong — tell the user explicitly
-5. Store whether a key is passphrase-protected in the database (`has_passphrase bool`) so the UI knows to prompt before connecting
-
-**Detection:** Test with an encrypted Ed25519 key and verify the error path produces a passphrase prompt, not a "bad key" error.
-
-**Codebase impact:** `be/internal/ssh/proxy.go` line 110-124 currently hardcodes `ssh.Password()` auth. The new key-based auth path must handle the passphrase flow before constructing `ssh.ClientConfig.Auth`.
-
-```go
-// Correct pattern:
-signer, err := ssh.ParsePrivateKey(keyBytes)
-if err != nil {
-    var passErr *ssh.PassphraseMissingError
-    if errors.As(err, &passErr) {
-        // Key is encrypted — need passphrase from user
-        signer, err = ssh.ParsePrivateKeyWithPassphrase(keyBytes, []byte(passphrase))
-        if err != nil {
-            // Check for x509.IncorrectPasswordError
-            return fmt.Errorf("wrong passphrase")
-        }
-    } else {
-        return fmt.Errorf("invalid private key: %w", err)
-    }
-}
-```
-
-### Pitfall 2: Private Key Material Leaked via Logs, Errors, or API Responses
-
-**What goes wrong:** The decrypted private key PEM bytes end up in log output, error messages, API response bodies, or the frontend JavaScript console.
+**What goes wrong:**
+The convenient `gpui-terminal` crate lists scrollback as "planned" and mouse selection as "partial/planned" in its feature matrix. Building the milestone on it and discovering this at parity-testing time means the terminal is unusable for real work (copy/paste is table stakes).
 
 **Why it happens:**
-- `log.Printf("Key parsed: %s", keyBytes)` — accidentally logs key material
-- Error wrapping includes key bytes: `fmt.Errorf("failed to parse key %s: %w", keyBytes, err)`
-- API endpoints return the decrypted key in GET responses (like `GetConnection` currently returns decrypted password)
-- Frontend `console.error()` dumps the full request body including key data
+Young crate, published recently; docs advertise the architecture but the matrix exposes gaps. Teams assume "complete terminal emulator" includes selection/scrollback.
 
-**Consequences:** Private SSH keys in logs = complete server access compromise. Keys are long-lived credentials — a leaked key means every server that key accesses is compromised.
+**How to avoid:**
+Timebox a spike in the first terminal phase: verify selection + scrollback behavior against real vim/htop usage. If gaps block parity, switch to the vendored Zed pattern (port the `terminal` crate's state handling + rendering approach) — a known-quantity port, not new research.
 
-**Prevention:**
-1. **Never log the key PEM bytes** — only log key metadata (type, fingerprint, ID, length)
-2. **API must never return decrypted private keys** — the `GetSSHKey` endpoint should return metadata (name, type, fingerprint, has_passphrase) but NEVER the decrypted key material
-3. **Use `[]byte` not `string` for key material** — `[]byte` can be zeroed after use; Go strings are immutable and linger in memory
-4. **Strip key from error messages** — errors should reference key ID, not key content
-5. **Zero key bytes after use** — after `ssh.ParsePrivateKey()` succeeds, zero the input `[]byte` slice: `for i := range keyBytes { keyBytes[i] = 0 }`
+**Warning signs:**
+"Planned" in the feature matrix; examples avoid selection demos; issues mention copy/paste workarounds.
 
-**Codebase impact:** The existing pattern in `connections.go:46-50` decrypts and returns passwords via API. The SSH key endpoints must NOT follow this pattern. The `Encrypted` field uses `json:"-"` tag correctly — replicate this for keys.
-
-```go
-// SSHKey model — correct pattern:
-type SSHKey struct {
-    ID              string `json:"id"`
-    Name            string `json:"name"`
-    KeyType         string `json:"key_type"`         // "RSA", "Ed25519", "ECDSA"
-    Fingerprint     string `json:"fingerprint"`       // SHA256:xxx — safe to display
-    HasPassphrase   bool   `json:"has_passphrase"`
-    EncryptedKey    string `json:"-" gorm:"column:private_key"` // NEVER in JSON
-    PublicKeyString string `json:"public_key"`        // OK to show
-    // ...
-}
-```
-
-### Pitfall 3: Reusing the Same AES-256-GCM Key for Passwords and Private Keys
-
-**What goes wrong:** The existing `config.EncryptionKey` (32-byte key from `WEBTERM_ENCRYPTION_KEY` env var) is used for password encryption. If the same key is reused for private key encryption without domain separation, a ciphertext confusion attack becomes possible — an attacker could swap encrypted password and encrypted key fields.
-
-**Why it happens:** It seems DRY — "we already have an encryption key, just reuse it." But AES-GCM with the same key and different data types but no type-tagging in the ciphertext creates confusion vulnerabilities.
-
-**Consequences:** If the database is dumped, encrypted passwords could potentially be substituted into the key field or vice versa during a controlled attack.
-
-**Prevention:**
-1. Use **different AEAD nonce spaces** per data type — add a context string to the GCM additional data (AAD) parameter
-2. The simplest fix: extend the existing `Encrypt`/`Decrypt` functions to accept an optional `context` string passed as GCM additional data
-3. Or use separate derived keys: `subkey_password = HKDF(master, "passwords")`, `subkey_keys = HKDF(master, "ssh-keys")`
-
-**Codebase impact:** `be/internal/config/encryption.go` uses `gcm.Seal(nonce, nonce, plaintext, nil)` — the `nil` additional data parameter should carry a type context.
-
-```go
-// Fix: add context parameter
-func EncryptWithContext(plaintext string, key []byte, context string) (string, error) {
-    // ... same as current Encrypt but:
-    ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), []byte(context))
-    // ...
-}
-
-// Usage:
-encryptedPassword, _ := EncryptWithContext(password, key, "webterm:password")
-encryptedKey, _ := EncryptWithContext(keyPEM, key, "webterm:ssh-private-key")
-```
-
-### Pitfall 4: WebSocket Protocol Breaking Change During Auth Method Migration
-
-**What goes wrong:** The `ConnectMessage` struct in `types.go` currently has `Password` field. Adding key-based auth means adding `KeyID` and `Passphrase` fields. If the frontend sends the new fields but the backend hasn't been updated (or vice versa), connections fail silently or with confusing errors.
-
-**Why it happens:** The WebSocket connect message has no version field. Frontend and backend are deployed independently (Go binary vs Vite build). During development, both change rapidly. The JSON unmarshaling is lenient (unknown fields ignored), but the auth logic assumes specific field combinations.
-
-**Consequences:** A half-deployed update where frontend sends `key_id` but backend ignores it and tries `ssh.Password("")` — connection hangs for 10 seconds then times out with no useful error.
-
-**Prevention:**
-1. **Add an `auth_method` field** to `ConnectMessage` — explicit `"password"` or `"key"` — no guessing
-2. **Backend must validate the combination** — if `auth_method` is `"key"` but `key_id` is empty, return error immediately
-3. **Keep backward compatibility** — if `auth_method` is missing, infer from available fields (current behavior)
-4. **Test the transition** — deploy backend first, then frontend (backend accepts both old and new format)
-
-**Codebase impact:** `be/internal/ssh/types.go` ConnectMessage struct needs new fields. `be/internal/ssh/proxy.go` lines 76-95 need to handle key-based credential resolution alongside password-based.
-
-```go
-type ConnectMessage struct {
-    Type         string `json:"type"`
-    Host         string `json:"host"`
-    Port         int    `json:"port"`
-    User         string `json:"user"`
-    Password     string `json:"password,omitempty"`
-    ConnectionID string `json:"connection_id,omitempty"`
-    AuthMethod   string `json:"auth_method,omitempty"` // NEW: "password" | "key"
-    KeyID        string `json:"key_id,omitempty"`      // NEW: SSH key ID
-    Passphrase   string `json:"passphrase,omitempty"`  // NEW: for encrypted keys
-    Rows         int    `json:"rows,omitempty"`
-    Cols         int    `json:"cols,omitempty"`
-}
-```
-
-### Pitfall 5: Database Migration Destroys Existing Connections
-
-**What goes wrong:** Adding an `AuthMethod` column and an optional `SSHKeyID` foreign key to the `Connection` model. If the migration sets a non-null default or requires a foreign key constraint, existing connection records become invalid.
-
-**Why it happens:** GORM's `AutoMigrate` adds columns but doesn't set defaults for existing rows. If the new `auth_method` column has a NOT NULL constraint without a default, SQLite will reject the migration. If `ssh_key_id` has a foreign key constraint and some key gets deleted, cascading deletes could wipe connections.
-
-**Consequences:** Existing users' saved connections disappear on upgrade, or the application fails to start with a migration error.
-
-**Prevention:**
-1. `auth_method` column must default to `"password"` for existing rows
-2. `ssh_key_id` must be nullable — existing connections don't use keys
-3. Do NOT use foreign key cascading delete — soft-link by ID, check existence at query time
-4. Run `AutoMigrate` BEFORE any query — ensure `db.go:Init()` includes new models
-5. Test migration against a populated SQLite database (not just empty)
-
-**Codebase impact:** `be/internal/db/models.go` needs `AuthMethod` and `SSHKeyID` fields on `Connection`. `be/internal/db/db.go:25` `AutoMigrate` must include `&SSHKey{}`.
+**Phase to address:**
+First terminal-rendering phase (make the spike a plan-level deliverable with go/no-go criteria).
 
 ---
 
-## Moderate Pitfalls
+### Pitfall 2: Pre-1.0 dependency churn (gpui, gpui-component, alacritty_terminal)
 
-### Pitfall 6: Key Format Support Gaps (PuTTY .ppk, PKCS#8 DER)
+**What goes wrong:**
+`cargo update` or an added dependency bumps gpui across a breaking minor; the build breaks weeks later with no local change. alacritty_terminal is 0.x — minor = breaking. Wasted days debugging "nothing changed" failures.
 
-**What goes wrong:** Users try to upload PuTTY-format keys (`.ppk`) or binary DER-encoded keys. `ssh.ParsePrivateKey()` only supports PEM-encoded keys (PKCS#1 RSA, PKCS#8, OpenSSH format). PuTTY keys fail silently.
+**Why it happens:**
+All three core deps are pre-1.0 and actively developed; Rust's default encouraged flow (loose requirements + Cargo.lock) hides breakage until an update.
 
-**Prevention:**
-1. Document supported formats clearly: "OpenSSH, PEM-encoded RSA/Ed25519/ECDSA"
-2. Validate the uploaded key immediately on upload — try `ssh.ParsePrivateKey()` and report the specific error
-3. If the PEM block type is "RSA PRIVATE KEY" but parsing fails, suggest converting with `ssh-keygen -i`
-4. Consider adding `.ppk` → PEM conversion on the backend using a library, or reject with a helpful error message
-5. Set a reasonable max key size (e.g., 1MB) — some users paste entire `authorized_keys` files
+**How to avoid:**
+Pin exact/minor versions in Cargo.toml; commit Cargo.lock; do dependency upgrades as deliberate, isolated PRs with a build+smoke-test checklist. Check gpui-component ↔ gpui pin compatibility on every bump.
 
-### Pitfall 7: Sidebar Removal Breaks Session Connection Flow
+**Warning signs:**
+Divergent builds between machines; CI green but local red after an unrelated change; "works on the lockfile from last month".
 
-**What goes wrong:** The current sidebar (`ConnectionList`) is the primary way to open saved connections. The redesign moves this to a card-based "Hosts" page. During the transition, the `ConnectionList` component is deleted but the new Hosts page isn't fully wired — users can't connect to anything.
-
-**Prevention:**
-1. Build the Hosts page FIRST, wire it completely, THEN remove the sidebar
-2. The `ConnectionList` component in the sidebar and the new `HostsPage` card grid can coexist temporarily
-3. Ensure the Hosts page card `onClick` handler calls the same `handleConnect` pattern as `NewTabView.tsx:23-37`
-4. Keep `QuickConnect` accessible from the header/tab bar, not just the sidebar
-
-### Pitfall 8: Sidebar State Lost During Page Navigation
-
-**What goes wrong:** Moving from a single-page sidebar to a 2-page router (Hosts / SSH Keys). When user navigates between pages, the current sidebar state (scroll position, selected tags, form open/close) is lost because the component unmounts.
-
-**Prevention:**
-1. Use conditional rendering (not router-based unmounting) for the sidebar pages — both pages render but only one is visible
-2. Or use Zustand store to persist page-specific state (selected filter, scroll position)
-3. The sidebar page navigation should be tab-like — CSS `hidden`/`visible`, not component mount/unmount
-
-**Codebase impact:** `fe/src/App.tsx` currently renders `ConnectionList` directly in the sidebar. The new pattern should keep both `HostsPage` and `SSHKeysPage` conditionally rendered based on a `sidebarPage` state in the store.
-
-### Pitfall 9: Passphrase Not Available During Reconnection
-
-**What goes wrong:** The `ReconnectOverlay` in `fe/src/features/terminal/ReconnectOverlay.tsx` calls `onReconnect` which re-triggers the WebSocket connect flow. For key-auth connections with encrypted keys, the passphrase is needed again but was never stored. The reconnect fails with "passphrase required" — but there's no UI to prompt for it.
-
-**Prevention:**
-1. Detect that the connection uses an encrypted key before reconnect
-2. Show the passphrase prompt BEFORE attempting WebSocket reconnection
-3. Do NOT store passphrases — always re-prompt on reconnect
-4. Add `needsPassphrase` flag to the `SSHSession` type so the reconnect overlay knows to prompt
-
-**Codebase impact:** `fe/src/features/terminal/types.ts` needs a field like `authMethod: 'password' | 'key'` and `keyHasPassphrase?: boolean` on `SSHSession`. The reconnect flow in `TerminalPane.tsx` must check these before calling `connect()`.
-
-### Pitfall 10: Export/Import Doesn't Handle SSH Keys
-
-**What goes wrong:** The existing `ExportConnections` endpoint in `be/internal/api/export.go` serializes `Connection` records. After adding SSH keys, the export contains `ssh_key_id` references but not the actual keys. Importing on another instance fails — connections reference key IDs that don't exist.
-
-**Prevention:**
-1. Extend export to include SSH keys alongside connections
-2. Import must create keys first, then map old key IDs to new IDs before creating connections
-3. Export format should be versioned: `{ "version": 2, "connections": [...], "ssh_keys": [...] }`
-4. Maintain backward compatibility — importing a v1 export (no keys) still works
-
-### Pitfall 11: Frontend State Gets Out of Sync with Backend Key Store
-
-**What goes wrong:** User uploads a key (POST), but the React Query cache isn't invalidated. The SSH Keys page still shows the old list. User tries to use the new key in a connection form, but the dropdown doesn't include it.
-
-**Prevention:**
-1. After key upload, invalidate the React Query cache for the keys list: `queryClient.invalidateQueries({ queryKey: ['ssh-keys'] })`
-2. The connection form's key dropdown should use `useQuery` (not one-time fetch) so it auto-updates
-3. Follow the same pattern as existing `useConnections` hook which uses `useQuery` with proper cache keys
+**Phase to address:**
+Project foundation phase (pins + lockfile + CI from day one).
 
 ---
 
-## Minor Pitfalls
+### Pitfall 3: Backend process lifecycle bugs (zombies, port races, orphaned children)
 
-### Pitfall 12: Large Key File Upload Causes Memory Pressure
+**What goes wrong:**
+The spawned Go backend outlives a crashed desktop app (orphan), two backends race for the same port after rapid restart, or a "restart backend" flow kills the wrong PID — leaving users with ghost sessions and confusing connection errors.
 
-**What goes wrong:** Users upload very large files (not just keys — some paste entire certificates or accidentally upload wrong files). The backend reads the entire body into memory, encrypts it, and stores it in SQLite.
+**Why it happens:**
+Child-process supervision has boring-but-critical edge cases: kill_on_drop vs explicit termination, SIGTERM equivalents on Windows (taskkill semantics), health-poll timeouts vs infinite retries.
 
-**Prevention:**
-1. Set `http.MaxBytesReader(w, r.Body, 1<<20)` (1MB max) on key upload endpoint
-2. Validate PEM structure before encryption — reject non-PEM data early
-3. Private keys should never exceed ~20KB even for 16K-bit RSA keys
+**How to avoid:**
+One supervisor code path (kill_on_drop + explicit graceful stop); bind the backend to an ephemeral port chosen by the parent and pass it via flag; health-poll with a hard timeout; on startup, detect and adopt-or-kill stale instances (single-instance design or PID handshake). Test crash/restart loops explicitly.
 
-### Pitfall 13: Key Fingerprint Collision in Display
+**Warning signs:**
+"Address already in use" after crashes; multiple backend processes in Task Manager; sessions that "come back" after app exit.
 
-**What goes wrong:** Two keys with the same name but different content confuse users. The SSH keys page shows only the name.
-
-**Prevention:**
-1. Always display the fingerprint alongside the key name (e.g., "Production Key (SHA256:abc...xyz)")
-2. Use `ssh.FingerprintSHA256(signer.PublicKey())` on upload to generate and store the fingerprint
-3. Reject duplicate keys (same fingerprint) with a clear message
-
-### Pitfall 14: Keyboard Shortcuts Conflict with New Page Navigation
-
-**What goes wrong:** Adding keyboard navigation for the sidebar pages (e.g., Ctrl+1 for Hosts, Ctrl+2 for SSH Keys) conflicts with existing shortcuts in `use-keyboard-shortcuts.ts`.
-
-**Prevention:**
-1. Check the existing shortcut map before assigning new ones
-2. Current shortcuts: Ctrl+T (new tab), Ctrl+W (close tab), Ctrl+Tab/Shift+Tab (next/prev tab)
-3. Sidebar page nav can use simpler keys or avoid shortcuts entirely — it's infrequent navigation
-
-### Pitfall 15: Connection Form Auth Method Toggle Resets Form State
-
-**What goes wrong:** The `ConnectionForm` component in `fe/src/features/connections/components/ConnectionForm.tsx` uses a single `formData` state. Toggling from "password" to "key" auth method clears the password field but also might accidentally clear other fields due to state management bugs.
-
-**Prevention:**
-1. Use separate state sections: `authMethod: 'password' | 'key'`, `passwordFields: {...}`, `keyFields: {...}`
-2. When toggling auth method, only show/hide the relevant fields — don't clear unrelated fields
-3. Keep password value in state even when hidden (in case user toggles back) — but don't send it if auth is "key"
-
-### Pitfall 16: Theme Toggle Position Shifts with New Navigation
-
-**What goes wrong:** The header bar layout changes with the new sidebar navigation. The `ThemeToggle` component currently sits in the header `flex` row. Adding page navigation icons shifts its position.
-
-**Prevention:**
-1. Keep `ThemeToggle` at `ml-auto` or fixed right position in the header
-2. Test both sidebar open/collapsed states with the new navigation elements
-3. The header structure: `[sidebar-toggle] [page-nav-icons?] [tabs...] [theme-toggle]`
+**Phase to address:**
+Backend integration phase (supervisor is small enough to get right early; write restart-loop tests then).
 
 ---
 
-## Phase-Specific Warnings
+### Pitfall 4: Local terminal on Windows (ConPTY gap)
 
-| Phase Topic | Likely Pitfall | Mitigation | Phase to Address |
-|-------------|---------------|------------|------------------|
-| SSH key upload API | Key material in error responses (Pitfall 2) | Sanitize all error messages, never include key bytes | Backend SSH key CRUD phase |
-| Key storage encryption | Same encryption key for passwords and keys (Pitfall 3) | Add AAD context to AES-GCM encryption | Backend SSH key storage phase |
-| Key parsing | PassphraseMissingError mishandled (Pitfall 1) | Try ParsePrivateKey, catch PassphraseMissingError, use ParsePrivateKeyWithPassphrase | Backend SSH auth phase |
-| WebSocket connect message | Breaking protocol change (Pitfall 4) | Add `auth_method` field, keep backward compatible | Backend SSH auth phase |
-| DB migration | Existing connections broken (Pitfall 5) | Default `auth_method="password"`, nullable `ssh_key_id` | Backend DB model phase |
-| Sidebar → Hosts page | Connection flow broken during transition (Pitfall 7) | Build new first, remove old after verification | Frontend Hosts page phase |
-| Page navigation | State lost on page switch (Pitfall 8) | Conditional rendering, not route-based unmounting | Frontend navigation phase |
-| Passphrase prompt on connect | No passphrase prompt during reconnect (Pitfall 9) | Add `keyHasPassphrase` to session type, prompt before reconnect | Frontend terminal phase |
-| Connection form auth toggle | Form state reset on toggle (Pitfall 15) | Separate auth state sections, don't clear hidden fields | Frontend connection form phase |
-| Export/import with keys | Key references without key data (Pitfall 10) | Version export format, include keys, map IDs on import | Backend export phase |
-| Key format validation | Rejection of valid PuTTY keys (Pitfall 6) | Clear error messages, suggest conversion command | Backend key upload phase |
+**What goes wrong:**
+The backend's local-terminal feature uses creack/pty, which is POSIX-only. On Windows the "local terminal" tab either fails or is silently dropped — breaking full-parity on one of the two target platforms.
+
+**Why it happens:**
+Web app deployments were POSIX servers; desktop targets Windows for the first time.
+
+**How to avoid:**
+Decide explicitly in the local-terminal phase: (a) add a ConPTY backend to the Go local-terminal endpoint (golang.org/x/sys/windows or an existing ConPTY wrapper), or (b) bypass the backend for local-terminal on Windows and feed portable-pty (ConPTY under the hood) I/O through the same WS-shaped pipeline. Linux always uses the backend path.
+
+**Warning signs:**
+Local terminal tested only on Linux during dev; feature matrix assumption "local works everywhere" never verified on Windows CI.
+
+**Phase to address:**
+Local terminal phase (explicit go/no-go on ConPTY approach with a Windows CI smoke test).
+
+---
+
+### Pitfall 5: Parity drift — "desktop done" that silently drops web features
+
+**What goes wrong:**
+Milestone ships with 90% parity: keyboard shortcuts subtly different, theme sync missing in SFTP, quick-connect absent, import/export forgotten. Users (you) keep opening the web UI, and the desktop app fails its own "daily-driveable" bar.
+
+**Why it happens:**
+Parity is a checklist of 22 validated requirements spread across 4 milestones; nobody holds the full list in their head while building greenfield UI.
+
+**How to avoid:**
+Treat PROJECT.md's validated list as the acceptance matrix; map every REQ to a desktop phase (the roadmap does exactly this); run an explicit parity-audit pass as a late phase before calling the milestone done.
+
+**Warning signs:**
+Phases completing without a mapping to a specific REQ-ID; "we'll get to shortcuts later" patterns.
+
+**Phase to address:**
+Every phase (mapping enforced by roadmap) + dedicated parity-audit phase at the end.
+
+---
+
+## Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Skipping the backend-client crate, scattering reqwest calls in views | Faster first screens | Protocol drift, untestable UI code | Never — the crate is cheap to start with |
+| Rendering terminal with naive per-cell layout (no glyph-run caching) | Quicker spike | Slow on heavy output, rewrite later | Spike phase only |
+| Hardcoded backend port | Faster setup | Port collisions, breaks multi-instance dev | Never |
+| Unversioned DTO mirroring (hand-rolled structs without tests) | Faster client work | Silent breakage on backend changes | Prototype only; add contract tests before SFTP phase |
+| Single-crate monolith desktop app | Simpler start | gpui churn infects all code; hard to swap terminal impl | Never for this milestone's risk profile |
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Go backend spawn | Assuming a fixed port is free | Parent picks ephemeral port, passes via flag; backend must honor it |
+| WS terminal protocol | Assuming web UI's framing is "obvious" — reimplementing it wrong | Read the backend's WS handler and mirror message types exactly; contract-test roundtrip |
+| Re-attach | Treating app restart same as WS drop | Two distinct paths: WS reconnect vs backend-process restart (sessions survive the first, not always the second) |
+| Clipboard (OSC 52) | Only wiring OSC 52, forgetting local Ctrl+C/V semantics | Support both: app-level clipboard ops and OSC 52 callback via arboard |
+| Theme sync | Terminal palette not following app theme (bug fixed in web v0.4!) | Single theme source in app state feeding both gpui-component theme and terminal ColorPalette |
+| Windows paths | Unix-style path handling in SFTP panes | Path abstraction per pane-source (local Windows vs remote POSIX) |
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Repainting whole window per terminal byte | Fan spins, UI stutters under output | Push-based notify + coalesced repaint (gpui-terminal's flume pattern) | Immediately under `yes`/cat large file |
+| Per-cell text shaping | Laggy scrolling, slow vim | Glyph-run caching, batch identical-style cells | Visible at full-screen redraws |
+| Unbounded WS receive buffer | Memory climb on fast output | Bounded channel with backpressure/coalescing | Heavy build logs |
+| Blocking UI thread on reqwest | Frozen panes during SFTP listing | All backend I/O async from the start | First slow network op |
+
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Logging backend traffic incl. terminal bytes | Secrets in plaintext log files | tracing filters exclude WS payloads; log metadata only |
+| Desktop settings file holding connection copies | Divergence from encrypted backend store | Settings hold UI prefs only (rule already in STACK.md) |
+| Binding backend to 0.0.0.0 in desktop mode | LAN-exposed SSH proxy on user machines | Loopback bind enforced by supervisor flags |
+| Passing secrets via command-line args | Visible in process listings | Env vars or config file for anything sensitive |
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Web shortcuts that fight OS conventions | Ctrl+W closes window (browser muscle memory inverted) | Map desktop shortcuts to native conventions; keep web parity where it doesn't conflict |
+| Missing window-state persistence | Resize/reposition every launch | Persist bounds + maximized state in desktop settings |
+| Backend "starting…" with no progress | App feels hung on cold start | Health-gate with visible startup state + failure diagnostics |
+| Font defaults that render nerd-font glyphs wrong | Broken prompt rendering | line_height_multiplier + document recommended mono fonts (gpui-terminal guidance) |
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **Terminal:** Often missing scrollback + selection under real use — verify vim + copy from `htop` output
+- [ ] **Shortcuts:** Often missing tab cycling + close — verify Ctrl+Tab/Ctrl+W behavior matrix
+- [ ] **Reconnection:** Often missing the *backend-restart* case (vs WS drop) — kill the child process mid-session and verify
+- [ ] **SFTP:** Often missing drag-and-drop from OS file manager — verify external DnD on Windows Explorer and Linux file managers
+- [ ] **Theme:** Often missing terminal palette sync with app theme — toggle dark/light mid-session
+- [ ] **Import/export:** Often forgotten entirely — roundtrip a connection JSON from the web app
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| gpui-terminal gaps discovered late | MEDIUM | Switch to vendored Zed pattern; terminal crate boundary keeps blast radius contained |
+| gpui breaking change mid-milestone | LOW-MEDIUM | Pin rollback; upgrade in isolated PR with checklist |
+| Orphaned backend processes reported | LOW | Supervisor handshake + stale-instance detection patch |
+| Parity gap found at audit | MEDIUM | Parity matrix makes gaps explicit; add remediation phase before ship |
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| gpui-terminal gaps | First terminal phase (spike w/ go/no-go) | Selection + scrollback demo against vim/htop |
+| Dependency churn | Foundation phase | Pinned manifest + committed lockfile in CI |
+| Process lifecycle | Backend integration phase | Restart-loop + kill-app-mid-session tests |
+| Windows ConPTY | Local terminal phase | Windows CI smoke test of local tab |
+| Parity drift | Roadmap mapping + final audit phase | Every REQ mapped; audit checklist executed |
 
 ## Sources
 
-- Go x/crypto/ssh v0.50.0 package documentation — pkg.go.dev (HIGH confidence)
-- WebTerm codebase analysis — 11 Go files, 23+ TypeScript files read directly (HIGH confidence)
-- SSH protocol key format support: RSA (PKCS#1), ECDSA, Ed25519, DSA, PKCS#8, OpenSSH — confirmed via Go docs
-- `PassphraseMissingError` type with `PublicKey` field — confirmed in Go x/crypto/ssh v0.50.0
-- `ParseRawPrivateKeyWithPassphrase` returns `x509.IncorrectPasswordError` on wrong passphrase — confirmed via Go docs
+- docs.rs/gpui-terminal feature matrix (scrollback "Planned", mouse "Partial") (HIGH)
+- docs.rs/crate/gpui — official pre-1.0 breaking-changes warning (HIGH)
+- crates.io alacritty_terminal — 0.x semver semantics (HIGH)
+- v2.tauri.app sidecar docs + plugins-workspace#3062 — recognized sidecar lifecycle pain incl. port-free checks (MEDIUM)
+- creack/pty POSIX-only scope + portable-pty ConPTY support (HIGH for library scope)
+- WebTerm STATE.md accumulated decisions (theme sync history; session re-attach design) (HIGH, internal)
+
+---
+*Pitfalls research for: WebTerm Desktop (GPUI client over Go backend)*
+*Researched: 2026-09-04*

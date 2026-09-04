@@ -1,114 +1,99 @@
-# Technology Stack
+# Stack Research
 
-**Project:** WebTerm v0.3.0 — SSH Key Auth & UI Redesign
-**Researched:** 2026-04-28
+**Domain:** Native desktop SSH client (GPUI frontend over existing Go backend)
+**Researched:** 2026-09-04
+**Confidence:** MEDIUM-HIGH (verified via docs.rs, crates.io, official Zed/GPUI sources; versions approximate — verify at `cargo add` time)
+**Note:** Produced inline by the orchestrator (generic inline workaround — no subagent runtime in this session). Content follows the standard gsd-project-researcher contract.
 
-## Executive Summary
+## Recommended Stack
 
-**This milestone requires zero new backend dependencies and only two new shadcn/ui components on the frontend.** The existing `golang.org/x/crypto/ssh` (v0.50.0) already provides all SSH key parsing, passphrase handling, and public key authentication APIs needed. The existing AES-256-GCM encryption infrastructure is reused directly for private key storage at rest. On the frontend, the sidebar navigation is a state-driven tab switcher (no router needed), and the key upload uses native browser APIs.
+### Core Technologies
 
-## Recommended Stack Changes
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| gpui | 0.2.x (crates.io) | GPU-accelerated UI framework | The framework Zed itself ships on; now published standalone on crates.io with Windows + Linux (X11/Wayland) support. User's explicit choice. Pre-1.0: pin exact version, expect breaking changes between minors. |
+| gpui-component | latest (Longbridge) | shadcn-inspired component library (60+ widgets, theming, tabs, dock) | Same design language as WebTerm's web UI (shadcn), proven in production at Longbridge; gives us light/dark themes, side/nav bars, inputs, menus instead of hand-rolling. |
+| alacritty_terminal | 0.2x (pin exact) | VT emulation core (grid, VTE parser, ANSI/256/truecolor) | Same engine Zed's integrated terminal uses — the user's explicit requirement ("yang dipakai Zed, sudah terbukti"). Battle-tested against vim/htop/tmux. 0.x semver: minor bumps are breaking — pin exactly. |
+| tokio + tokio-tungstenite | 1.x | Async runtime + WebSocket client | Connects to the Go backend's existing WS protocol (terminal I/O, SFTP events) and drives the I/O pipeline that feeds alacritty_terminal. |
+| serde / serde_json | 1.x | REST/WS payload types | The Go backend speaks JSON; mirror the existing DTOs. |
 
-### Backend (Go) — No New Dependencies
+### Supporting Libraries
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `golang.org/x/crypto/ssh` | v0.50.0 (existing) | SSH key auth: `ParsePrivateKey`, `ParsePrivateKeyWithPassphrase`, `PublicKeys` | Already in `go.mod`. All key-based auth primitives are available: unencrypted key parsing, passphrase-protected key parsing, `Signer` → `AuthMethod` conversion, `PassphraseMissingError` detection, `FingerprintSHA256` for display. **Verified via pkg.go.dev official docs.** |
-| `config.Encrypt/Decrypt` | existing (AES-256-GCM) | Private key encryption at rest | Same proven pattern used for password storage. PEM-encoded private keys are just strings — encrypt with existing `Encrypt()`, store in DB, decrypt with `Decrypt()` on connect. No size concerns: typical PEM keys are 1-5KB, well within AES-256-GCM practical limits. |
-| GORM + SQLite | existing | `SSHKey` model storage | New `SSHKey` GORM model alongside existing `Connection` model. AutoMigrate handles schema creation. Same DB, same driver. |
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| portable-pty | 0.8+ | Cross-platform PTY (ConPTY on Windows, OpenPTY on Unix) | Only if local-terminal is handled Rust-side; the Go backend currently uses creack/pty which is POSIX-only — Windows local terminal needs a ConPTY path somewhere. |
+| reqwest | 0.12 | REST client for connection/key CRUD | Hosts, keys, SFTP listing, port-forward management against existing Go REST API. |
+| arboard | latest | System clipboard | Terminal copy/paste (gpui-terminal already uses it internally). |
+| dirs / etcetera | latest | Platform config dirs | Desktop-only settings (backend binary path, window state) in a native config dir — SSH data stays in the backend's SQLite. |
+| tracing + tracing-subscriber | 0.1/0.3 | Logging | File-based logs for desktop diagnostics (no console in a windowed app). |
 
-#### Key APIs Used (all from existing `golang.org/x/crypto/ssh`)
+### Development Tools
 
-```go
-// Unencrypted key → Signer
-signer, err := ssh.ParsePrivateKey(pemBytes)
-
-// Encrypted key → Signer (when PassphraseMissingError is returned)
-signer, err := ssh.ParsePrivateKeyWithPassphrase(pemBytes, []byte(passphrase))
-
-// Signer → AuthMethod (for ssh.ClientConfig.Auth)
-authMethod := ssh.PublicKeys(signer)
-
-// Detect encrypted key (enables passphrase prompt flow)
-var passErr *ssh.PassphraseMissingError
-if errors.As(err, &passErr) { /* key needs passphrase */ }
-
-// Key fingerprint for display
-fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
-```
-
-**Confidence:** HIGH — verified against pkg.go.dev for `golang.org/x/crypto/ssh` v0.50.0.
-
-### Frontend (React) — Two New shadcn/ui Components
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `@shadcn/ui tabs` | latest (via CLI) | Sidebar 2-page navigation (Hosts / SSH Keys) | Standard shadcn/ui component built on Radix Tabs. Provides `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`. Install: `npx shadcn@latest add tabs`. **Verified via ui.shadcn.com/docs/components/tabs.** |
-| `@shadcn/ui select` | latest (via CLI) | Auth method selector in connection form (Password vs SSH Key, which key) | Standard shadcn/ui component built on Radix Select. Provides `Select`, `SelectTrigger`, `SelectContent`, `SelectItem`, `SelectGroup`. Install: `npx shadcn@latest add select`. **Verified via ui.shadcn.com/docs/components/select.** |
-
-#### No New npm Packages Required
-
-| What | Why NOT Needed | Instead Use |
-|------|----------------|-------------|
-| react-router-dom | Sidebar navigation is tab-like state switching, not URL-based routing. App has no URL structure — it's a single-page terminal client with a sidebar. | Zustand state: `sidebarPage: 'hosts' \| 'keys'` controls which view renders in the sidebar. Same pattern as existing `sidebarOpen` state. |
-| File upload library | SSH private keys are small PEM text files (1-5KB). No progress bars, chunking, or drag-drop needed. | Native `<input type="file" accept=".pem,.key">` + `FileReader.readAsText()`. Standard browser API, zero dependencies. |
-| Form library | Existing connection form uses controlled React state directly. Adding auth method toggle + key selector follows same pattern. | Existing pattern: controlled state + `connectionsApi.create/update`. |
-
-**Confidence:** HIGH — verified current component inventory, verified no router dependency, verified shadcn/ui tabs and select docs.
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| cargo workspace | Single workspace rooted at `desktop-gpui/` | Crates: `app` (bin), optional `backend-client` (WS/REST types) split if the surface grows. |
+| Go toolchain (existing) | Build the backend binary to bundle | Desktop app spawns `webterm-backend` (or existing server binary name) as child process. |
+| GitHub Actions matrix | CI builds for `windows-latest` + `ubuntu-latest` | GPUI needs Mesa/Vulkan-ish deps on Linux runners; DirectX on Windows is supported by gpui 0.2. |
+| cargo-deny / dependabot | Dependency pinning | Pre-1.0 ecosystem — surface bumps deliberately, never passively. |
 
 ## Installation
 
 ```bash
-# Frontend only — add two shadcn/ui components
-cd fe
-npx shadcn@latest add tabs
-npx shadcn@latest add select
-
-# Backend — nothing to install
-# All Go dependencies already in go.mod
+# Inside desktop-gpui/ (new cargo workspace)
+cargo new --lib backend-client   # WS/REST client for the Go backend
+cargo new --bin webterm          # GPUI application
+# then in Cargo.toml files:
+# gpui = "=0.2.2"                # exact pin (illustrative; resolve at add time)
+# gpui-component = "0.x"         # pin minor
+# alacritty_terminal = "=0.25.x" # exact pin (illustrative; resolve at add time)
 ```
 
-## Internal Components to Build
-
-### Backend — New/Modified Files
-
-| Component | Type | Description |
-|-----------|------|-------------|
-| `db/models.go` → `SSHKey` struct | New model | `ID`, `Name`, `EncryptedKey` (AES-256-GCM), `PublicKeyFingerprint`, `KeyType` (rsa/ed25519/ecdsa), `HasPassphrase` bool, `CreatedAt`, `UpdatedAt` |
-| `db/models.go` → `Connection` modification | Schema change | Add `AuthMethod` (`"password"` \| `"key"`) and `SSHKeyID` (nullable FK to `SSHKey`) |
-| `api/keys.go` | New handler | CRUD: `ListKeys`, `GetKey` (returns metadata only, never decrypted key), `CreateKey` (upload + encrypt + parse metadata), `UpdateKey` (rename), `DeleteKey` |
-| `api/routes.go` | Route additions | `GET/POST/PUT/DELETE /api/keys` + `GET /api/keys/{id}` |
-| `ssh/proxy.go` → `HandleWebSocket` | Auth logic change | When `ConnectionID` references a key-auth connection: decrypt key from DB → parse with `ParsePrivateKey` or `ParsePrivateKeyWithPassphrase` → use `ssh.PublicKeys(signer)` as AuthMethod |
-| `ssh/types.go` → `ConnectMessage` | Message extension | Add `KeyID string` and `Passphrase string` fields for key-auth WebSocket connections |
-| `db/db.go` → `Init` | Migration | Add `&SSHKey{}` to `AutoMigrate` call |
-
-### Frontend — New/Modified Files
-
-| Component | Type | Description |
-|-----------|------|-------------|
-| `components/ui/tabs.tsx` | New (shadcn) | Installed via CLI — sidebar navigation |
-| `components/ui/select.tsx` | New (shadcn) | Installed via CLI — auth method dropdown in connection form |
-| `features/keys/components/SSHKeysPage.tsx` | New | Key pool management: upload, list (with fingerprint + type), rename, delete |
-| `features/keys/components/KeyUploadDialog.tsx` | New | File upload with name input, passphrase option |
-| `features/connections/components/HostsPage.tsx` | New | Card-based host layout with kebab menus (replaces current sidebar list) |
-| `lib/api.ts` | Extended | Add `keysApi` (list, create with FormData, update, delete) + extend `Connection` interface with `auth_method` and `ssh_key_id` |
-| `stores/app-store.ts` | Extended | Add `sidebarPage: 'hosts' \| 'keys'` state + `setSidebarPage` action |
-| App.tsx sidebar section | Modified | Replace current sidebar with `Tabs` containing `HostsPage` and `SSHKeysPage` |
-| `features/connections/components/ConnectionForm.tsx` | Modified | Add auth method selector (`Select`) + key picker dropdown |
+Go side: no changes required for SSH/SFTP/port-forward parity; local-terminal-on-Windows may require a ConPTY addition (see ARCHITECTURE.md).
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Sidebar nav | Zustand state + `Tabs` component | react-router-dom with `<Outlet>` | Overkill. App is single-page with no URL structure. Router adds ~15KB bundle for zero benefit. The sidebar is a tab switcher, not route-based navigation. |
-| Key upload | Native `<input type="file">` + FileReader | react-dropzone, uppy | Private keys are tiny text files. No need for drag-drop UX, progress bars, or multi-file upload. Native API is simpler and zero-dependency. |
-| Key storage encryption | Existing AES-256-GCM | HashiCorp Vault, age encryption | Self-hosted single-user app. Vault requires running a separate service. age adds a new dependency for something the existing crypto already handles. |
-| Auth method UI | shadcn `Select` | shadcn `RadioGroup` or custom toggle | Select scales better if more auth methods are added later (e.g., certificate-based). Also handles the "which key" dropdown naturally when nested in `SelectGroup`. |
-| Key format | PEM (OpenSSH-compatible) | PKCS#8, PuTTY PPK | PEM is the universal standard. OpenSSH, OpenSSL, and all tools use PEM. PuTTY users can convert with `puttygen`. Don't add format complexity. |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| gpui-terminal crate for the terminal view | Port Zed's `terminal` crate approach (alacritty_terminal + custom GPUI renderer, like Zed's `terminal_view`) | gpui-terminal has gaps (scrollback and mouse selection listed as planned/partial). Spike it in the first terminal phase; if scrollback/selection block parity, vendor/port Zed's renderer pattern instead. |
+| gpui-component for UI | Hand-rolled GPUI widgets | Only if a needed component is missing; gpui-component covers nav bars, inputs, menus, tabs, theming. |
+| Bundling the Go backend as child process | Native Rust SSH (russh) | Never this milestone — user locked GPUI + Go backend; russh would discard a proven, encrypted-credential, session-persistent backend. |
+| Keep web UI as-is, desktop beside it | Retire web UI | Desktop-replaces-web is explicitly not this milestone's goal. |
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Floating gpui/gpui-component versions | gpui is pre-1.0 — "there will often be breaking changes between versions" (official docs.rs). A passive minor bump can brick the build. | Exact/minor pins + deliberate upgrades. |
+| Floating alacritty_terminal | 0.x semver: minor = breaking. Zed tracks it closely; we shouldn't. | Pin exact version; upgrade with intent. |
+| Electron wrapper (`desktop/`) or the Tauri scaffold (`desktop-tauri/`) for new work | Superseded by this milestone's decision; maintaining three desktop shells fragments effort. | GPUI app; mark the old dirs deprecated in docs. |
+| A second SQLite/settings store for SSH data | Divergence risk with the backend's AES-256-GCM credential store. | All SSH data via backend API; Rust config file holds desktop-only prefs only. |
+
+## Stack Patterns by Variant
+
+**If local terminal on Windows must land this milestone:**
+- Either add a ConPTY backend to the Go local-terminal endpoint, or bypass it with portable-pty in Rust and feed the same WS-shaped I/O into the terminal view. Decide during the local-terminal phase; POSIX (Linux) can always use the existing backend path.
+
+**If gpui-terminal proves too immature during the terminal spike:**
+- Timebox the spike; fall back to vendoring the Zed `terminal`/`terminal_view` pattern (alacritty_terminal + custom render element). Budget: it is a known-quantity port, not research.
+
+## Version Compatibility
+
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| gpui 0.2.x | gpui-component (check its gpui dep pin) | gpui-component tracks gpui closely; keep their pins in lockstep. |
+| alacritty_terminal | gpui-terminal (or vendored Zed code) | gpui-terminal declares an alacritty_terminal version; if vendoring, we choose the pin. |
+| Go backend | any desktop release | Protocol compatibility guarded by the backend's existing REST/WS versioning; desktop consumes the same API the web UI uses. |
 
 ## Sources
 
-- **golang.org/x/crypto/ssh v0.50.0** — Official Go package docs: https://pkg.go.dev/golang.org/x/crypto/ssh — Verified `ParsePrivateKey`, `ParsePrivateKeyWithPassphrase`, `PublicKeys`, `PassphraseMissingError`, `Signer` interface, `FingerprintSHA256`. All present in v0.50.0.
-- **shadcn/ui Tabs** — Official docs: https://ui.shadcn.com/docs/components/tabs — Verified installation (`npx shadcn@latest add tabs`) and API (`Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`).
-- **shadcn/ui Select** — Official docs: https://ui.shadcn.com/docs/components/select — Verified installation (`npx shadcn@latest add select`) and composition API.
-- **Existing codebase** — `be/go.mod`, `be/internal/ssh/proxy.go`, `be/internal/config/encryption.go`, `be/internal/db/models.go`, `fe/package.json`, `fe/src/stores/app-store.ts`, `fe/src/lib/api.ts`, `fe/src/App.tsx` — All analyzed for current patterns and integration points.
+- docs.rs/gpui (gpui 0.2.2) — standalone crate, pre-1.0 churn warning, platform support (HIGH)
+- gpui.rs — official standalone site; component guidance drawn from Zed's crates (HIGH)
+- docs.rs/gpui-terminal — TerminalView over alacritty_terminal, feature matrix incl. gaps (HIGH)
+- crates.io/crates/gpui-component + longbridge.github.io/gpui-component — 60+ components, shadcn-inspired, production use at Longbridge (HIGH)
+- zed.dev/docs/terminal + zed/crates/terminal_view README — Zed terminal is Alacritty-backed; abstraction boundary in `terminal` crate (HIGH)
+- reddit/HN gpui-component thread — gpui hit crates.io only weeks before Oct 2025; git-only before that (MEDIUM)
+- v2.tauri.app sidecar docs — lifecycle patterns for embedded backend binaries (MEDIUM, pattern-level)
+
+---
+*Stack research for: WebTerm Desktop (GPUI client over Go backend)*
+*Researched: 2026-09-04*

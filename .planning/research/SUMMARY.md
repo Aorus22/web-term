@@ -1,145 +1,163 @@
 # Project Research Summary
 
-**Project:** WebTerm v0.3.0 — SSH Key Authentication & Sidebar UI Redesign
-**Domain:** Self-hosted web-based SSH terminal client
-**Researched:** 2026-04-28
-**Confidence:** HIGH
+**Project:** WebTerm
+**Domain:** Native desktop SSH client (GPUI frontend over existing Go backend)
+**Researched:** 2026-09-04
+**Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-WebTerm v0.3.0 adds SSH key-based authentication and a sidebar UI redesign to an existing web SSH terminal that currently supports only password auth. This is a well-understood domain: the Go ecosystem's `golang.org/x/crypto/ssh` library provides all needed primitives (key parsing, passphrase handling, public key auth), and the existing AES-256-GCM encryption infrastructure is directly reusable for private key storage at rest. On the frontend, a 2-page sidebar navigation using Zustand state (no router needed) separates Hosts from SSH Keys, while the connection form gains an auth method toggle. The architecture is 3-layered: backend data layer (model + API), frontend UI layer (navigation + key management + connection form), and integration layer (WebSocket key auth + passphrase flow).
+WebTerm v0.5.0 adds a native desktop client built with GPUI — the GPU-accelerated framework Zed ships on, now published standalone on crates.io (0.2.x) with Windows + Linux support — while deliberately reusing the existing Go backend (WebSocket SSH proxy, SQLite with AES-256-GCM, SFTP, port forwarding) as a locally-spawned child process. The terminal renders via `alacritty_terminal`, the same engine Zed's integrated terminal uses, satisfying the user's proven-engine requirement. This architecture converts the riskiest unknowns (SSH, credential storage, session persistence) into already-validated assets, and concentrates all genuine new risk in three areas: the GPUI terminal rendering bridge, the backend process supervisor, and Windows local-terminal PTY support.
 
-The recommended approach is a strict 3-phase build order driven by dependency analysis. Phase 1 establishes the backend foundation — `SSHKey` model, CRUD API, connection schema update — with zero frontend impact and testable via curl. Phase 2 builds all frontend UI — sidebar tabs, SSH Keys page, Hosts card layout, connection form auth toggle — consuming the Phase 1 API. Phase 3 is the integration capstone — extending the WebSocket protocol for key-based SSH auth and the passphrase round-trip prompt. This order ensures each phase is independently testable and that the hardest feature (passphrase flow over WebSocket) is built on a fully validated foundation.
+The recommended approach is a four-crate cargo workspace (`webterm` app, `terminal` bridge, `backend-client`, `backend-supervisor`) that isolates gpui churn and makes the terminal implementation swappable. The decisive early decision is a timeboxed spike in the first terminal phase: the convenient `gpui-terminal` crate documents scrollback as "planned" and mouse selection as "partial", so the spike either validates it against real vim/htop + copy/paste workflows or falls back to porting Zed's proven `terminal`/`terminal_view` pattern — a known-quantity port, not new research.
 
-The key risks are: (1) passphrase-protected key silent failure — `ssh.ParsePrivateKey()` returns `PassphraseMissingError` which must be explicitly type-asserted, not treated as a generic parse error; (2) private key material leakage via logs, errors, or API responses — the API must never return decrypted key material; (3) AES-256-GCM key reuse without domain separation — the existing encryption functions need AAD context strings to prevent ciphertext confusion between passwords and keys; and (4) the WebSocket passphrase round-trip adds protocol complexity that requires careful state machine handling in both frontend and backend.
+Key risks and mitigations: (1) **pre-1.0 dependency churn** — pin exact versions, commit Cargo.lock, upgrade deliberately; (2) **process lifecycle bugs** — one supervisor path with ephemeral-port handoff, health-gated startup, and restart-loop tests; (3) **Windows ConPTY gap** — the backend's local terminal uses POSIX-only creack/pty, so the local-terminal phase must explicitly choose Go-side ConPTY or Rust-side portable-pty; (4) **parity drift** — every phase maps to specific validated REQ-IDs and a dedicated parity-audit phase closes the milestone.
 
 ## Key Findings
 
 ### Recommended Stack
 
-**Zero new backend dependencies.** The existing `golang.org/x/crypto/ssh` v0.50.0 already provides `ParsePrivateKey`, `ParsePrivateKeyWithPassphrase`, `PublicKeys` (Signer→AuthMethod), `PassphraseMissingError` detection, and `FingerprintSHA256`. The existing AES-256-GCM encryption in `config.Encrypt()`/`config.Decrypt()` handles private key storage at rest identically to passwords. On the frontend, only two shadcn/ui components are added via CLI (`tabs`, `select`). No react-router, no file upload library, no form library — all handled by native APIs and existing patterns.
+GPUI anchors the stack; the frontend component layer and terminal engine slot in around it with strong existing art. Full detail in STACK.md.
 
 **Core technologies:**
-- `golang.org/x/crypto/ssh` v0.50.0 (existing): SSH key parsing, passphrase handling, public key auth — all APIs verified present
-- `config.Encrypt()`/`config.Decrypt()` (existing): AES-256-GCM for private key storage — reuse proven password encryption pattern
-- shadcn/ui `Tabs` + `Select` (new): Sidebar navigation and auth method dropdown — standard components, CLI-installed
-- Zustand `sidebarPage` state (existing store): Page switching without react-router — matches existing state-only architecture
-- Native `<input type="file">` + `FileReader`: Key upload — PEM keys are 1-5KB text files, no library needed
+- **gpui 0.2.x (crates.io):** GPU-accelerated UI framework, standalone since late 2025; Windows (DirectX) + Linux (X11/Wayland). Pre-1.0 — pin exactly.
+- **gpui-component (Longbridge):** 60+ shadcn-inspired components with theming — matches WebTerm's web aesthetic; proven in production.
+- **alacritty_terminal (pinned 0.2x):** the Zed-proven VT engine (grid, VTE parser, truecolor); GPUI renders its grid state.
+- **tokio + tokio-tungstenite / reqwest:** drives the backend-client (WS terminal I/O, REST CRUD) mirroring the existing Go API.
+- **portable-pty (conditional):** Windows local-terminal fallback if ConPTY isn't added Go-side.
 
 ### Expected Features
 
-**Must have (table stakes) — all P1 for v0.3.0:**
-- SSH key upload (PEM files via file picker or paste) — users expect to bring existing keys
-- Encrypted key storage at rest (AES-256-GCM) — must match password encryption security bar
-- Passphrase-protected key support — most serious SSH users encrypt private keys
-- Per-connection auth method selection (Password vs SSH Key) — some hosts use keys, some passwords
-- Key pool management (CRUD) — add, rename, delete keys without filesystem access
-- 2-page sidebar navigation (Hosts / SSH Keys) — both are first-class, not buried in settings
-- Hosts page with card layout — standard in connection managers (Termius, Tabby)
+Parity with the web app is the baseline; the desktop differentiates on native performance and one-click launch. Full landscape in FEATURES.md.
 
-**Should have (competitive) — P2 for v0.3.x patches:**
-- Key fingerprint display (SHA256) — verify correct key selected
-- Key type badge (RSA/Ed25519/ECDSA) — identify weak keys visually
-- Passphrase caching per session — reduce friction on reconnect
-- Key usage indicator ("Used by N hosts") — prevent accidental deletion
+**Must have (table stakes):**
+- Tabbed sessions with status dots, SSH + key/password auth, copy/paste + selection, scrollback, resize reflow, connection manager (cards/tags/quick-connect/import-export), dark/light theme, keyboard shortcuts, reconnection UX, settings persistence
+
+**Should have (competitive):**
+- GPU-rendered alacritty terminal (headline), dual-pane SFTP with drag-and-drop, one-click app (backend as child process), port-forwarding UI
 
 **Defer (v2+):**
-- In-browser key generation — edge case, `ssh-keygen` works fine
-- Public key deployment (ssh-copy-id) — requires SFTP (out of scope)
-- Agent forwarding — security risk, architecturally complex in web context
-- SSH certificate support — enterprise feature
+- Command palette, system tray, global hotkey, auto-updater (user deferred extras), macOS target
 
 ### Architecture Approach
 
-The architecture follows the existing patterns exactly: GORM models + AutoMigrate for schema, standard `net/http` handlers for REST API, Zustand for frontend state, TanStack Query for API data fetching, and the established WebSocket JSON protocol for terminal communication. The key architectural change is extending the WebSocket proxy (`proxy.go`) to dispatch on auth method — resolving key credentials from the DB, detecting passphrase requirements, and implementing a round-trip prompt before SSH dial. No new architectural patterns or libraries are introduced.
+A sidecar-style desktop shell: the GPUI app spawns the bundled Go backend on an ephemeral loopback port, health-gates startup, and speaks the exact REST/WS protocol the web UI uses; terminal state (alacritty_terminal `Term`) is separated from GPUI rendering exactly as Zed does, with push-based I/O wakeups; session re-attach reuses the backend's existing session-manager contract. Full design in ARCHITECTURE.md.
 
 **Major components:**
-1. **SSHKey model + CRUD API** (`be/internal/db/models.go`, `be/internal/api/sshkeys.go`) — encrypted private key storage, key metadata (type, fingerprint, passphrase flag), full REST API
-2. **Sidebar page navigation** (`fe/src/App.tsx`, `fe/src/stores/app-store.ts`) — Zustand `sidebarPage` state drives conditional rendering of HostsPage vs SSHKeysPage
-3. **WebSocket key auth + passphrase flow** (`be/internal/ssh/proxy.go`, `fe/src/features/terminal/useSSHSession.ts`) — extends existing protocol with `passphrase-required`/`passphrase` message types, adds `ssh.PublicKeys()` auth branch
+1. **backend-supervisor** — spawn/health/kill lifecycle; loopback-only bind; stale-instance handling
+2. **backend-client** — typed REST + WS client; the only crate that knows the protocol; DTO contract tests
+3. **terminal** — alacritty state + GPUI render bridge; swappable behind a boundary (gpui-terminal vs vendored Zed pattern)
+4. **webterm app** — shell, views (Hosts/Keys/SFTP/Settings), theme, keybinds; the only gpui-dependent crate
 
 ### Critical Pitfalls
 
-1. **PassphraseMissingError silent failure** — Always try `ssh.ParsePrivateKey()` first, then `errors.As(err, &ssh.PassphraseMissingError{})` to detect encrypted keys. Never treat it as "invalid key." Test with encrypted Ed25519 key.
-2. **Private key material leakage** — API must never return decrypted key PEM. Use `json:"-"` tag on `EncryptedKey` field. Never log key bytes. Zero `[]byte` slices after parsing. Sanitize all error messages.
-3. **AES-256-GCM key reuse without domain separation** — Extend existing `Encrypt()`/`Decrypt()` with AAD context strings (`"webterm:password"` vs `"webterm:ssh-private-key"`) to prevent ciphertext confusion attacks.
-4. **WebSocket protocol breaking change** — Add explicit `auth_method` field to `ConnectMessage`. Keep backward compatible (infer from fields if missing). Deploy backend before frontend.
-5. **DB migration destroying existing connections** — Default `auth_method="password"`, nullable `ssh_key_id`. No cascading deletes. Test against populated DB.
+1. **gpui-terminal feature gaps (selection/scrollback "planned")** — timeboxed spike with go/no-go in the first terminal phase; fallback is the vendored Zed pattern
+2. **Pre-1.0 dependency churn** — exact pins + committed lockfile + deliberate upgrade PRs from the foundation phase
+3. **Backend process lifecycle bugs** — single supervisor path, ephemeral port handoff, restart-loop and kill-mid-session tests
+4. **Windows ConPTY gap for local terminal** — explicit Go-side vs Rust-side decision with Windows CI smoke test
+5. **Parity drift** — REQ-ID mapping per phase + final parity-audit phase against PROJECT.md's validated list
 
 ## Implications for Roadmap
 
-Based on combined research, the following 3-phase structure is recommended:
+Based on research, suggested phase structure (numbering continues from v0.4.0 → Phase 20; eight phases map cleanly, adjust count as needed):
 
-### Phase 1: Backend SSH Key Storage
-**Rationale:** Pure backend foundation with zero frontend impact. Testable via curl. Everything else depends on keys existing in the database.
-**Delivers:** `SSHKey` GORM model, encrypted key storage, CRUD API endpoints (`/api/ssh-keys`), connection schema update (`auth_method`, `ssh_key_id`), AES-256-GCM AAD context fix.
-**Addresses:** Key upload, encrypted storage, key pool management API, per-connection auth method fields.
-**Avoids:** Pitfall 2 (key leakage via API — `json:"-"` from the start), Pitfall 3 (AAD context built into encryption from day 1), Pitfall 5 (safe migration with defaults).
-**Estimated scope:** ~165 lines across 5 backend files.
+### Phase 20: Desktop Foundation & Backend Integration
+**Rationale:** Nothing renders without the shell + a reachable backend; supervisor and client are prerequisites for every feature phase.
+**Delivers:** Cargo workspace, pinned deps + CI, GPUI window with basic shell, backend-supervisor (spawn/health/kill), backend-client skeleton, startup UX.
+**Addresses:** settings persistence, one-click launch.
+**Avoids:** dependency churn pitfall (pins from day one), lifecycle bugs (tests here).
 
-### Phase 2: Frontend UI — Navigation & Key Management
-**Rationale:** Consumes Phase 1 API. Can be built and tested with real key data. Doesn't need WebSocket auth flow yet — connections still use password auth while UI for key selection is in place.
-**Delivers:** Sidebar tab navigation (Hosts/SSH Keys), SSH Keys page with upload/rename/delete, Hosts page card layout replacing ConnectionList, ConnectionForm auth method toggle + key selector, `useSSHKeys` TanStack Query hooks.
-**Uses:** shadcn/ui `Tabs` and `Select` components, Zustand `sidebarPage` state, existing `connectionsApi` pattern for new `sshKeysApi`.
-**Implements:** Frontend half of all 7 P1 features. Backend key data is already accessible.
-**Avoids:** Pitfall 7 (build new Hosts page before removing ConnectionList), Pitfall 8 (conditional rendering, not route-based unmounting), Pitfall 11 (React Query cache invalidation after key mutations).
-**Estimated scope:** ~515 lines across 9 frontend files.
+### Phase 21: Terminal Rendering Spike (go/no-go)
+**Rationale:** The root risk; validate gpui-terminal selection + scrollback before building sessions on it.
+**Delivers:** One working terminal view rendering local/WS-fed data through alacritty_terminal; spike report with go/no-go and (if no-go) the vendored-Zed fallback plan.
+**Addresses:** terminal table stakes (selection, scrollback, truecolor).
+**Avoids:** discovering gpui-terminal gaps after sessions are built on it.
 
-### Phase 3: WebSocket Key Auth Integration
-**Rationale:** The integration capstone. Depends on both backend key storage (Phase 1) and frontend key selection UI (Phase 2). The passphrase prompt flow is the hardest feature — requires extending the WebSocket protocol with a round-trip message exchange before SSH dial.
-**Delivers:** Key-based SSH auth in proxy.go (`ssh.PublicKeys(signer)`), passphrase round-trip protocol (`passphrase-required` → `passphrase` messages), PassphrasePrompt component, ConnectMessage extension with `ssh_key_id`, reconnection passphrase handling.
-**Uses:** `ssh.ParsePrivateKey`, `ssh.ParsePrivateKeyWithPassphrase`, `ssh.PublicKeys` from existing Go library; extended WebSocket JSON protocol.
-**Implements:** End-to-end SSH key authentication — the core value proposition of v0.3.0.
-**Avoids:** Pitfall 1 (explicit `PassphraseMissingError` handling), Pitfall 4 (backward-compatible protocol extension with `auth_method` field), Pitfall 9 (passphrase prompt before reconnect, not after failure).
-**Estimated scope:** ~120 lines across 6 files (3 backend, 3 frontend).
+### Phase 22: SSH Terminal Sessions & Tabs
+**Rationale:** With rendering proven, wire real sessions — the product's core.
+**Delivers:** SSH connect (password/key), multi-tab with status dots, resize sync, shortcuts, WS drop reconnection.
+**Addresses:** core SSH parity items.
+**Avoids:** UX drift on shortcuts (desktop conventions decided here).
+
+### Phase 23: Hosts & SSH Keys Management
+**Rationale:** CRUD surfaces are low-risk and unblock daily usability; backend API exists unchanged.
+**Delivers:** Hosts cards/kebab/tags/search/quick-connect, import/export, key pool + passphrase flow, per-connection auth method.
+**Addresses:** hosts + keys parity.
+
+### Phase 24: Local Terminal (incl. Windows ConPTY decision)
+**Rationale:** Isolated PTY decision with its own go/no-go and CI smoke test.
+**Delivers:** Local terminal tab on Linux (backend path) + Windows (chosen ConPTY path); local-first New Tab ordering parity.
+**Addresses:** local terminal parity on both platforms.
+**Avoids:** silent Windows breakage of a validated feature.
+
+### Phase 25: SFTP Dual-Pane Manager
+**Rationale:** Largest UI surface; backend-client and session state are stable by now; can partially parallelize with Phase 23 if desired.
+**Delivers:** Dual-pane browsing, local/remote sources, list/upload/download/delete/rename with streaming, drag-and-drop, external OS DnD.
+**Addresses:** SFTP parity.
+
+### Phase 26: Port Forwarding, Settings & Theme Polish
+**Rationale:** Remaining parity surfaces are small once the shell and views exist.
+**Delivers:** Port-forward management UI, settings page (desktop-scope; no engine selector), theme system with terminal palette sync, window-state persistence.
+**Addresses:** forwarding + settings + theme parity.
+
+### Phase 27: Parity Audit & Desktop Hardening
+**Rationale:** Research flags parity drift as the failure mode of parity milestones; a dedicated close-out phase makes "daily-driveable" an explicit, verified bar.
+**Delivers:** REQ-by-REQ audit vs PROJECT.md validated list, reconnection chaos tests (WS drop vs backend kill), performance pass on heavy output, packaging/installers for Windows + Linux.
+**Addresses:** the done-criteria.
+**Avoids:** shipping 90% parity.
 
 ### Phase Ordering Rationale
 
-- **Phase 1 → Phase 2 dependency:** Frontend SSH Keys page and ConnectionForm key selector need real API endpoints to test against. Building UI first would require mocking.
-- **Phase 2 → Phase 3 dependency:** The WebSocket auth flow needs the frontend to already know which key a connection uses (`ssh_key_id` stored in connection form). Without the UI, there's no way to select a key.
-- **Phase 1 and Phase 2 partial parallelism:** Phase 1 backend work is fully independent. Phase 2's frontend component scaffolding (HostsPage, SSHKeysPage layouts) could start in parallel with Phase 1, wiring to API only after Phase 1 completes. However, sequential is safer for a single developer.
-- **Phase 3 is the integration test:** All the hardest pitfalls (passphrase flow, protocol extension, reconnect handling) live here. Building it on a validated foundation reduces risk.
+- Foundation → terminal spike → sessions follows the dependency chain (shell/engine → render proof → real I/O).
+- Hosts/keys before SFTP because SFTP shares connection state; SFTP's size justifies its own phase.
+- Local terminal is isolated so the ConPTY decision cannot destabilize SSH parity work.
+- The audit phase converts the "22 validated requirements" checklist into gate criteria.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 3:** The WebSocket passphrase round-trip is novel — no existing pattern in the codebase for bi-directional message exchange before SSH dial. The proxy.go `HandleWebSocket` function is already 252 lines; adding auth dispatch requires careful refactoring. Consider extracting `resolveAuthMethods()` helper as recommended in ARCHITECTURE.md anti-patterns section.
+- **Phase 21 (terminal spike):** gpui-terminal maturity unknowns; scrollback/selection implementation specifics
+- **Phase 24 (local terminal):** ConPTY integration choice needs a concrete spike (Go wrapper availability vs portable-pty bypass)
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1:** GORM model + CRUD API mirrors existing `Connection` pattern exactly. Encryption reuse is straightforward. Well-documented Go SSH APIs.
-- **Phase 2:** shadcn/ui component installation + TanStack Query hooks follow existing codebase patterns exactly. No novel patterns needed.
+- **Phase 23 (hosts/keys):** CRUD over existing API, well-understood
+- **Phase 26 (settings/theme):** configuration + theming patterns are documented in gpui-component
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All APIs verified against pkg.go.dev and ui.shadcn.com. Zero new dependencies — all reuse existing libraries. |
-| Features | HIGH | Feature list derived from competitor analysis (Termius, Tabby) and codebase integration point analysis. Clear P1/P2/P3 prioritization. |
-| Architecture | HIGH | Full codebase analysis with file-level integration points. 3-phase build order validated against dependency graph. ~800 LOC estimate based on file-by-file analysis. |
-| Pitfalls | HIGH | 16 pitfalls identified from codebase analysis and Go library behavior. Top 5 are critical with specific prevention code. |
+| Stack | MEDIUM-HIGH | gpui/gpui-component/alacritty_terminal verified on official sources; exact current versions to confirm at add time |
+| Features | MEDIUM-HIGH | Parity baseline is our own validated list; competitor landscape consistent |
+| Architecture | MEDIUM-HIGH | Mirrors Zed's real terminal split + Tauri sidecar conventions; protocol specifics from this repo's backend |
+| Pitfalls | MEDIUM | Crate-maturity gaps documented; lifecycle/platform quirks pattern-level |
 
-**Overall confidence:** HIGH
+**Overall confidence:** MEDIUM-HIGH
 
 ### Gaps to Address
 
-- **AES-256-GCM AAD context implementation:** The recommendation to add context strings to encryption is clear, but the exact function signature change (`EncryptWithContext` vs modifying `Encrypt`) should be decided during Phase 1 planning. The existing `connections.go` callers will need updating.
-- **Export/import v2 format:** The current export format doesn't include keys. Phase 1 or Phase 3 should extend it, but the exact versioning strategy (`version: 2`) needs spec during planning.
-- **Key deletion safety:** When a key is deleted but referenced by connections, the exact UX (prevent deletion? warn? cascade to password auth?) should be specified during Phase 2 planning.
+- **gpui-terminal real-world maturity:** resolve in Phase 21 spike with explicit go/no-go criteria
+- **ConPTY integration path for Go:** verify availability/quality of Go ConPTY wrappers in Phase 24 planning before choosing Go-side vs Rust-side
+- **Exact current crate versions:** confirm at `cargo add` time; STACK.md versions are approximate
+- **gpui-component ↔ gpui pin lockstep:** verify compatibility matrix when pinning
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `golang.org/x/crypto/ssh` v0.50.0 — pkg.go.dev — Verified: `ParsePrivateKey`, `ParsePrivateKeyWithPassphrase`, `PublicKeys`, `PassphraseMissingError`, `FingerprintSHA256`
-- shadcn/ui — ui.shadcn.com — Verified: Tabs component, Select component installation and API
-- WebTerm codebase — 11 Go files, 23+ TypeScript files analyzed directly — All integration points verified
+- docs.rs/crate/gpui (0.2.2) — standalone crate, pre-1.0 churn warning, platform support
+- docs.rs/gpui-terminal — TerminalView architecture, callback surface, feature matrix incl. gaps
+- crates.io/crates/gpui-component + longbridge.github.io/gpui-component — component set, production use
+- zed.dev/docs/terminal + zed/crates/terminal_view README — Alacritty-backed terminal, abstraction boundary
+- tokio::process / std::process docs — child supervision semantics
 
 ### Secondary (MEDIUM confidence)
-- Competitor analysis — Termius, Tabby, WebSSH — Feature comparison based on public documentation
-- PROJECT.md — v0.3.0 milestone requirements and constraints
+- v2.tauri.app/develop/sidecar + plugins-workspace#3062 — sidecar lifecycle conventions and pain points
+- creack/pty and portable-pty docs — POSIX-only vs ConPTY scopes
+- Reddit/HN threads — gpui ecosystem timing, component library perception
 
 ### Tertiary (LOW confidence)
-- None — all findings verified against at least one primary source
+- Feature-comparison blog posts (SSH client landscape) — table-stakes perception only
 
 ---
-*Research completed: 2026-04-28*
+*Research completed: 2026-09-04*
 *Ready for roadmap: yes*
