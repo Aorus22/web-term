@@ -1,116 +1,176 @@
-# Roadmap: WebTerm v0.4.0 — Local Terminal & SFTP
+# Roadmap: WebTerm v0.5.0 — Desktop GPUI Client
 
 ## Overview
-Milestone v0.4.0 introduces local terminal access and a dual-pane SFTP file manager.
+Milestone v0.5.0 ships a native desktop WebTerm built with GPUI (Rust) that reuses the existing Go backend as a locally-spawned process, reaching full feature parity with the web app on Windows and Linux. The terminal renders via alacritty_terminal — the engine proven in Zed.
 
 ## Milestones
 - ✅ **v0.2.0 MVP** - [Archive](milestones/v0.2.0-ROADMAP.md) (shipped 2026-04-28)
 - ✅ **v0.3.0 SSH Key Auth & UI Redesign** - [Archive](milestones/v0.3.0-ROADMAP.md) (shipped 2026-04-29)
-- 🏗️ **v0.4.0 Local Terminal & SFTP** - (Target: 2026-05-05)
+- ✅ **v0.4.0 Local Terminal & SFTP** - [Archive](milestones/v0.4.0-ROADMAP.md) (shipped 2026-05-18)
+- 🏗️ **v0.5.0 Desktop GPUI Client** - Phases 20-27
 
 ## Current Objective
-Implement local shell support and a Termius-inspired dual-pane SFTP manager.
+Build the GPUI desktop client: app shell + backend integration, terminal rendering (alacritty engine), SSH/local sessions, hosts & keys management, SFTP dual-pane, forwarding & settings, and a parity-audit close-out.
 
 ## Progress
-**Execution Order:** Phases 12 → 13 → 14 → 15 → 16 → 17 → 18
+**Execution Order:** Phases 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27
 
 | Phase | Milestone | Description | Status | Target |
 |-------|-----------|-------------|--------|--------|
-| **12. Local Terminal Foundation** | v0.4.0 | Backend PTY spawning + Frontend "Local Terminal" option in New Tab. | ✅ Shipped | 2026-05-03 |
-| **13. SFTP Backend Core** | v0.4.0 | `pkg/sftp` integration, Local FS driver, and REST API for file operations. | ✅ Shipped | 2026-05-03 |
-| **14. SFTP Frontend UI** | v0.4.0 | Sidebar nav, dual-pane layout, and basic directory browsing (Local & Remote). | ✅ Shipped | 2026-05-04 |
-| **15. SFTP Operations & DND** | v0.4.0 | File upload/download/delete/rename and inter-pane drag-and-drop. | ✅ Shipped | 2026-05-05 |
-| **16. Polish & UI Cohesion** | v0.4.0 | Breadcrumbs, keyboard shortcuts, progress indicators, and visual polish. | ✅ Shipped | 2026-05-05 |
-| **17. Terminal Theme Sync** | v0.4.0 | Sync terminal theme selection from settings to overall application theme for cohesive look. | ✅ Shipped | 2026-05-05 |
-| **18. Terminal Engine Selector** | v0.4.0 | Allow users to switch between @wterm/react and xterm.js in settings. | ✅ Shipped | 2026-05-06 |
-| **19. Polish & Review Fixes** | v0.4.0 | Address code review findings from Phase 18 and finalize milestone. | ✅ Shipped | 2026-05-06 |
+| **20. Desktop Foundation & Backend Integration** | v0.5.0 | Cargo workspace, pinned deps + CI, GPUI app shell, backend supervisor + client, startup UX. | ○ Not started | 2026-09-08 |
+| **21. Terminal Rendering (Alacritty Engine)** | v0.5.0 | gpui-terminal spike with go/no-go; alacritty_terminal state + GPUI render; selection, scrollback, truecolor. | ○ Not started | 2026-09-10 |
+| **22. SSH Terminal Sessions & Tabs** | v0.5.0 | SSH connect (password/key), multi-tab with status dots, resize sync, shortcuts, reconnection + re-attach. | ○ Not started | 2026-09-14 |
+| **23. Hosts & SSH Keys Management** | v0.5.0 | Host cards, kebab menus, tags, search, quick-connect, import/export; key pool, passphrase flow, auth method. | ○ Not started | 2026-09-16 |
+| **24. Local Terminal (Cross-Platform PTY)** | v0.5.0 | Local terminal tab on Linux (backend path) + Windows (ConPTY decision with go/no-go). | ○ Not started | 2026-09-18 |
+| **25. SFTP Dual-Pane Manager** | v0.5.0 | Dual-pane browsing, local/remote sources, file ops with streaming, drag-and-drop incl. OS DnD. | ○ Not started | 2026-09-22 |
+| **26. Port Forwarding, Settings & Theme Polish** | v0.5.0 | Forward rule management, settings page (desktop scope), theme system with terminal palette sync, window state. | ○ Not started | 2026-09-24 |
+| **27. Parity Audit & Desktop Hardening** | v0.5.0 | REQ-by-REQ audit vs web app, reconnection chaos tests, performance pass, packaging for Windows + Linux. | ○ Not started | 2026-09-28 |
 
 ## Phase Details
 
-### Phase 12: Local Terminal Foundation
-- **Goal:** Enable users to open a terminal session on the machine running the WebTerm backend.
-- **Requirements:** [REQ-PTY-INTEGRATION, REQ-LOCAL-WS-HANDLER, REQ-LOCAL-UI-OPTION]
-- **Tasks:**
-    - Integrate `creack/pty` in Go backend.
-    - Add `ConnectionID: "local"` support to WebSocket handler.
-    - Update `NewTabView.tsx` to show "Local Terminal" as the primary option.
-    - Ensure terminal resizing and I/O work for local PTY.
+### Phase 20: Desktop Foundation & Backend Integration
+- **Goal:** Stand up the GPUI application and make the existing Go backend a locally-managed child process with one-click startup.
+- **Depends on:** Nothing (first phase of the milestone)
+- **Requirements:** [SHELL-01, SHELL-02, SHELL-03, SHELL-05, SHELL-06]
+- **Success Criteria** (what must be TRUE):
+  1. Running `webterm` (desktop binary) opens a native window on Windows and Linux without a manually started backend
+  2. The window shows the shell skeleton (sidebar nav with Hosts / SSH Keys / SFTP / Settings) and a visible startup state that surfaces backend failure errors
+  3. Dark/light theme selection renders across the shell and persists across restarts
+  4. Window size and position persist across restarts
+  5. Dependency pins are exact, Cargo.lock is committed, and CI builds both target platforms
+- **Plans:** TBD
 
-### Phase 13: SFTP Backend Core
-- **Goal:** Provide a unified API for interacting with local and remote filesystems.
-- **Plans:** 1 plan
-- **Plan list:**
-    - [ ] 13-01-PLAN.md — Implement FileSystem drivers and SFTP REST API.
+Plans:
+- [ ] 20-01: Workspace scaffold, dependency pins, CI matrix, tracing/logging
+- [ ] 20-02: Backend supervisor (spawn/ephemeral port/health/kill) + stale-instance handling
+- [ ] 20-03: GPUI app shell: root entity, sidebar navigation, startup state, theme application
+- [ ] 20-04: Desktop settings store (window state, theme, backend path) + persistence
+
+### Phase 21: Terminal Rendering (Alacritty Engine)
+- **Goal:** Render a terminal grid in GPUI through alacritty_terminal, proving selection, scrollback, and truecolor work — with an explicit go/no-go on the gpui-terminal crate.
+- **Depends on:** Phase 20
+- **Requirements:** [TERM-01, TERM-02, TERM-03, TERM-04]
+- **Success Criteria** (what must be TRUE):
+  1. A terminal view renders PTY byte streams (local test source) with correct colors, bold/italic/underline, and 24-bit truecolor
+  2. Mouse selection + copy and paste work in real workflows
+  3. Scrollback works (reviewable history after full-screen output)
+  4. Resizing the view keeps the grid in sync (resize callback fires with cols/rows)
+  5. Spike verdict recorded: gpui-terminal validated OR vendored Zed-pattern fallback implemented behind the terminal crate boundary
+- **Plans:** TBD
+
+Plans:
+- [ ] 21-01: Timeboxed spike on gpui-terminal (selection + scrollback against vim/htop) with go/no-go report
+- [ ] 21-02: Terminal state layer (alacritty_terminal Term, parser, scrollback) behind the crates/terminal boundary
+- [ ] 21-03: GPUI renderer (glyph batching, palette, cursor) + input mapping (keystroke → escape sequences)
+
+### Phase 22: SSH Terminal Sessions & Tabs
+- **Goal:** Wire real SSH sessions into the terminal: connect, tab lifecycle, resilience.
+- **Depends on:** Phase 21
+- **Requirements:** [SHELL-04, TERM-05, TERM-06, TERM-07, TERM-08]
+- **Success Criteria** (what must be TRUE):
+  1. User connects to a saved host over SSH (password or key) and works in vim/htop/tmux in a desktop tab
+  2. Multiple tabs open/switch/close with per-session status indicators
+  3. WS drop triggers reconnection UX; killing the backend process mid-session is distinguishable and recoverable (app restart re-attaches sessions)
+  4. Keyboard shortcuts for new/close/cycle tabs follow desktop conventions
+- **Plans:** TBD
+
+Plans:
+- [ ] 22-01: backend-client WS terminal channel (framing matched to backend protocol, contract tests)
+- [ ] 22-02: Session manager + tab strip with status dots and shortcuts
+- [ ] 22-03: Reconnection UX + session re-attach across app restart
+- [ ] 22-04: Local terminal tab baseline via backend WS (POSIX path; full cross-platform PTY finalization in Phase 24)
+
+### Phase 23: Hosts & SSH Keys Management
+- **Goal:** Full connection and key management parity in GPUI, speaking the existing REST API.
+- **Depends on:** Phase 22 (uses backend-client REST surface; can overlap Phase 22 in planning)
+- **Requirements:** [HOSTS-01, HOSTS-02, HOSTS-03, HOSTS-04, KEYS-01, KEYS-02, KEYS-03]
+- **Success Criteria** (what must be TRUE):
+  1. User can create/edit/delete connections and browse them as cards with kebab menus, tags, and search
+  2. Quick-connect works from the New Tab view; export/import JSON roundtrips with the web app
+  3. Key pool supports upload/management; passphrase prompts cache session-scoped (never stored); per-connection auth method selectable
+- **Plans:** TBD
+
+Plans:
+- [ ] 23-01: Hosts view (cards, kebab menus, tags, search/filter)
+- [ ] 23-02: Connection form (CRUD + per-connection auth method) + quick-connect
+- [ ] 23-03: SSH Keys view (pool, upload, passphrase flow)
+- [ ] 23-04: Import/export JSON roundtrip (web-app compatible)
+
+### Phase 24: Local Terminal (Cross-Platform PTY)
+- **Goal:** Local terminal as a first-class New Tab option on both target platforms, resolving the Windows ConPTY decision explicitly.
+- **Depends on:** Phase 22
+- **Requirements:** [TERM-05]
+- **Success Criteria** (what must be TRUE):
+  1. Local terminal opens from New Tab as a first-class option on Linux (backend PTY path)
+  2. Local terminal opens on Windows via the chosen ConPTY path (Go-side extension or Rust-side portable-pty), with a recorded decision
+  3. A Windows CI smoke test exercises the local terminal path
+- **Plans:** TBD
+
+Plans:
+- [ ] 24-01: ConPTY spike + decision record (Go wrapper vs portable-pty bypass)
+- [ ] 24-02: Implement chosen path + New Tab ordering parity
+- [ ] 24-03: Windows CI smoke test for local terminal
+
+### Phase 25: SFTP Dual-Pane Manager
+- **Goal:** Port the dual-pane SFTP manager to GPUI at full interaction parity.
+- **Depends on:** Phase 23 (shares connection state + REST client)
 - **Requirements:** [SFTP-01, SFTP-02, SFTP-03, SFTP-04]
-- **Tasks:**
-    - Add `pkg/sftp` dependency.
-    - Implement a `FileSystem` interface in Go with `Local` and `SFTP` implementations.
-    - Create REST endpoints for `list`, `upload`, `download`, `delete`, `rename`.
-    - Handle authentication by reusing existing SSH client sessions.
+- **Success Criteria** (what must be TRUE):
+  1. Dual-pane view opens from the sidebar; each pane selects Local Filesystem or a saved host
+  2. Directory browsing with breadcrumbs, metadata columns, and sorting in both panes
+  3. Upload/download/delete/rename/new-folder work with progress indicators; transfers stream
+  4. Drag-and-drop works within/between panes and from the OS file manager (Windows Explorer + Linux)
+- **Plans:** TBD
 
-### Phase 14: SFTP Frontend UI
-- **Goal:** Create the visual framework for the SFTP manager.
-- **Plans:** 2 plans
-- **Plan list:**
-    - [ ] 14-01-PLAN.md — Setup navigation, API extensions, and dual-pane resizable layout.
-    - [x] 14-02-PLAN.md — Implement directory listing, navigation logic, and source selection.
-- **Requirements:** [SFTP-01, SFTP-02, SFTP-03, SFTP-04]
-- **Tasks:**
-    - Add "SFTP" to sidebar navigation.
-    - Create `SFTPView` component with a dual-pane `SplitLayout`.
-    - Implement `DirectoryBrowser` component with source selector (Local vs Hosts).
-    - Basic directory listing and navigation (double-click to enter folder).
+Plans:
+- [ ] 25-01: Dual-pane layout + directory browsers (source selection, breadcrumbs, metadata, sorting)
+- [ ] 25-02: File operations (upload/download/delete/rename/new folder) with transfer progress
+- [ ] 25-03: Drag-and-drop (inter-pane + OS DnD) + context menus + keyboard shortcuts
 
-### Phase 15: SFTP Operations & DND
-- **Goal:** Enable file management and inter-host transfers.
-- **Tasks:**
-    - Implement file upload (multipart) and download (stream).
-    - Add UI for Delete and Rename (with confirmation).
-    - Implement drag-and-drop between panes to trigger transfers.
-    - Handle large file transfers with chunked/streamed backend processing.
+### Phase 26: Port Forwarding, Settings & Theme Polish
+- **Goal:** Close out remaining parity surfaces: forwarding rules, settings, and cohesive theming.
+- **Depends on:** Phase 23
+- **Requirements:** [FWD-01, SET-01]
+- **Success Criteria** (what must be TRUE):
+  1. User can create and manage local port forwarding rules from the desktop app
+  2. Settings page offers themes and desktop preferences (backend path override); no terminal engine selector
+  3. Theme change applies to app and terminal palette live, mid-session
+- **Plans:** TBD
 
-### Phase 16: Polish & UI Cohesion
-- **Goal:** Finalize the UX and visual design of the SFTP manager with breadcrumbs, shortcuts, and progress tracking.
-- **Plans:** 3 plans
-- **Plan list:**
-    - [ ] 16-01-PLAN.md — Implement interactive breadcrumbs and file-type icons.
-    - [ ] 16-02-PLAN.md — Implement keyboard shortcuts (Enter, Backspace, Delete, etc.).
-    - [ ] 16-03-PLAN.md — Create a centralized Transfer Manager for progress tracking.
-- **Requirements:** [SFTP-01, SFTP-04]
-- **Tasks:**
-    - Add interactive breadcrumbs for path navigation.
-    - Implement keyboard shortcuts (Delete, F5, Ctrl+C/V).
-    - Add a "Transfer Queue" or toast-based progress indicators.
-    - Visual polish: high-quality icons, row highlighting, and transition animations.
+Plans:
+- [ ] 26-01: Port forwarding management UI
+- [ ] 26-02: Settings page (desktop scope) + live theme application incl. terminal palette sync
 
-### Phase 17: Terminal Theme Sync
-- **Goal:** Synchronize the application's visual theme (sidebar, tabs, panels) with the user's selected terminal theme.
-- **Plans:** 3 plans
-- **Plan list:**
-    - [x] 17-01-PLAN.md — Implement core theme mapping logic and AppThemeProvider.
-    - [x] 17-02-PLAN.md — UI refinement, sidebar/tab adaptation, and accessibility verification.
-    - [ ] 17-03-PLAN.md — Gap closure: replace hardcoded colors with theme-responsive CSS variables.
-- **Requirements:** [THEME-01, THEME-02, THEME-03, THEME-04, THEME-05]
-- **Tasks:**
-    - Map terminal theme palettes to app-level CSS variables.
-    - Update settings UI to trigger app theme change on terminal theme selection.
-    - Ensure all app components (sidebar, tabs, panels) respond to the synced theme.
-    - Handle edge cases (custom themes, fallback colors).
+### Phase 27: Parity Audit & Desktop Hardening
+- **Goal:** Verify full parity against the web app's validated requirements and harden for daily-driver use.
+- **Depends on:** Phases 20-26
+- **Requirements:** [QA-01, QA-02, QA-03]
+- **Success Criteria** (what must be TRUE):
+  1. Every validated v0.2-v0.4 REQ is verified against the desktop app in a recorded audit matrix
+  2. Reconnection chaos tests pass (WS drop vs backend kill vs app restart)
+  3. Performance holds under heavy terminal output (no UI stall, bounded memory)
+  4. The app ships as a single launchable bundle per platform with the backend loopback-only
+- **Plans:** TBD
 
-### Phase 18: Terminal Engine Selector
-- **Goal:** Provide an alternative terminal engine (xterm.js) for users who prefer it or need specific xterm features.
-- **Plans:** 3 plans
-- **Plan list:**
-    - [ ] 18-01-PLAN.md — Foundation, Backend Settings, and Dependency Setup.
-    - [ ] 18-02-PLAN.md — Terminal Engine Abstraction (WTerm & XTerm components).
-    - [ ] 18-03-PLAN.md — UI Integration into TerminalPane and Settings page.
-- **Requirements:** [ENGINE-01, ENGINE-02, ENGINE-03]
-- **Tasks:**
-    - Add "Terminal Engine" selection to Settings page.
-    - Integrate `xterm.js` and `@xterm/addon-fit`.
-    - Create a wrapper component to toggle between `@wterm/react` and `xterm.js`.
-    - Ensure input/output and resizing work correctly for both engines.
+Plans:
+- [ ] 27-01: Parity audit matrix execution vs PROJECT.md validated list
+- [ ] 27-02: Chaos + performance testing pass
+- [ ] 27-03: Packaging/installers (Windows + Linux) + loopback enforcement verification
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 20. Desktop Foundation & Backend Integration | 0/4 | Not started | - |
+| 21. Terminal Rendering (Alacritty Engine) | 0/3 | Not started | - |
+| 22. SSH Terminal Sessions & Tabs | 0/4 | Not started | - |
+| 23. Hosts & SSH Keys Management | 0/4 | Not started | - |
+| 24. Local Terminal (Cross-Platform PTY) | 0/3 | Not started | - |
+| 25. SFTP Dual-Pane Manager | 0/3 | Not started | - |
+| 26. Port Forwarding, Settings & Theme Polish | 0/2 | Not started | - |
+| 27. Parity Audit & Desktop Hardening | 0/3 | Not started | - |
+
+**Validation:** 30 requirements mapped across 8 phases — coverage complete, every REQ mapped to exactly one phase ✓ (TERM-05 primary mapping: Phase 24)
 
 ---
-
-*Last updated: 2026-05-06 after planning Phase 18*
+*Last updated: 2026-09-04 at milestone v0.5.0 roadmap creation*
