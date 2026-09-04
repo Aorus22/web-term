@@ -245,6 +245,7 @@ impl TerminalSessionManager {
         tab_id: u64,
         handle: TerminalWsHandle,
         session_id: String,
+        app_weak: Option<WeakEntity<crate::app_state::AppState>>,
         cx: &mut App,
     ) {
         let tab = match self.tabs.iter_mut().find(|t| t.id == tab_id) {
@@ -272,6 +273,7 @@ impl TerminalSessionManager {
 
             // 2. Spawn async task pumping backend PTY bytes into the terminal
             let view_weak = view.downgrade();
+            let app_weak_clone = app_weak.clone();
             cx.spawn(move |cx: &mut AsyncApp| {
                 let view_weak = view_weak.clone();
                 let cx_handle = cx.clone();
@@ -292,6 +294,18 @@ impl TerminalSessionManager {
                         if !ok {
                             break;
                         }
+                    }
+
+                    // WebSocket output dropped: inform AppState for reconnection handling
+                    if let Some(ref app_weak) = app_weak_clone {
+                        let app_weak = app_weak.clone();
+                        cx_handle.update(move |cx: &mut App| {
+                            if let Some(app) = app_weak.upgrade() {
+                                app.update(cx, |this, cx| {
+                                    this.on_tab_dropped(tab_id, cx);
+                                });
+                            }
+                        });
                     }
                 }
             })

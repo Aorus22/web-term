@@ -41,6 +41,15 @@ pub struct WindowState {
     pub maximized: bool,
 }
 
+/// Persisted session tab state to survive app restart.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SavedSessionTab {
+    pub session_id: String,
+    pub title: String,
+    pub session_type: String, // "local" | "ssh"
+    pub connection_id: Option<String>,
+}
+
 /// Desktop settings store holding UI preferences and encryption key custody.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct DesktopSettings {
@@ -54,6 +63,8 @@ pub struct DesktopSettings {
     pub window_state: Option<WindowState>,
     #[serde(default)]
     pub last_backend_url: Option<String>,
+    #[serde(default)]
+    pub open_sessions: Vec<SavedSessionTab>,
 
     #[serde(skip)]
     pub custom_base: Option<PathBuf>,

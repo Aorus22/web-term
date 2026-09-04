@@ -7,6 +7,7 @@ use crate::actions::{
     JumpTab9, NewTab, NextTab, PrevTab,
 };
 use crate::app_state::{AppState, View};
+use crate::views::reconnect_banner::render_reconnect_banner;
 use crate::views::tab_strip::render_tab_strip;
 
 /// Render the left navigation sidebar and active content pane.
@@ -209,6 +210,8 @@ fn render_content_pane(
                 .overflow_hidden()
                 // Top Tab Strip
                 .child(render_tab_strip(app, cx))
+                // Reconnection banner (when active tab is reconnecting or disconnected)
+                .children(render_reconnect_banner(app, cx))
                 // Active Terminal or Empty State
                 .child(
                     div()
