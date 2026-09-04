@@ -42,15 +42,15 @@ Requirements for the desktop client. Each maps to roadmap phases.
 
 ### SFTP
 
-- [ ] **SFTP-01**: User can open the dual-pane SFTP manager with a local or remote source per pane
-- [ ] **SFTP-02**: User can browse directories with breadcrumbs, file metadata, and sorting
-- [ ] **SFTP-03**: User can upload, download, delete, rename, and create folders with progress indicators
-- [ ] **SFTP-04**: User can drag-and-drop files within/between panes and from the OS file manager
+- [x] **SFTP-01**: User can open the dual-pane SFTP manager with a local or remote source per pane
+- [x] **SFTP-02**: User can browse directories with breadcrumbs, file metadata, and sorting
+- [x] **SFTP-03**: User can upload, download, delete, rename, and create folders with progress indicators
+- [x] **SFTP-04**: User can drag-and-drop files within/between panes and from the OS file manager
 
 ### Forwarding & Settings
 
-- [ ] **FWD-01**: User can create and manage local port forwarding rules
-- [ ] **SET-01**: User can configure themes and desktop preferences (e.g., backend path override); no terminal engine selector — the desktop engine is fixed to alacritty
+- [x] **FWD-01**: User can create and manage local port forwarding rules
+- [x] **SET-01**: User can configure themes and desktop preferences (e.g., backend path override); no terminal engine selector — the desktop engine is fixed to alacritty
 
 ### Quality & Packaging
 
@@ -119,8 +119,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SFTP-02 | Phase 25 | Satisfied |
 | SFTP-03 | Phase 25 | Satisfied |
 | SFTP-04 | Phase 25 | Satisfied |
-| FWD-01 | Phase 26 | Pending |
-| SET-01 | Phase 26 | Pending |
+| FWD-01 | Phase 26 | Satisfied |
+| SET-01 | Phase 26 | Satisfied |
 | QA-01 | Phase 27 | Pending |
 | QA-02 | Phase 27 | Pending |
 | QA-03 | Phase 27 | Pending |
@@ -132,4 +132,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-09-04*
-*Last updated: 2026-09-05 after Phase 23 completion*
+*Last updated: 2026-09-05 after Phase 26 completion*
