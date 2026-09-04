@@ -4,7 +4,7 @@ members = [
     "crates/supervisor",
     "crates/settings",
     "crates/backend-client",
-    "crates/app",
+    "crates/webterm",
 ]
 
 [workspace.package]
@@ -22,7 +22,7 @@ webterm-backend-client = { path = "crates/backend-client" }
 # Exact pins — see .planning/phases/20-desktop-foundation-backend-integration/20-RESEARCH.md
 # gpui is pre-1.0 with real breaking-change churn; every core dep is pinned exactly
 # and Cargo.lock is committed (plan 20-01 Task 1).
-gpui = "=0.2.2"
+gpui = { package = "gpui-pre", version = "=0.3.3" }
 gpui-component = "=0.6.0"
 tokio = { version = "=1.53.1", features = [
     "rt-multi-thread",

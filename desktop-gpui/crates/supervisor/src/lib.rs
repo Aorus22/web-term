@@ -3,7 +3,7 @@
 //! Framework-free (tokio only, no GPUI) so the spawn/handshake/readiness/kill
 //! logic is testable headless in CI (20-RESEARCH §Validation Architecture).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use parking_lot::Mutex;
@@ -355,7 +355,7 @@ impl Supervisor {
         self.child = Some(child);
 
         // Spawn child exit monitor
-        let status_tx = self.status_tx.clone();
+        let _status_tx = self.status_tx.clone();
         tokio::spawn(async move {
             // Note: child handle is held in self.child, but wait() in stop will reap.
         });
