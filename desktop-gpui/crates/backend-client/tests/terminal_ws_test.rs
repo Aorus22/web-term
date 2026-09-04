@@ -247,3 +247,36 @@ async fn test_ws_connect_server_error_response() {
 
     server_task.await.unwrap();
 }
+
+#[test]
+fn test_ws_connect_request_local_with_and_without_cwd() {
+    // 1. Without cwd
+    let req_no_cwd = WsConnectRequest::for_local(80, 24);
+    assert_eq!(req_no_cwd.session_type.as_deref(), Some("local"));
+    assert_eq!(req_no_cwd.connection_id.as_deref(), Some("local"));
+    assert!(req_no_cwd.cwd.is_none());
+
+    let val_no_cwd = serde_json::to_value(&req_no_cwd).unwrap();
+    assert_eq!(val_no_cwd["type"], "connect");
+    assert_eq!(val_no_cwd["session_type"], "local");
+    assert_eq!(val_no_cwd["connection_id"], "local");
+    assert!(val_no_cwd.get("cwd").is_none());
+
+    // 2. With cwd
+    let req_with_cwd = WsConnectRequest::for_local_with_cwd(
+        120,
+        35,
+        Some("/home/developer/workspace".to_string()),
+    );
+    assert_eq!(req_with_cwd.cols, 120);
+    assert_eq!(req_with_cwd.rows, 35);
+    assert_eq!(
+        req_with_cwd.cwd.as_deref(),
+        Some("/home/developer/workspace")
+    );
+
+    let val_with_cwd = serde_json::to_value(&req_with_cwd).unwrap();
+    assert_eq!(val_with_cwd["cwd"], "/home/developer/workspace");
+    assert_eq!(val_with_cwd["cols"], 120);
+    assert_eq!(val_with_cwd["rows"], 35);
+}

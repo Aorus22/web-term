@@ -39,6 +39,24 @@ fn test_local_connect_request_structure_and_serialization() {
 }
 
 #[test]
+fn test_local_connect_request_with_cwd_serialization() {
+    let req = WsConnectRequest::for_local_with_cwd(90, 30, Some("C:\\Coding\\project".to_string()));
+
+    assert_eq!(req.msg_type, "connect");
+    assert_eq!(req.session_type.as_deref(), Some("local"));
+    assert_eq!(req.connection_id.as_deref(), Some("local"));
+    assert_eq!(req.cols, 90);
+    assert_eq!(req.rows, 30);
+    assert_eq!(req.cwd.as_deref(), Some("C:\\Coding\\project"));
+
+    let val = serde_json::to_value(&req).expect("must serialize");
+    assert_eq!(val["type"], "connect");
+    assert_eq!(val["session_type"], "local");
+    assert_eq!(val["connection_id"], "local");
+    assert_eq!(val["cwd"], "C:\\Coding\\project");
+}
+
+#[test]
 fn test_quick_ssh_connect_request_structure() {
     let req = WsConnectRequest::for_quick_connect("192.168.1.100", 2222, "alice", "secret123", 100, 30);
 

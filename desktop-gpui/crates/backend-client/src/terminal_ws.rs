@@ -98,8 +98,12 @@ impl WsConnectRequest {
         }
     }
 
-    /// Create a request for a local shell terminal session.
-    pub fn for_local(cols: u16, rows: u16) -> Self {
+    /// Create a request for a local shell terminal session with an optional custom working directory.
+    ///
+    /// On Windows, the Go backend spawns ConPTY with `conpty.ConPtyWorkDir(cwd)`.
+    /// On Linux, the Go backend spawns POSIX PTY with `c.Dir = cwd`.
+    /// If `cwd` is `None` or empty, the backend defaults to the user's home directory.
+    pub fn for_local_with_cwd(cols: u16, rows: u16, cwd: Option<String>) -> Self {
         Self {
             msg_type: "connect".to_string(),
             session_type: Some("local".to_string()),
@@ -112,11 +116,16 @@ impl WsConnectRequest {
             ssh_key_id: None,
             passphrase: None,
             connection_id: Some("local".to_string()),
-            cwd: None,
+            cwd,
             cols,
             rows,
             term: "xterm-256color".to_string(),
         }
+    }
+
+    /// Create a request for a local shell terminal session using the default working directory.
+    pub fn for_local(cols: u16, rows: u16) -> Self {
+        Self::for_local_with_cwd(cols, rows, None)
     }
 
     /// Create a request for a quick-connect SSH session.
