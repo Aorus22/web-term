@@ -75,6 +75,18 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         None
     };
 
+    let sftp_context_menu_overlay = if app.sftp_manager.context_menu.is_some() {
+        crate::views::sftp::render_sftp_context_menu(app, is_dark, cx)
+    } else {
+        None
+    };
+
+    let sftp_modal_overlay = if app.sftp_manager.modal.is_some() {
+        crate::views::sftp::render_sftp_modal(app, is_dark, cx)
+    } else {
+        None
+    };
+
     let notification_toast = app.notification.clone().map(|msg| {
         div()
             .absolute()
@@ -379,6 +391,8 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .children(passphrase_modal_overlay)
         .children(forward_modal_overlay)
         .children(delete_forward_modal_overlay)
+        .children(sftp_context_menu_overlay)
+        .children(sftp_modal_overlay)
         .children(notification_toast)
         .into_any_element()
 }

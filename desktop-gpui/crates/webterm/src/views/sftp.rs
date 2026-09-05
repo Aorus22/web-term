@@ -42,8 +42,6 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let primary_color = app.primary_color();
-    let primary_fg = rgb(app.current_theme().primary_foreground);
 
     let focus_handle = app
         .sftp_manager
@@ -53,8 +51,6 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
 
     let left_pane = render_pane(app, SftpActivePane::Left, is_dark, cx);
     let right_pane = render_pane(app, SftpActivePane::Right, is_dark, cx);
-    let modal_overlay = render_sftp_modal(app, is_dark, cx);
-    let context_menu_overlay = render_sftp_context_menu(app, is_dark, cx);
     let transfers_drawer = render_transfers_drawer(app, is_dark, cx);
 
     div()
@@ -65,178 +61,66 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
             let is_alt = ev.keystroke.modifiers.alt;
             this.sftp_handle_key(&key, is_alt, cx);
         }))
+        .relative()
         .flex()
         .flex_col()
         .size_full()
         .bg(bg_color)
         .text_color(text_color)
-        // Top Global SFTP Toolbar
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .justify_between()
-                .px_4()
-                .py_2()
-                .border_b_1()
-                .border_color(border_color)
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_2()
-                        .child(svg().data(crate::icons::FILES_SVG).size(px(18.0)).text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }))
-                        .child(div().text_base().font_weight(FontWeight::BOLD).child("SFTP Dual-Pane Manager"))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(muted_text)
-                                .child("Local Filesystem & Remote SSH Host File Transfer"),
-                        ),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_2()
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_1()
-                                .rounded_md()
-                                .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
-                                .cursor_pointer()
-                                .text_xs()
-                                .child(svg().data(crate::icons::REFRESH_CW_SVG).size(px(12.0)).text_color(muted_text))
-                                .child("Refresh Both")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.sftp_load_pane(SftpActivePane::Left, cx);
-                                    this.sftp_load_pane(SftpActivePane::Right, cx);
-                                })),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_1()
-                                .rounded_md()
-                                .bg(if app.sftp_manager.transfers_drawer_open {
-                                    if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) }
-                                } else if is_dark {
-                                    rgb(0x27272a)
-                                } else {
-                                    rgb(0xe2e8f0)
-                                }
-                                )
-                                .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
-                                .cursor_pointer()
-                                .text_xs()
-                                .child(svg().data(crate::icons::ZAP_SVG).size(px(12.0)).text_color(if app.sftp_manager.transfers_drawer_open { rgb(0xffffff) } else { muted_text }))
-                                .child(format!(
-                                    "Transfers ({})",
-                                    app.sftp_manager.transfers.len()
-                                ))
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.sftp_toggle_transfers_drawer(cx);
-                                })),
-                        ),
-                ),
-        )
-        // Dual Pane Content Area
+        // Dual Pane Content Area (50/50 horizontal split with 1px divider and grabber handle)
         .child(
             div()
                 .flex()
                 .flex_row()
                 .flex_1()
-                .w_full()
+                .size_full()
                 .overflow_hidden()
                 .child(
                     div()
                         .flex_1()
                         .h_full()
-                        .border_r_1()
-                        .border_color(border_color)
+                        .overflow_hidden()
                         .child(left_pane),
                 )
-                // Central divider toolbar with transfer actions
+                // 1px central divider with grabber handle
                 .child(
                     div()
-                        .flex()
-                        .flex_col()
-                        .items_center()
-                        .justify_center()
-                        .gap_3()
-                        .px_2()
-                        .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) })
-                        .border_r_1()
-                        .border_color(border_color)
+                        .w(px(1.0))
+                        .h_full()
+                        .bg(border_color)
+                        .relative()
                         .child(
                             div()
+                                .absolute()
+                                .top(px(260.0))
+                                .left(px(-10.0))
+                                .w(px(21.0))
+                                .h(px(26.0))
+                                .rounded_sm()
+                                .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
+                                .border_1()
+                                .border_color(border_color)
                                 .flex()
-                                .flex_row()
                                 .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_2()
-                                .rounded_md()
-                                .bg(primary_color)
-                                .hover(|s| s.opacity(0.9))
-                                .cursor_pointer()
-                                .text_xs()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(primary_fg)
-                                .child("Transfer")
-                                .child(svg().data(crate::icons::ARROW_RIGHT_SVG).size(px(12.0)).text_color(primary_fg))
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.sftp_transfer_selected(SftpActivePane::Left, cx);
-                                })),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_2()
-                                .rounded_md()
-                                .bg(primary_color)
-                                .hover(|s| s.opacity(0.9))
-                                .cursor_pointer()
-                                .text_xs()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(primary_fg)
-                                .child(svg().data(crate::icons::ARROW_LEFT_SVG).size(px(12.0)).text_color(primary_fg))
-                                .child("Transfer")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.sftp_transfer_selected(SftpActivePane::Right, cx);
-                                })),
+                                .justify_center()
+                                .child(
+                                    svg()
+                                        .data(crate::icons::GRABBER_SVG)
+                                        .size(px(12.0))
+                                        .text_color(muted_text),
+                                ),
                         ),
                 )
                 .child(
                     div()
                         .flex_1()
                         .h_full()
+                        .overflow_hidden()
                         .child(right_pane),
                 ),
         )
         // Collapsible Bottom Transfers Drawer
         .children(transfers_drawer)
-        // Context Menu Overlay
-        .children(context_menu_overlay)
-        // Modal Overlay
-        .children(modal_overlay)
         .into_any_element()
 }
 
@@ -248,32 +132,29 @@ fn render_pane(
     cx: &mut Context<AppState>,
 ) -> AnyElement {
     let state = app.sftp_pane(pane);
-    let is_focused = app.sftp_manager.focused_pane == pane;
+    let _is_focused = app.sftp_manager.focused_pane == pane;
 
     let card_bg = app.card_bg();
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let header_bg = app.card_bg();
-    let focus_indicator = if is_focused {
-        app.primary_color()
-    } else {
-        border_color
-    };
+
+    let any_popover_open = state.show_source_picker
+        || state.show_actions_menu
+        || state.show_drive_picker
+        || app.sftp_manager.context_menu.is_some()
+        || app.sftp_manager.modal.is_some();
+    let is_interactive = !any_popover_open;
 
     let visible_files = state.visible_files();
-    let total_count = state.files.len();
-    let selected_count = state.selected.len();
-
-    let breadcrumb_segments = split_breadcrumbs(&state.current_path);
 
     div()
         .flex()
         .flex_col()
         .size_full()
         .bg(card_bg)
-        .border_t_2()
-        .border_color(focus_indicator)
+        .relative()
         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
             this.sftp_focus_pane(pane, cx);
             if let Some(ref fh) = this.sftp_manager.focus_handle {
@@ -296,7 +177,7 @@ fn render_pane(
                 }
             }
         }))
-        // Pane Header: Source Selector & Focus Badge
+        // 1. Pane Header: Machine Selector (Left) & Actions Menu (Right)
         .child(
             div()
                 .flex()
@@ -309,116 +190,106 @@ fn render_pane(
                 .border_b_1()
                 .border_color(border_color)
                 .child(
+                    // Source selector button (Local Machine v)
                     div()
                         .flex()
                         .flex_row()
                         .items_center()
-                        .gap_2()
+                        .gap_1p5()
+                        .px_2()
+                        .py_1()
+                        .rounded_md()
+                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                        .cursor_pointer()
                         .child(
                             div()
-                                .text_xs()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(if is_focused { focus_indicator } else { muted_text })
-                                .child(match pane {
-                                    SftpActivePane::Left => "[LEFT PANE]",
-                                    SftpActivePane::Right => "[RIGHT PANE]",
-                                }),
-                        )
-                        // Source dropdown button
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_2()
-                                .py_1()
-                                .rounded_md()
-                                .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
-                                .cursor_pointer()
-                                .text_xs()
+                                .text_sm()
                                 .font_weight(FontWeight::SEMIBOLD)
-                                .child(
-                                    svg()
-                                        .data(if state.source_id == "local" || state.source_id.is_empty() {
-                                            crate::icons::MONITOR_SVG
-                                        } else {
-                                            crate::icons::GLOBE_SVG
-                                        })
-                                        .size(px(13.0))
-                                        .text_color(muted_text),
-                                )
-                                .child(state.source_label.clone())
-                                .child(
-                                    svg()
-                                        .data(crate::icons::ARROW_DOWN_SVG)
-                                        .size(px(10.0))
-                                        .text_color(muted_text),
-                                )
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                    this.sftp_toggle_source_picker(pane, cx);
-                                })),
-                        ),
+                                .text_color(text_color)
+                                .child(state.source_label.clone()),
+                        )
+                        .child(
+                            svg()
+                                .data(crate::icons::CHEVRON_DOWN_SVG)
+                                .size(px(12.0))
+                                .text_color(muted_text),
+                        )
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                            this.sftp_toggle_source_picker(pane, cx);
+                        })),
                 )
                 .child(
+                    // Actions dropdown trigger (Actions v)
                     div()
-                        .text_xs()
-                        .text_color(muted_text)
-                        .child(format!("{} items ({} selected)", total_count, selected_count)),
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1p5()
+                        .px_2()
+                        .py_1()
+                        .rounded_md()
+                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                        .cursor_pointer()
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(muted_text)
+                                .child("Actions"),
+                        )
+                        .child(
+                            svg()
+                                .data(crate::icons::CHEVRON_DOWN_SVG)
+                                .size(px(12.0))
+                                .text_color(muted_text),
+                        )
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                            this.sftp_toggle_actions_menu(pane, cx);
+                        })),
                 ),
         )
-        // Source Picker Dropdown (if open)
-        .children(if state.show_source_picker {
-            Some(render_source_picker_dropdown(app, pane, is_dark, cx))
-        } else {
-            None
-        })
-        // Breadcrumb Navigation Bar
+        // 2. Breadcrumbs Bar
         .child(
             div()
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap_1()
+                .gap_1p5()
                 .px_3()
                 .py_1p5()
+                .bg(header_bg)
                 .border_b_1()
                 .border_color(border_color)
-                .bg(app.bg_color())
+                .overflow_hidden()
+                // Back button `<`
                 .child(
                     div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_1()
-                        .px_2()
+                        .px_1p5()
                         .py_0p5()
                         .rounded_sm()
-                        .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
-                        .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
-                        .cursor_pointer()
-                        .text_xs()
-                        .child(svg().data(crate::icons::ARROW_UP_SVG).size(px(11.0)).text_color(muted_text))
-                        .child("Up")
+                        .cursor(if state.can_go_back() { CursorStyle::PointingHand } else { CursorStyle::Arrow })
+                        .opacity(if state.can_go_back() { 1.0 } else { 0.25 })
+                        .hover(|s| if state.can_go_back() { s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }) } else { s })
+                        .text_sm()
+                        .text_color(text_color)
+                        .child("‹")
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                            this.sftp_navigate_up(pane, cx);
+                            this.sftp_navigate_back(pane, cx);
                         })),
                 )
+                // Forward button `>`
                 .child(
                     div()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .px_2()
+                        .px_1p5()
                         .py_0p5()
                         .rounded_sm()
-                        .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
-                        .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
-                        .cursor_pointer()
-                        .child(svg().data(crate::icons::REFRESH_CW_SVG).size(px(11.0)).text_color(muted_text))
+                        .cursor(if state.can_go_forward() { CursorStyle::PointingHand } else { CursorStyle::Arrow })
+                        .opacity(if state.can_go_forward() { 1.0 } else { 0.25 })
+                        .hover(|s| if state.can_go_forward() { s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }) } else { s })
+                        .text_sm()
+                        .text_color(text_color)
+                        .child("›")
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                            this.sftp_load_pane(pane, cx);
+                            this.sftp_navigate_forward(pane, cx);
                         })),
                 )
                 // Breadcrumbs trail
@@ -427,216 +298,14 @@ fn render_pane(
                         .flex()
                         .flex_row()
                         .items_center()
-                        .flex_wrap()
                         .gap_1()
-                        .children(breadcrumb_segments.into_iter().map(|(seg_name, target_path)| {
-                            let path_for_nav = target_path.clone();
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1()
-                                .child(
-                                    div()
-                                        .px_1p5()
-                                        .py_0p5()
-                                        .rounded_sm()
-                                        .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) }))
-                                        .cursor_pointer()
-                                        .text_xs()
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .child(seg_name)
-                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                            this.sftp_navigate(pane, path_for_nav.clone(), cx);
-                                        })),
-                                )
-                                .child(div().text_xs().text_color(muted_text).child("/"))
-                        })),
+                        .overflow_hidden()
+                        .children(render_breadcrumbs_segments(app, pane, &state.current_path, is_dark, cx)),
                 ),
         )
-        // Sub-toolbar: Search, Show Hidden, New Folder
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .justify_between()
-                .px_3()
-                .py_1()
-                .border_b_1()
-                .border_color(border_color)
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_2()
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(muted_text)
-                                .child(if state.search_query.is_empty() {
-                                    "Filter: (all)".to_string()
-                                } else {
-                                    format!("Filter: '{}'", state.search_query)
-                                }),
-                        )
-                        .children(if !state.search_query.is_empty() {
-                            Some(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap_1()
-                                    .cursor_pointer()
-                                    .text_xs()
-                                    .text_color(muted_text)
-                                    .hover(|s| s.text_color(text_color))
-                                    .child(svg().data(crate::icons::X_SVG).size(px(11.0)).text_color(muted_text))
-                                    .child("Clear")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                        this.sftp_set_search_query(pane, String::new(), cx);
-                                    })),
-                            )
-                        } else {
-                            None
-                        }),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_2()
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1()
-                                .px_2()
-                                .py_0p5()
-                                .rounded_sm()
-                                .bg(if state.show_hidden {
-                                    if is_dark { rgb(0x0284c7) } else { rgb(0xbae6fd) }
-                                } else if is_dark {
-                                    rgb(0x27272a)
-                                } else {
-                                    rgb(0xe2e8f0)
-                                })
-                                .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
-                                .cursor_pointer()
-                                .text_xs()
-                                .child(svg().data(crate::icons::EYE_SVG).size(px(12.0)).text_color(if state.show_hidden { rgb(0xffffff) } else { muted_text }))
-                                .child(if state.show_hidden { "Hidden: ON" } else { "Hidden: OFF" })
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                    this.sftp_toggle_hidden(pane, cx);
-                                })),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1()
-                                .px_2()
-                                .py_0p5()
-                                .rounded_sm()
-                                .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
-                                .cursor_pointer()
-                                .text_xs()
-                                .child(svg().data(crate::icons::FOLDER_SVG).size(px(12.0)).text_color(muted_text))
-                                .child("Folder")
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                    this.sftp_open_new_folder_modal(pane, cx);
-                                })),
-                        )
-                        .children(if state.selected.len() == 1 {
-                            let item_to_rename = state.selected.iter().next().unwrap().clone();
-                            Some(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap_1()
-                                    .px_2()
-                                    .py_0p5()
-                                    .rounded_sm()
-                                    .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
-                                    .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
-                                    .cursor_pointer()
-                                    .text_xs()
-                                    .child(svg().data(crate::icons::EDIT_SVG).size(px(12.0)).text_color(muted_text))
-                                    .child("Rename")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                        this.sftp_open_rename_modal(pane, item_to_rename.clone(), cx);
-                                    })),
-                            )
-                        } else {
-                            None
-                        })
-                        .children(if !state.selected.is_empty() {
-                            let targets: Vec<String> = state.selected.iter().cloned().collect();
-                            Some(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap_1()
-                                    .px_2()
-                                    .py_0p5()
-                                    .rounded_sm()
-                                    .bg(if is_dark { rgb(0x450a0a) } else { rgb(0xfee2e2) })
-                                    .hover(|s| s.bg(if is_dark { rgb(0x7f1d1d) } else { rgb(0xfecaca) }))
-                                    .cursor_pointer()
-                                    .text_xs()
-                                    .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
-                                    .child(svg().data(crate::icons::TRASH_SVG).size(px(12.0)).text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) }))
-                                    .child(format!("Delete ({})", state.selected.len()))
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                        this.sftp_open_delete_modal(pane, targets.clone(), cx);
-                                    })),
-                            )
-                        } else {
-                            None
-                        })
-                        .children(if !state.selected.is_empty() {
-                            let targets: Vec<String> = state.selected.iter().cloned().collect();
-                            let other_pane = match pane {
-                                SftpActivePane::Left => SftpActivePane::Right,
-                                SftpActivePane::Right => SftpActivePane::Left,
-                            };
-                            let is_copy_right = matches!(pane, SftpActivePane::Left);
-                            let sel_count = state.selected.len();
-                            Some(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap_1()
-                                    .px_2()
-                                    .py_0p5()
-                                    .rounded_sm()
-                                    .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
-                                    .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
-                                    .cursor_pointer()
-                                    .text_xs()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(svg().data(if is_copy_right { crate::icons::ARROW_RIGHT_SVG } else { crate::icons::ARROW_LEFT_SVG }).size(px(11.0)).text_color(rgb(0xffffff)))
-                                    .child(if is_copy_right { format!("Copy Right ({sel_count})") } else { format!("Copy Left ({sel_count})") })
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                        this.sftp_transfer_between_panes(pane, other_pane, targets.clone(), cx);
-                                    })),
-                            )
-                        } else {
-                            None
-                        }),
-                ),
-        )
-        // Table Header: Name, Size, Modified
+        // 3. Column headers (Name, Date Modified, Size)
         .child(render_table_header(app, state.sort_column, state.sort_order, pane, cx))
-        // File Listing or Status State
+        // 4. File listing
         .child(
             div()
                 .flex()
@@ -702,7 +371,7 @@ fn render_pane(
                             .justify_center()
                             .text_sm()
                             .text_color(muted_text)
-                            .child("Empty directory"),
+                            .child("Directory is empty"),
                     )
                 } else {
                     None
@@ -714,16 +383,35 @@ fn render_pane(
                         &state.current_path,
                         pane,
                         is_dark,
+                        is_interactive,
                         cx,
                     ))
                 } else {
                     None
                 }),
         )
+        // Source Picker Dropdown (if open) - rendered last to float on top of file rows
+        .children(if state.show_source_picker {
+            Some(render_source_picker_dropdown(app, pane, is_dark, cx))
+        } else {
+            None
+        })
+        // Actions Dropdown Menu (if open) - rendered last to float on top of file rows
+        .children(if state.show_actions_menu {
+            Some(render_actions_dropdown(app, pane, is_dark, cx))
+        } else {
+            None
+        })
+        // Drive Picker Dropdown (if open) - rendered last to float on top of file rows
+        .children(if state.show_drive_picker {
+            Some(render_drive_picker_dropdown(app, pane, is_dark, cx))
+        } else {
+            None
+        })
         .into_any_element()
 }
 
-/// Render table header row with clickable sort columns.
+/// Render table header row with clickable sort columns (Name, Date Modified, Size).
 fn render_table_header(
     app: &AppState,
     sort_column: SftpSortColumn,
@@ -731,7 +419,7 @@ fn render_table_header(
     pane: SftpActivePane,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let header_bg = app.bg_color();
+    let header_bg = app.card_bg();
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
@@ -743,13 +431,14 @@ fn render_table_header(
         .flex_row()
         .items_center()
         .px_3()
-        .py_1p5()
+        .py_2()
         .bg(header_bg)
         .border_b_1()
         .border_color(border_color)
         .text_xs()
-        .font_weight(FontWeight::SEMIBOLD)
-        // Name Column (clickable)
+        .font_weight(FontWeight::MEDIUM)
+        .text_color(muted_text)
+        // 1. Name Column (flex-1)
         .child(
             div()
                 .flex_1()
@@ -761,40 +450,24 @@ fn render_table_header(
                 .hover(|s| s.text_color(text_color))
                 .text_color(if sort_column == SftpSortColumn::Name { text_color } else { muted_text })
                 .child("Name")
-                .children(if sort_column == SftpSortColumn::Name {
-                    Some(svg().data(if is_asc { crate::icons::ARROW_UP_SVG } else { crate::icons::ARROW_DOWN_SVG }).size(px(10.0)).text_color(text_color))
-                } else {
-                    None
-                })
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(if sort_column == SftpSortColumn::Name { text_color } else { rgb(0x71717a) })
+                        .child(if sort_column == SftpSortColumn::Name {
+                            if is_asc { "▲" } else { "▼" }
+                        } else {
+                            "⇅"
+                        }),
+                )
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                     this.sftp_toggle_sort(pane, SftpSortColumn::Name, cx);
                 })),
         )
-        // Size Column (clickable)
+        // 2. Date Modified Column (150px)
         .child(
             div()
-                .w(px(80.0))
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap_1()
-                .cursor_pointer()
-                .hover(|s| s.text_color(text_color))
-                .text_color(if sort_column == SftpSortColumn::Size { text_color } else { muted_text })
-                .child("Size")
-                .children(if sort_column == SftpSortColumn::Size {
-                    Some(svg().data(if is_asc { crate::icons::ARROW_UP_SVG } else { crate::icons::ARROW_DOWN_SVG }).size(px(10.0)).text_color(text_color))
-                } else {
-                    None
-                })
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                    this.sftp_toggle_sort(pane, SftpSortColumn::Size, cx);
-                })),
-        )
-        // Modified Column (clickable)
-        .child(
-            div()
-                .w(px(140.0))
+                .w(px(150.0))
                 .flex()
                 .flex_row()
                 .items_center()
@@ -802,26 +475,59 @@ fn render_table_header(
                 .cursor_pointer()
                 .hover(|s| s.text_color(text_color))
                 .text_color(if sort_column == SftpSortColumn::ModTime { text_color } else { muted_text })
-                .child("Modified")
-                .children(if sort_column == SftpSortColumn::ModTime {
-                    Some(svg().data(if is_asc { crate::icons::ARROW_UP_SVG } else { crate::icons::ARROW_DOWN_SVG }).size(px(10.0)).text_color(text_color))
-                } else {
-                    None
-                })
+                .child("Date Modified")
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(if sort_column == SftpSortColumn::ModTime { text_color } else { rgb(0x71717a) })
+                        .child(if sort_column == SftpSortColumn::ModTime {
+                            if is_asc { "▲" } else { "▼" }
+                        } else {
+                            "⇅"
+                        }),
+                )
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                     this.sftp_toggle_sort(pane, SftpSortColumn::ModTime, cx);
+                })),
+        )
+        // 3. Size Column (100px)
+        .child(
+            div()
+                .w(px(100.0))
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_center()
+                .gap_1()
+                .cursor_pointer()
+                .hover(|s| s.text_color(text_color))
+                .text_color(if sort_column == SftpSortColumn::Size { text_color } else { muted_text })
+                .child("Size")
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(if sort_column == SftpSortColumn::Size { text_color } else { rgb(0x71717a) })
+                        .child(if sort_column == SftpSortColumn::Size {
+                            if is_asc { "▲" } else { "▼" }
+                        } else {
+                            "⇅"
+                        }),
+                )
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    this.sftp_toggle_sort(pane, SftpSortColumn::Size, cx);
                 })),
         )
         .into_any_element()
 }
 
-/// Render list of file rows for a pane.
+/// Render list of file rows for a pane matching DirectoryBrowser.tsx 1:1.
 fn render_file_rows(
     files: &[SftpFileInfo],
     selected: &std::collections::HashSet<String>,
     current_path: &str,
     pane: SftpActivePane,
     is_dark: bool,
+    is_interactive: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
     let hover_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
@@ -834,39 +540,86 @@ fn render_file_rows(
         SftpActivePane::Right => 1u64,
     };
 
-    let rows: Vec<AnyElement> = files
-        .iter()
-        .enumerate()
-        .map(|(idx, file)| {
-            let is_selected = selected.contains(&file.name);
-            let is_dir = file.is_dir;
-            let file_name = file.name.clone();
-            let file_name_right = file.name.clone();
-            let row_name = file.name.clone();
-            let target_path = if is_dir {
-                join_path(current_path, &file.name)
-            } else {
-                String::new()
-            };
+    let is_root = current_path.is_empty()
+        || current_path == "/"
+        || current_path == "."
+        || (current_path.len() <= 3 && current_path.chars().nth(1) == Some(':'));
 
-            let formatted_size = if is_dir {
-                "-".to_string()
-            } else {
-                format_file_size(file.size)
-            };
+    let mut rows: Vec<AnyElement> = Vec::new();
 
-            let formatted_date = if file.mod_time.len() >= 19 {
-                &file.mod_time[..19]
-            } else {
-                &file.mod_time
-            };
+    // 1. Parent navigation row "⤴ .." when not in root
+    if !is_root {
+        rows.push(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .px_3()
+                .h(px(40.0))
+                .cursor(if is_interactive { CursorStyle::PointingHand } else { CursorStyle::Arrow })
+                .hover(|s| if is_interactive { s.bg(hover_bg) } else { s })
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2p5()
+                        .child(
+                            svg()
+                                .data(crate::icons::CORNER_LEFT_UP_SVG)
+                                .size(px(16.0))
+                                .text_color(muted_text),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(text_color)
+                                .child(".."),
+                        ),
+                )
+                .child(div().w(px(150.0)))
+                .child(div().w(px(100.0)))
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _window, cx| {
+                    if !is_interactive { return; }
+                    this.sftp_focus_pane(pane, cx);
+                    if ev.click_count >= 2 {
+                        this.sftp_navigate_up(pane, cx);
+                    }
+                }))
+                .into_any_element(),
+        );
+    }
 
-            let drag_filenames = if selected.contains(&file.name) && selected.len() > 1 {
-                selected.iter().cloned().collect()
-            } else {
-                vec![file.name.clone()]
-            };
+    // 2. File and Directory rows
+    for (idx, file) in files.iter().enumerate() {
+        let is_selected = selected.contains(&file.name);
+        let is_dir = file.is_dir;
+        let file_name = file.name.clone();
+        let file_name_right = file.name.clone();
+        let target_path = if is_dir {
+            join_path(current_path, &file.name)
+        } else {
+            String::new()
+        };
 
+        let formatted_size = if is_dir {
+            "- -".to_string()
+        } else {
+            format_file_size(file.size)
+        };
+
+        let formatted_date = crate::app_state::format_date_modified(&file.mod_time);
+        let formatted_perm = crate::app_state::format_permissions(file.mode, is_dir);
+
+        let drag_filenames = if selected.contains(&file.name) && selected.len() > 1 {
+            selected.iter().cloned().collect()
+        } else {
+            vec![file.name.clone()]
+        };
+
+        rows.push(
             div()
                 .id(ElementId::NamedInteger(
                     "sftp-row".into(),
@@ -890,48 +643,74 @@ fn render_file_rows(
                 .flex_row()
                 .items_center()
                 .px_3()
-                .py_1p5()
-                .cursor_pointer()
+                .h(px(44.0))
+                .cursor(if is_interactive { CursorStyle::PointingHand } else { CursorStyle::Arrow })
                 .bg(if is_selected { selected_bg } else { rgba(0x00000000) })
-                .hover(|s| s.bg(hover_bg))
-                .text_xs()
-                .text_color(text_color)
+                .hover(|s| if is_interactive { s.bg(hover_bg) } else { s })
+                // Column 1: Icon + Name + Permissions (flex-1)
                 .child(
                     div()
                         .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
                         .flex()
                         .flex_row()
                         .items_center()
-                        .gap_2()
+                        .gap_2p5()
                         .child(
-                            svg()
-                                .data(if is_dir { crate::icons::FOLDER_SVG } else { crate::icons::FILE_SVG })
-                                .size(px(14.0))
-                                .text_color(if is_dir {
-                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
-                                } else {
-                                    muted_text
-                                }),
+                            if is_dir {
+                                svg()
+                                    .data(crate::icons::BLUE_FOLDER_SVG)
+                                    .size(px(16.0))
+                                    .text_color(rgb(0x3b82f6))
+                            } else {
+                                svg()
+                                    .data(crate::icons::FILE_SVG)
+                                    .size(px(16.0))
+                                    .text_color(muted_text)
+                            },
                         )
                         .child(
                             div()
-                                .font_weight(if is_dir { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-                                .child(row_name),
+                                .flex()
+                                .flex_col()
+                                .min_w_0()
+                                .overflow_hidden()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::NORMAL)
+                                        .text_color(text_color)
+                                        .truncate()
+                                        .child(file_name.clone()),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(muted_text)
+                                        .child(formatted_perm),
+                                ),
                         ),
                 )
+                // Column 2: Date Modified (150px)
                 .child(
                     div()
-                        .w(px(80.0))
+                        .w(px(150.0))
+                        .text_xs()
                         .text_color(muted_text)
+                        .child(formatted_date),
+                )
+                // Column 3: Size (100px, centered)
+                .child(
+                    div()
+                        .w(px(100.0))
+                        .text_xs()
+                        .text_color(muted_text)
+                        .text_center()
                         .child(formatted_size),
                 )
-                .child(
-                    div()
-                        .w(px(140.0))
-                        .text_color(muted_text)
-                        .child(formatted_date.to_string()),
-                )
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                    if !is_interactive { return; }
                     this.sftp_focus_pane(pane, cx);
                     if let Some(ref fh) = this.sftp_manager.focus_handle {
                         window.focus(fh, cx);
@@ -944,6 +723,7 @@ fn render_file_rows(
                     }
                 }))
                 .on_mouse_down(MouseButton::Right, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                    if !is_interactive { return; }
                     let x = ev.position.x / px(1.0);
                     let y = ev.position.y / px(1.0);
                     this.sftp_select_single(pane, file_name_right.clone(), cx);
@@ -952,11 +732,99 @@ fn render_file_rows(
                     }
                     this.sftp_open_context_menu(pane, file_name_right.clone(), is_dir, (x, y), cx);
                 }))
-                .into_any_element()
-        })
-        .collect();
+                .into_any_element(),
+        );
+    }
 
-    div().flex().flex_col().children(rows).into_any_element()
+    div()
+        .id(ElementId::NamedInteger("sftp-file-list".into(), pane_u64))
+        .flex()
+        .flex_col()
+        .size_full()
+        .overflow_y_scroll()
+        .children(rows)
+        .into_any_element()
+}
+
+/// Render breadcrumb segments trail with amber drive indicator and blue folders.
+fn render_breadcrumbs_segments(
+    app: &AppState,
+    pane: SftpActivePane,
+    path: &str,
+    is_dark: bool,
+    cx: &mut Context<AppState>,
+) -> Vec<AnyElement> {
+    let state = app.sftp_pane(pane);
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let hover_bg = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
+
+    let segments = split_breadcrumbs(path);
+    let mut elements = Vec::new();
+
+    let is_windows_local = state.source_id == "local" && path.len() >= 2 && path.chars().nth(1) == Some(':');
+
+    for (idx, (seg_name, target_path)) in segments.into_iter().enumerate() {
+        let is_first = idx == 0;
+        let nav_path = target_path.clone();
+
+        if !is_first {
+            // Separator: subtle chevron
+            elements.push(
+                div()
+                    .text_xs()
+                    .text_color(rgb(0x71717a))
+                    .px_0p5()
+                    .child("›")
+                    .into_any_element(),
+            );
+        }
+
+        if is_first && is_windows_local {
+            // Amber drive button: [DriveSvg] C: v
+            elements.push(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_1()
+                    .px_1p5()
+                    .py_0p5()
+                    .rounded_sm()
+                    .hover(|s| s.bg(hover_bg))
+                    .cursor_pointer()
+                    .child(svg().data(crate::icons::DRIVE_SVG).size(px(14.0)).text_color(rgb(0xf59e0b)))
+                    .child(div().text_sm().text_color(text_color).child(seg_name))
+                    .child(svg().data(crate::icons::CHEVRON_DOWN_SVG).size(px(10.0)).text_color(muted_text))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                        this.sftp_toggle_drive_picker(pane, cx);
+                    }))
+                    .into_any_element(),
+            );
+        } else {
+            // Directory segment with blue folder icon
+            elements.push(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_1()
+                    .px_1p5()
+                    .py_0p5()
+                    .rounded_sm()
+                    .hover(|s| s.bg(hover_bg))
+                    .cursor_pointer()
+                    .child(svg().data(crate::icons::BLUE_FOLDER_SVG).size(px(14.0)).text_color(rgb(0x3b82f6)))
+                    .child(div().text_sm().text_color(text_color).child(seg_name))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                        this.sftp_navigate(pane, nav_path.clone(), cx);
+                    }))
+                    .into_any_element(),
+            );
+        }
+    }
+
+    elements
 }
 
 /// Render dropdown menu for picking source connection (Local vs saved connections).
@@ -966,29 +834,30 @@ fn render_source_picker_dropdown(
     is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
+    let card_bg = if is_dark { rgb(0x18181b) } else { rgb(0xffffff) };
+    let border_color = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
     let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
     let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let hover_bg = if is_dark { rgb(0x3f3f46) } else { rgb(0xf1f5f9) };
+    let hover_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
 
     let mut items = Vec::new();
 
-    // Option 1: Local Filesystem
+    // Option 1: Local Machine
     items.push(
         div()
             .flex()
             .flex_row()
             .items_center()
             .gap_2()
-            .px_3()
-            .py_2()
+            .px_2p5()
+            .py_1p5()
+            .rounded_sm()
             .cursor_pointer()
             .hover(|s| s.bg(hover_bg))
             .text_xs()
             .text_color(text_color)
             .child(svg().data(crate::icons::MONITOR_SVG).size(px(14.0)).text_color(muted_text))
-            .child("Local Filesystem")
+            .child("Local Machine")
             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                 this.sftp_set_source(pane, "local".to_string(), cx);
             }))
@@ -1007,8 +876,9 @@ fn render_source_picker_dropdown(
                 .items_center()
                 .justify_between()
                 .gap_2()
-                .px_3()
-                .py_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
                 .cursor_pointer()
                 .hover(|s| s.bg(hover_bg))
                 .text_xs()
@@ -1022,7 +892,7 @@ fn render_source_picker_dropdown(
                         .child(svg().data(crate::icons::GLOBE_SVG).size(px(14.0)).text_color(muted_text))
                         .child(conn_label),
                 )
-                .child(div().text_xs().text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) }).child(conn_host))
+                .child(div().text_xs().text_color(muted_text).child(conn_host))
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                     this.sftp_set_source(pane, conn_id.clone(), cx);
                 }))
@@ -1031,14 +901,302 @@ fn render_source_picker_dropdown(
     }
 
     div()
-        .flex()
-        .flex_col()
-        .w_full()
-        .bg(card_bg)
-        .border_b_1()
-        .border_color(border_color)
-        .shadow_md()
-        .children(items)
+        .absolute()
+        .inset_0()
+        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+            this.sftp_pane_mut(pane).show_source_picker = false;
+            cx.notify();
+        }))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .w(px(260.0))
+                .absolute()
+                .top(px(38.0))
+                .left(px(12.0))
+                .bg(card_bg)
+                .border_1()
+                .border_color(border_color)
+                .rounded_md()
+                .shadow_xl()
+                .p_1()
+                .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                .children(items),
+        )
+        .into_any_element()
+}
+
+/// Render Actions dropdown menu matching DirectoryBrowser.tsx.
+fn render_actions_dropdown(
+    app: &AppState,
+    pane: SftpActivePane,
+    is_dark: bool,
+    cx: &mut Context<AppState>,
+) -> AnyElement {
+    let card_bg = if is_dark { rgb(0x18181b) } else { rgb(0xffffff) };
+    let border_color = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
+    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
+    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let hover_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
+    let destructive_text = if is_dark { rgb(0xf87171) } else { rgb(0xef4444) };
+
+    let state = app.sftp_pane(pane);
+    let has_selection = !state.selected.is_empty();
+    let has_single_selection = state.selected.len() == 1;
+    let sel_targets: Vec<String> = state.selected.iter().cloned().collect();
+    let single_item = state.selected.iter().next().cloned();
+
+    div()
+        .absolute()
+        .inset_0()
+        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+            this.sftp_pane_mut(pane).show_actions_menu = false;
+            cx.notify();
+        }))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .w(px(180.0))
+                .absolute()
+                .top(px(38.0))
+                .right(px(12.0))
+                .bg(card_bg)
+                .border_1()
+                .border_color(border_color)
+                .rounded_md()
+                .shadow_xl()
+                .p_1()
+                .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                // 1. Refresh
+                .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
+                .cursor_pointer()
+                .hover(|s| s.bg(hover_bg))
+                .text_xs()
+                .text_color(text_color)
+                .child(svg().data(crate::icons::REFRESH_CW_SVG).size(px(13.0)).text_color(muted_text))
+                .child("Refresh")
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    this.sftp_pane_mut(pane).show_actions_menu = false;
+                    this.sftp_load_pane(pane, cx);
+                })),
+        )
+        // 2. Upload File
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
+                .cursor_pointer()
+                .hover(|s| s.bg(hover_bg))
+                .text_xs()
+                .text_color(text_color)
+                .child(svg().data(crate::icons::UPLOAD_SVG).size(px(13.0)).text_color(muted_text))
+                .child("Upload File")
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, _cx| {
+                    this.sftp_pane_mut(pane).show_actions_menu = false;
+                })),
+        )
+        // 3. New Folder
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
+                .cursor_pointer()
+                .hover(|s| s.bg(hover_bg))
+                .text_xs()
+                .text_color(text_color)
+                .child(svg().data(crate::icons::FOLDER_PLUS_SVG).size(px(13.0)).text_color(muted_text))
+                .child("New Folder")
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    this.sftp_pane_mut(pane).show_actions_menu = false;
+                    this.sftp_open_new_folder_modal(pane, cx);
+                })),
+        )
+        // Separator
+        .child(div().h(px(1.0)).bg(border_color).my_1())
+        // 4. Rename
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
+                .cursor(if has_single_selection { CursorStyle::PointingHand } else { CursorStyle::Arrow })
+                .opacity(if has_single_selection { 1.0 } else { 0.4 })
+                .hover(|s| if has_single_selection { s.bg(hover_bg) } else { s })
+                .text_xs()
+                .text_color(text_color)
+                .child(svg().data(crate::icons::EDIT_SVG).size(px(13.0)).text_color(muted_text))
+                .child("Rename")
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    if let Some(ref item) = single_item {
+                        this.sftp_pane_mut(pane).show_actions_menu = false;
+                        this.sftp_open_rename_modal(pane, item.clone(), cx);
+                    }
+                })),
+        )
+        // 5. Delete
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
+                .cursor(if has_selection { CursorStyle::PointingHand } else { CursorStyle::Arrow })
+                .opacity(if has_selection { 1.0 } else { 0.4 })
+                .hover(|s| if has_selection { s.bg(hover_bg) } else { s })
+                .text_xs()
+                .text_color(destructive_text)
+                .child(svg().data(crate::icons::TRASH_SVG).size(px(13.0)).text_color(destructive_text))
+                .child("Delete")
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    if has_selection {
+                        this.sftp_pane_mut(pane).show_actions_menu = false;
+                        this.sftp_open_delete_modal(pane, sel_targets.clone(), cx);
+                    }
+                })),
+        )
+        // Separator
+        .child(div().h(px(1.0)).bg(border_color).my_1())
+        // 6. Show / Hide Hidden Files
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
+                .cursor_pointer()
+                .hover(|s| s.bg(hover_bg))
+                .text_xs()
+                .text_color(text_color)
+                .child(svg().data(crate::icons::EYE_SVG).size(px(13.0)).text_color(muted_text))
+                .child(if state.show_hidden { "Hide Hidden Files" } else { "Show Hidden Files" })
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    this.sftp_pane_mut(pane).show_actions_menu = false;
+                    this.sftp_toggle_hidden(pane, cx);
+                })),
+        )
+        // 7. Transfers Drawer
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded_sm()
+                .cursor_pointer()
+                .hover(|s| s.bg(hover_bg))
+                .text_xs()
+                .text_color(text_color)
+                .child(svg().data(crate::icons::ZAP_SVG).size(px(13.0)).text_color(muted_text))
+                .child(format!("Transfers ({})", app.sftp_manager.transfers.len()))
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    this.sftp_pane_mut(pane).show_actions_menu = false;
+                    this.sftp_toggle_transfers_drawer(cx);
+                })),
+        ),
+    )
+    .into_any_element()
+}
+
+/// Render Windows drive volumes dropdown picker.
+fn render_drive_picker_dropdown(
+    _app: &AppState,
+    pane: SftpActivePane,
+    is_dark: bool,
+    cx: &mut Context<AppState>,
+) -> AnyElement {
+    let card_bg = if is_dark { rgb(0x18181b) } else { rgb(0xffffff) };
+    let border_color = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
+    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
+    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let hover_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
+
+    let drives = crate::app_state::get_available_drives();
+
+    div()
+        .absolute()
+        .inset_0()
+        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+            this.sftp_pane_mut(pane).show_drive_picker = false;
+            cx.notify();
+        }))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .w(px(160.0))
+                .absolute()
+                .top(px(72.0))
+                .left(px(36.0))
+                .bg(card_bg)
+                .border_1()
+                .border_color(border_color)
+                .rounded_md()
+                .shadow_xl()
+                .p_1()
+                .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                .child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(muted_text)
+                        .child("Volumes"),
+                )
+                .children(drives.into_iter().map(|drive| {
+                    let drive_path = format!("{}\\", drive);
+                    let drive_label = drive.clone();
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2()
+                        .px_2p5()
+                        .py_1p5()
+                        .rounded_sm()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(hover_bg))
+                        .text_xs()
+                        .text_color(text_color)
+                        .child(svg().data(crate::icons::DRIVE_SVG).size(px(14.0)).text_color(rgb(0xf59e0b)))
+                        .child(drive_label)
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                            this.sftp_pane_mut(pane).show_drive_picker = false;
+                            this.sftp_navigate(pane, drive_path.clone(), cx);
+                        }))
+                })),
+        )
         .into_any_element()
 }
 
@@ -1159,7 +1317,7 @@ fn render_transfers_drawer(
 }
 
 /// Render SFTP operation modals (New Folder, Rename, Delete confirmation).
-fn render_sftp_modal(
+pub fn render_sftp_modal(
     app: &AppState,
     is_dark: bool,
     cx: &mut Context<AppState>,
@@ -1534,7 +1692,7 @@ fn render_sftp_modal(
 }
 
 /// Render SFTP right-click context menu overlay.
-fn render_sftp_context_menu(
+pub fn render_sftp_context_menu(
     app: &AppState,
     is_dark: bool,
     cx: &mut Context<AppState>,
@@ -1557,8 +1715,25 @@ fn render_sftp_context_menu(
     let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
     let hover_bg = if is_dark { rgb(0x3f3f46) } else { rgb(0xf1f5f9) };
 
-    let x = (menu.position.0 - 10.0).max(10.0);
-    let y = (menu.position.1 - 10.0).max(10.0);
+    let menu_w = 220.0;
+    let menu_h = 160.0;
+
+    let raw_x = (menu.position.0 - 4.0).max(8.0);
+    let raw_y = (menu.position.1 - 4.0).max(8.0);
+
+    // If near right window edge, flip to left of cursor so it never gets clipped
+    let x = if raw_x + menu_w > 1200.0 {
+        (raw_x - menu_w).max(8.0)
+    } else {
+        raw_x
+    };
+
+    // If near bottom window edge, flip upwards so it never gets pushed off
+    let y = if raw_y + menu_h > 720.0 {
+        (raw_y - menu_h).max(8.0)
+    } else {
+        raw_y
+    };
 
     let fn_transfer = filename.clone();
     let fn_rename = filename.clone();
@@ -1580,7 +1755,7 @@ fn render_sftp_context_menu(
                     .absolute()
                     .top(px(y))
                     .left(px(x))
-                    .w(px(220.0))
+                    .w(px(menu_w))
                     .rounded_lg()
                     .bg(card_bg)
                     .border_1()
@@ -1591,6 +1766,7 @@ fn render_sftp_context_menu(
                     .flex_col()
                     .gap_0p5()
                     .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                    .on_mouse_down(MouseButton::Right, |_, _, _| {})
                     // 1. Transfer to opposite pane
                     .child(
                         div()

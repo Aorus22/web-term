@@ -318,14 +318,19 @@ pub struct SftpPaneState {
     pub sort_column: SftpSortColumn,
     pub sort_order: SftpSortOrder,
     pub show_source_picker: bool,
+    pub show_actions_menu: bool,
+    pub show_drive_picker: bool,
+    pub history: Vec<String>,
+    pub history_index: usize,
 }
 
 impl SftpPaneState {
     pub fn new(source_id: impl Into<String>, source_label: impl Into<String>, initial_path: impl Into<String>) -> Self {
+        let p = initial_path.into();
         Self {
             source_id: source_id.into(),
             source_label: source_label.into(),
-            current_path: initial_path.into(),
+            current_path: p.clone(),
             files: Vec::new(),
             is_loading: false,
             error: None,
@@ -335,7 +340,19 @@ impl SftpPaneState {
             sort_column: SftpSortColumn::Name,
             sort_order: SftpSortOrder::Ascending,
             show_source_picker: false,
+            show_actions_menu: false,
+            show_drive_picker: false,
+            history: vec![p],
+            history_index: 0,
         }
+    }
+
+    pub fn can_go_back(&self) -> bool {
+        self.history_index > 0
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        self.history_index + 1 < self.history.len()
     }
 
     /// Return filtered and sorted files according to search_query, show_hidden, and sort column/order.
@@ -590,6 +607,71 @@ pub fn format_file_size(bytes: i64) -> String {
         format!("{:.1} KB", b / KB)
     } else {
         format!("{} B", bytes)
+    }
+}
+
+/// Format Unix/POSIX permissions mode into standard string (e.g. `drwxrwxrwx`).
+pub fn format_permissions(mode: u32, is_dir: bool) -> String {
+    let r = |m: u32| if (mode & m) != 0 { 'r' } else { '-' };
+    let w = |m: u32| if (mode & m) != 0 { 'w' } else { '-' };
+    let x = |m: u32| if (mode & m) != 0 { 'x' } else { '-' };
+    let mut s = String::with_capacity(10);
+    s.push(if is_dir { 'd' } else { '-' });
+    s.push(r(0o400));
+    s.push(w(0o200));
+    s.push(x(0o100));
+    s.push(r(0o040));
+    s.push(w(0o020));
+    s.push(x(0o010));
+    s.push(r(0o004));
+    s.push(w(0o002));
+    s.push(x(0o001));
+    s
+}
+
+/// Format ISO-8601 modTime string into friendly US format `M/D/YYYY, h:mm A`.
+pub fn format_date_modified(iso: &str) -> String {
+    let clean = iso.trim();
+    if clean.is_empty() {
+        return String::new();
+    }
+    // Pattern: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS
+    if clean.len() >= 16 && &clean[4..5] == "-" && &clean[7..8] == "-" {
+        let year = &clean[0..4];
+        let month = clean[5..7].trim_start_matches('0');
+        let day = clean[8..10].trim_start_matches('0');
+        if let (Ok(h), Ok(m)) = (clean[11..13].parse::<u32>(), clean[14..16].parse::<u32>()) {
+            let ampm = if h >= 12 { "PM" } else { "AM" };
+            let h12 = if h == 0 { 12 } else if h > 12 { h - 12 } else { h };
+            return format!("{month}/{day}/{year}, {h12}:{m:02} {ampm}");
+        }
+    }
+    if clean.len() >= 19 {
+        clean[..19].replace('T', " ")
+    } else {
+        clean.to_string()
+    }
+}
+
+/// Query available disk drives on the local machine (Windows drives, or root on Unix).
+pub fn get_available_drives() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut drives = Vec::new();
+        for letter in b'A'..=b'Z' {
+            let p = format!("{}:\\", letter as char);
+            if std::path::Path::new(&p).exists() {
+                drives.push(format!("{}:", letter as char));
+            }
+        }
+        if drives.is_empty() {
+            drives.push("C:".to_string());
+        }
+        drives
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec!["/".to_string()]
     }
 }
 
@@ -2286,13 +2368,39 @@ impl AppState {
     pub fn sftp_toggle_source_picker(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
         let state = self.sftp_pane_mut(pane);
         state.show_source_picker = !state.show_source_picker;
+        if state.show_source_picker {
+            state.show_actions_menu = false;
+            state.show_drive_picker = false;
+        }
+        cx.notify();
+    }
+
+    /// Toggle actions dropdown menu for a pane.
+    pub fn sftp_toggle_actions_menu(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        state.show_actions_menu = !state.show_actions_menu;
+        if state.show_actions_menu {
+            state.show_source_picker = false;
+            state.show_drive_picker = false;
+        }
+        cx.notify();
+    }
+
+    /// Toggle drive picker popover for a pane.
+    pub fn sftp_toggle_drive_picker(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        state.show_drive_picker = !state.show_drive_picker;
+        if state.show_drive_picker {
+            state.show_source_picker = false;
+            state.show_actions_menu = false;
+        }
         cx.notify();
     }
 
     /// Change source connection for a pane ("local" or connection ID).
     pub fn sftp_set_source(&mut self, pane: SftpActivePane, conn_id: String, cx: &mut Context<Self>) {
         let label = if conn_id == "local" || conn_id.is_empty() {
-            "Local Filesystem".to_string()
+            "Local Machine".to_string()
         } else if let Some(conn) = self.connections.iter().find(|c| c.id == conn_id) {
             conn.label.clone()
         } else {
@@ -2306,16 +2414,64 @@ impl AppState {
         state.selected.clear();
         state.search_query.clear();
         state.show_source_picker = false;
+        state.show_actions_menu = false;
+        state.show_drive_picker = false;
+        state.history = vec![".".to_string()];
+        state.history_index = 0;
         self.sftp_load_pane(pane, cx);
     }
 
-    /// Navigate pane to a specified directory path.
+    /// Navigate pane to a specified directory path, maintaining history.
     pub fn sftp_navigate(&mut self, pane: SftpActivePane, path: String, cx: &mut Context<Self>) {
         let state = self.sftp_pane_mut(pane);
+        if state.history.is_empty() {
+            state.history.push(state.current_path.clone());
+            state.history_index = 0;
+        }
+        if state.history_index + 1 < state.history.len() {
+            state.history.truncate(state.history_index + 1);
+        }
+        if state.history.last().map(|s| s.as_str()) != Some(&path) {
+            state.history.push(path.clone());
+            state.history_index = state.history.len() - 1;
+        }
         state.current_path = path;
         state.selected.clear();
         state.search_query.clear();
+        state.show_source_picker = false;
+        state.show_actions_menu = false;
+        state.show_drive_picker = false;
         self.sftp_load_pane(pane, cx);
+    }
+
+    /// Navigate back in directory history.
+    pub fn sftp_navigate_back(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        if state.history_index > 0 {
+            state.history_index -= 1;
+            let prev_path = state.history[state.history_index].clone();
+            state.current_path = prev_path;
+            state.selected.clear();
+            state.show_source_picker = false;
+            state.show_actions_menu = false;
+            state.show_drive_picker = false;
+            self.sftp_load_pane(pane, cx);
+        }
+    }
+
+    /// Navigate forward in directory history.
+    pub fn sftp_navigate_forward(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        if state.history_index + 1 < state.history.len() {
+            state.history_index += 1;
+            let next_path = state.history[state.history_index].clone();
+            state.current_path = next_path;
+            state.selected.clear();
+            state.show_source_picker = false;
+            state.show_actions_menu = false;
+            state.show_drive_picker = false;
+            self.sftp_load_pane(pane, cx);
+        }
     }
 
     /// Navigate pane to parent directory.

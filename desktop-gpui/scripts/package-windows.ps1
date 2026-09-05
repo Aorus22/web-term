@@ -1,5 +1,7 @@
 param(
-    [switch]$Release
+    [switch]$Release,
+    [switch]$SkipBackend,
+    [switch]$BuildBackend
 )
 
 $Profile = if ($Release) { "release" } else { "debug" }
@@ -19,12 +21,17 @@ Write-Host "Target distribution directory: $DistDir"
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 New-Item -ItemType Directory -Force -Path "$DistDir\assets" | Out-Null
 
-Write-Host "[1/3] Compiling Go backend with loopback binding..." -ForegroundColor Yellow
-Push-Location "$Root\be"
-try {
-    go build -ldflags "-s -w" -o "$DistDir\backend.exe" ./cmd/server
-} finally {
-    Pop-Location
+$BackendExists = Test-Path "$DistDir\backend.exe"
+if ($SkipBackend -or (-not $BuildBackend -and $BackendExists)) {
+    Write-Host "[1/3] Backend binary already exists at $DistDir\backend.exe (skipping backend build)..." -ForegroundColor Cyan
+} else {
+    Write-Host "[1/3] Compiling Go backend with loopback binding..." -ForegroundColor Yellow
+    Push-Location "$Root\be"
+    try {
+        go build -ldflags "-s -w" -o "$DistDir\backend.exe" ./cmd/server
+    } finally {
+        Pop-Location
+    }
 }
 
 # Ensure shader compiler is available for GPUI build
