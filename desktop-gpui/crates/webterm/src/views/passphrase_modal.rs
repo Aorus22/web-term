@@ -54,10 +54,18 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                         .justify_between()
                         .child(
                             div()
-                                .text_lg()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(text_color)
-                                .child("🔒 Unlock SSH Key"),
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_2()
+                                .child(svg().data(crate::icons::LOCK_SVG).size(px(18.0)).text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }))
+                                .child(
+                                    div()
+                                        .text_lg()
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(text_color)
+                                        .child("Unlock SSH Key"),
+                                ),
                         )
                         .child(
                             div()
@@ -69,7 +77,7 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                 .hover(|s| s.bg(tag_bg))
                                 .cursor_pointer()
                                 .text_color(muted_text)
-                                .child("×")
+                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.cancel_passphrase(cx);
                                 })),
@@ -85,6 +93,10 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                 // Error banner (if any)
                 .children(app.passphrase_error.as_ref().map(|err| {
                     div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1p5()
                         .px_3()
                         .py_2()
                         .rounded_md()
@@ -93,7 +105,8 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                         .border_color(rgb(0xef4444))
                         .text_xs()
                         .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
-                        .child(format!("⚠️ {err}"))
+                        .child(svg().data(crate::icons::ALERT_TRIANGLE_SVG).size(px(13.0)).text_color(rgb(0xef4444)))
+                        .child(err.clone())
                 }))
                 // Passphrase Input Field
                 .child(

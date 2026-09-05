@@ -103,7 +103,7 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                 .hover(|s| s.bg(tag_bg))
                                 .cursor_pointer()
                                 .text_color(muted_text)
-                                .child("×")
+                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.close_connection_modal(cx);
                                 })),
@@ -112,6 +112,10 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                 // Error banner (if validation failed)
                 .children(form.error_message.map(|err| {
                     div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1p5()
                         .px_3()
                         .py_2()
                         .rounded_md()
@@ -120,7 +124,8 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                         .border_color(rgb(0xef4444))
                         .text_xs()
                         .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
-                        .child(format!("⚠️ {err}"))
+                        .child(svg().data(crate::icons::ALERT_TRIANGLE_SVG).size(px(13.0)).text_color(rgb(0xef4444)))
+                        .child(err)
                 }))
                 // Form Fields
                 .child(
@@ -230,6 +235,10 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                         // Password Pill
                                         .child(
                                             div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_1p5()
                                                 .px_3()
                                                 .py_1p5()
                                                 .rounded_md()
@@ -242,7 +251,8 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                                 .cursor_pointer()
                                                 .text_xs()
                                                 .font_weight(FontWeight::SEMIBOLD)
-                                                .child("🔒 Password")
+                                                .child(svg().data(crate::icons::LOCK_SVG).size(px(13.0)).text_color(if !is_key_auth { rgb(0xffffff) } else { muted_text }))
+                                                .child("Password")
                                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                     if let Some(f) = &mut this.connection_modal {
                                                         f.auth_method = "password".to_string();
@@ -253,6 +263,10 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                         // SSH Key Pill
                                         .child(
                                             div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_1p5()
                                                 .px_3()
                                                 .py_1p5()
                                                 .rounded_md()
@@ -265,7 +279,8 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                                 .cursor_pointer()
                                                 .text_xs()
                                                 .font_weight(FontWeight::SEMIBOLD)
-                                                .child("🔑 SSH Key")
+                                                .child(svg().data(crate::icons::KEY_SVG).size(px(13.0)).text_color(if is_key_auth { rgb(0xffffff) } else { muted_text }))
+                                                .child("SSH Key")
                                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                     if let Some(f) = &mut this.connection_modal {
                                                         f.auth_method = "key".to_string();
@@ -327,10 +342,18 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                                 .justify_between()
                                                 .child(
                                                     div()
-                                                        .text_xs()
-                                                        .font_weight(if is_selected { FontWeight::BOLD } else { FontWeight::NORMAL })
-                                                        .text_color(text_color)
-                                                        .child(format!("🔑 {} ({})", key.name, key.key_type)),
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_1p5()
+                                                        .child(svg().data(crate::icons::KEY_SVG).size(px(13.0)).text_color(if is_selected { rgb(0x38bdf8) } else { muted_text }))
+                                                        .child(
+                                                            div()
+                                                                .text_xs()
+                                                                .font_weight(if is_selected { FontWeight::BOLD } else { FontWeight::NORMAL })
+                                                                .text_color(text_color)
+                                                                .child(format!("{} ({})", key.name, key.key_type)),
+                                                        ),
                                                 )
                                                 .child(
                                                     div()
@@ -537,7 +560,7 @@ pub fn render_import_modal(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                 .hover(|s| s.bg(tag_bg))
                                 .cursor_pointer()
                                 .text_color(muted_text)
-                                .child("×")
+                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.close_import_modal(cx);
                                 })),
@@ -564,13 +587,21 @@ pub fn render_import_modal(app: &mut AppState, cx: &mut Context<AppState>) -> An
                         .justify_between()
                         .child(
                             div()
-                                .text_xs()
-                                .text_color(text_color)
-                                .child(if export_file_exists {
-                                    "📁 Found: webterm-connections-export.json"
-                                } else {
-                                    "📁 Place export file at: webterm-connections-export.json"
-                                }),
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
+                                .child(svg().data(crate::icons::FOLDER_SVG).size(px(14.0)).text_color(muted_text))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(text_color)
+                                        .child(if export_file_exists {
+                                            "Found: webterm-connections-export.json"
+                                        } else {
+                                            "Place export file at: webterm-connections-export.json"
+                                        }),
+                                ),
                         )
                         .child(
                             div()

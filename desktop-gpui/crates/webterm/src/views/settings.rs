@@ -137,13 +137,35 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .justify_between()
                                                 .child(
                                                     div()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_2()
                                                         .text_sm()
                                                         .font_weight(FontWeight::MEDIUM)
                                                         .text_color(text_color)
-                                                        .child("🌙 Dark Theme"),
+                                                        .child(
+                                                            svg()
+                                                                .data(crate::icons::MOON_SVG)
+                                                                .size(px(16.0))
+                                                                .text_color(if current_theme == SettingsTheme::Dark {
+                                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                                                } else {
+                                                                    muted_text
+                                                                }),
+                                                        )
+                                                        .child("Dark Theme"),
                                                 )
                                                 .child(if current_theme == SettingsTheme::Dark {
-                                                    div().text_xs().text_color(rgb(0x0284c7)).child("✓ Active")
+                                                    div()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_1()
+                                                        .text_xs()
+                                                        .text_color(rgb(0x0284c7))
+                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(rgb(0x0284c7)))
+                                                        .child("Active")
                                                 } else {
                                                     div()
                                                 }),
@@ -151,8 +173,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                             this.set_theme(SettingsTheme::Dark, cx);
                                         })),
-                                )
                                 // Light Theme Option
+                                )
                                 .child(
                                     div()
                                         .flex_1()
@@ -179,13 +201,35 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .justify_between()
                                                 .child(
                                                     div()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_2()
                                                         .text_sm()
                                                         .font_weight(FontWeight::MEDIUM)
                                                         .text_color(text_color)
-                                                        .child("☀️ Light Theme"),
+                                                        .child(
+                                                            svg()
+                                                                .data(crate::icons::SUN_SVG)
+                                                                .size(px(16.0))
+                                                                .text_color(if current_theme == SettingsTheme::Light {
+                                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                                                } else {
+                                                                    muted_text
+                                                                }),
+                                                        )
+                                                        .child("Light Theme"),
                                                 )
                                                 .child(if current_theme == SettingsTheme::Light {
-                                                    div().text_xs().text_color(rgb(0x0284c7)).child("✓ Active")
+                                                    div()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_1()
+                                                        .text_xs()
+                                                        .text_color(rgb(0x0284c7))
+                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(rgb(0x0284c7)))
+                                                        .child("Active")
                                                 } else {
                                                     div()
                                                 }),
@@ -221,13 +265,35 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .justify_between()
                                                 .child(
                                                     div()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_2()
                                                         .text_sm()
                                                         .font_weight(FontWeight::MEDIUM)
                                                         .text_color(text_color)
-                                                        .child("💻 System"),
+                                                        .child(
+                                                            svg()
+                                                                .data(crate::icons::MONITOR_SVG)
+                                                                .size(px(16.0))
+                                                                .text_color(if current_theme == SettingsTheme::System {
+                                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                                                } else {
+                                                                    muted_text
+                                                                }),
+                                                        )
+                                                        .child("System"),
                                                 )
                                                 .child(if current_theme == SettingsTheme::System {
-                                                    div().text_xs().text_color(rgb(0x0284c7)).child("✓ Active")
+                                                    div()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_1()
+                                                        .text_xs()
+                                                        .text_color(rgb(0x0284c7))
+                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(rgb(0x0284c7)))
+                                                        .child("Active")
                                                 } else {
                                                     div()
                                                 }),
@@ -392,9 +458,14 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .child(
                             div()
                                 .mt_2()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
                                 .text_xs()
                                 .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
-                                .child("✓ Requirement SET-01 enforced: Browser-based engines (wterm / xterm.js) are excluded from the desktop application."),
+                                .child(svg().data(crate::icons::INFO_SVG).size(px(14.0)).text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }))
+                                .child("Requirement SET-01 enforced: Browser-based engines (wterm / xterm.js) are excluded from the desktop application."),
                         ),
                 )
                 // 4. Terminal Typography & Sizing Section

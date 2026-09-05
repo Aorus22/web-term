@@ -44,7 +44,7 @@ pub fn render_reconnect_banner(app: &mut AppState, cx: &mut Context<AppState>) -
                             .flex()
                             .items_center()
                             .gap_2()
-                            .child(div().text_base().child("⚠️"))
+                            .child(svg().data(crate::icons::ALERT_TRIANGLE_SVG).size(px(16.0)).text_color(text_color))
                             .child(format!(
                                 "Connection lost. Reconnecting in {}s (attempt {}/5)...",
                                 next_retry_secs, attempt
@@ -118,7 +118,7 @@ pub fn render_reconnect_banner(app: &mut AppState, cx: &mut Context<AppState>) -
                             .flex()
                             .items_center()
                             .gap_2()
-                            .child(div().text_base().child("❌"))
+                            .child(svg().data(crate::icons::X_SVG).size(px(16.0)).text_color(rgb(0xef4444)))
                             .child(format!("Session disconnected: {}", reason_text)),
                     )
                     // Actions

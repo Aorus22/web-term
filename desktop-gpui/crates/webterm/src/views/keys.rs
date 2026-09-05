@@ -1,6 +1,7 @@
 //! SSH Keys vault view and Add Key modal dialog.
 
 use gpui::*;
+use gpui_component::{Icon, IconName};
 use webterm_settings::Theme as SettingsTheme;
 use crate::app_state::AppState;
 
@@ -69,16 +70,22 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         // Refresh
                         .child(
                             div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
                                 .px_3()
-                                .py_1()
-                                .rounded_md()
+                                .py_1p5()
+                                .rounded_lg()
                                 .bg(card_bg)
                                 .border_1()
                                 .border_color(border_color)
                                 .text_xs()
+                                .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(|s| s.bg(tag_bg))
-                                .child(if is_loading { "⟳ Loading..." } else { "⟳ Refresh" })
+                                .hover(|s| s.bg(tag_bg).text_color(text_color))
+                                .child(Icon::new(IconName::RotateCw).size(px(12.0)))
+                                .child(if is_loading { "Loading..." } else { "Refresh" })
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.fetch_ssh_keys(cx);
                                 })),
@@ -86,16 +93,21 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         // + Add Key button
                         .child(
                             div()
-                                .px_3()
-                                .py_1()
-                                .rounded_md()
-                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x0ea5e9) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
+                                .px_3p5()
+                                .py_1p5()
+                                .rounded_lg()
+                                .bg(rgb(0xc084fc))
+                                .hover(|s| s.bg(rgb(0xa855f7)))
                                 .text_xs()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(rgb(0xffffff))
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(rgb(0x000000))
                                 .cursor_pointer()
-                                .child("+ Add SSH Key")
+                                .child(Icon::new(IconName::Plus).size(px(13.0)).text_color(rgb(0x000000)))
+                                .child("Add SSH Key")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.open_add_key_modal(cx);
                                 })),
@@ -118,7 +130,16 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .py_16()
                 .gap_3()
                 .text_color(muted_text)
-                .child(div().text_3xl().child("🔑"))
+                .child(
+                    div()
+                        .size(px(48.0))
+                        .rounded_full()
+                        .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) })
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(svg().data(crate::icons::KEY_SVG).size(px(24.0)).text_color(muted_text)),
+                )
                 .child(
                     div()
                         .text_base()
@@ -136,16 +157,21 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .child(
                     div()
                         .mt_2()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1p5()
                         .px_4()
                         .py_2()
-                        .rounded_md()
-                        .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x0ea5e9) })
-                        .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                        .rounded_lg()
+                        .bg(rgb(0xc084fc))
+                        .hover(|s| s.bg(rgb(0xa855f7)))
                         .cursor_pointer()
                         .text_xs()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(rgb(0xffffff))
-                        .child("+ Upload First Key")
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(rgb(0x000000))
+                        .child(Icon::new(IconName::Plus).size(px(13.0)).text_color(rgb(0x000000)))
+                        .child("Upload First Key")
                         .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                             this.open_add_key_modal(cx);
                         })),
@@ -183,10 +209,18 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 .justify_between()
                                 .child(
                                     div()
-                                        .text_sm()
-                                        .font_weight(FontWeight::BOLD)
-                                        .text_color(text_color)
-                                        .child(format!("🔑 {}", key.name)),
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap_2()
+                                        .child(svg().data(crate::icons::KEY_SVG).size(px(15.0)).text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }))
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_color(text_color)
+                                                .child(key.name.clone()),
+                                        ),
                                 )
                                 .child(
                                     div()
@@ -241,10 +275,15 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 )
                                 .child(
                                     div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap_1p5()
                                         .cursor_pointer()
                                         .text_xs()
                                         .text_color(rgb(0xef4444))
                                         .hover(|s| s.text_color(rgb(0xdc2626)))
+                                        .child(svg().data(crate::icons::TRASH_SVG).size(px(12.0)).text_color(rgb(0xef4444)))
                                         .child("Delete")
                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                             this.delete_ssh_key(&key_id_del, cx);
@@ -332,7 +371,7 @@ pub fn render_add_key_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .hover(|s| s.bg(tag_bg))
                                 .cursor_pointer()
                                 .text_color(muted_text)
-                                .child("×")
+                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.close_add_key_modal(cx);
                                 })),
@@ -341,6 +380,10 @@ pub fn render_add_key_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                 // Error banner (if any)
                 .children(app.add_key_error.as_ref().map(|err| {
                     div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1p5()
                         .px_3()
                         .py_2()
                         .rounded_md()
@@ -349,7 +392,8 @@ pub fn render_add_key_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .border_color(rgb(0xef4444))
                         .text_xs()
                         .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
-                        .child(format!("⚠️ {err}"))
+                        .child(svg().data(crate::icons::ALERT_TRIANGLE_SVG).size(px(13.0)).text_color(rgb(0xef4444)))
+                        .child(err.clone())
                 }))
                 // Form Fields
                 .child(

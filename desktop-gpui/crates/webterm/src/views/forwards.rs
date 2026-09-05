@@ -1,6 +1,7 @@
 //! Port Forwarding rules management view: rule cards, toggle, create/edit, and deletion modals.
 
 use gpui::*;
+use gpui_component::{Icon, IconName};
 use webterm_settings::Theme as SettingsTheme;
 use crate::app_state::{AppState, ForwardModalMode};
 
@@ -76,16 +77,22 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         // Refresh
                         .child(
                             div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
                                 .px_3()
-                                .py_1()
-                                .rounded_md()
+                                .py_1p5()
+                                .rounded_lg()
                                 .bg(card_bg)
                                 .border_1()
                                 .border_color(border_color)
                                 .text_xs()
+                                .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(|s| s.bg(tag_bg))
-                                .child(if is_loading { "⟳ Loading..." } else { "⟳ Refresh" })
+                                .hover(|s| s.bg(tag_bg).text_color(text_color))
+                                .child(Icon::new(IconName::RotateCw).size(px(12.0)))
+                                .child(if is_loading { "Loading..." } else { "Refresh" })
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.fetch_forwards(cx);
                                 })),
@@ -93,16 +100,21 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         // + Create Forward button
                         .child(
                             div()
-                                .px_3()
-                                .py_1()
-                                .rounded_md()
-                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x0ea5e9) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
+                                .px_3p5()
+                                .py_1p5()
+                                .rounded_lg()
+                                .bg(rgb(0xc084fc))
+                                .hover(|s| s.bg(rgb(0xa855f7)))
                                 .text_xs()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(rgb(0xffffff))
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(rgb(0x000000))
                                 .cursor_pointer()
-                                .child("+ Create Forward")
+                                .child(Icon::new(IconName::Plus).size(px(13.0)).text_color(rgb(0x000000)))
+                                .child("Create Forward")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.open_create_forward_modal(cx);
                                 })),
@@ -131,8 +143,13 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .border_color(border_color)
                         .child(
                             div()
-                                .text_3xl()
-                                .child("⇄"),
+                                .size(px(48.0))
+                                .rounded_full()
+                                .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) })
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .child(svg().data(crate::icons::ARROW_LEFT_RIGHT_SVG).size(px(24.0)).text_color(muted_text)),
                         )
                         .child(
                             div()
@@ -153,16 +170,21 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .child(
                             div()
                                 .mt_2()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
                                 .px_4()
-                                .py_1p5()
-                                .rounded_md()
-                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x0ea5e9) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
-                                .text_xs()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(rgb(0xffffff))
+                                .py_2()
+                                .rounded_lg()
+                                .bg(rgb(0xc084fc))
+                                .hover(|s| s.bg(rgb(0xa855f7)))
                                 .cursor_pointer()
-                                .child("+ Create First Forward")
+                                .text_xs()
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(rgb(0x000000))
+                                .child(Icon::new(IconName::Plus).size(px(13.0)).text_color(rgb(0x000000)))
+                                .child("Create First Forward")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.open_create_forward_modal(cx);
                                 })),
@@ -222,13 +244,16 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 } else {
                                                     tag_bg
                                                 })
-                                                .text_base()
-                                                .text_color(if is_active {
-                                                    if is_dark { rgb(0x4ade80) } else { rgb(0x16a34a) }
-                                                } else {
-                                                    muted_text
-                                                })
-                                                .child("⇄"),
+                                                .child(
+                                                    svg()
+                                                        .data(crate::icons::ARROW_LEFT_RIGHT_SVG)
+                                                        .size(px(16.0))
+                                                        .text_color(if is_active {
+                                                            if is_dark { rgb(0x4ade80) } else { rgb(0x16a34a) }
+                                                        } else {
+                                                            muted_text
+                                                        }),
+                                                ),
                                         )
                                         // Information
                                         .child(
@@ -337,6 +362,10 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         // Start/Stop Toggle Button
                                         .child(
                                             div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_1p5()
                                                 .px_3()
                                                 .py_1p5()
                                                 .rounded_md()
@@ -359,7 +388,17 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 } else {
                                                     text_color
                                                 })
-                                                .child(if is_active { "■ Stop Tunnel" } else { "▶ Start Tunnel" })
+                                                .child(
+                                                    svg()
+                                                        .data(if is_active { crate::icons::SQUARE_SVG } else { crate::icons::PLAY_SVG })
+                                                        .size(px(12.0))
+                                                        .text_color(if is_active {
+                                                            if is_dark { rgb(0x4ade80) } else { rgb(0x16a34a) }
+                                                        } else {
+                                                            text_color
+                                                        }),
+                                                )
+                                                .child(if is_active { "Stop Tunnel" } else { "Start Tunnel" })
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                     this.toggle_forward_active(&id_toggle, cx);
                                                 })),
@@ -367,6 +406,10 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         // Edit Button
                                         .child(
                                             div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_1()
                                                 .px_2p5()
                                                 .py_1p5()
                                                 .rounded_md()
@@ -375,6 +418,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
                                                 .text_xs()
                                                 .text_color(text_color)
+                                                .child(svg().data(crate::icons::EDIT_SVG).size(px(12.0)).text_color(muted_text))
                                                 .child("Edit")
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                     this.open_edit_forward_modal(&id_edit, cx);
@@ -383,6 +427,10 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         // Delete Button
                                         .child(
                                             div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_1()
                                                 .px_2p5()
                                                 .py_1p5()
                                                 .rounded_md()
@@ -391,6 +439,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .hover(|s| s.bg(if is_dark { rgb(0x7f1d1d) } else { rgb(0xfecaca) }))
                                                 .text_xs()
                                                 .text_color(rgb(0xef4444))
+                                                .child(svg().data(crate::icons::TRASH_SVG).size(px(12.0)).text_color(rgb(0xef4444)))
                                                 .child("Delete")
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                     this.open_delete_forward_modal(forward_del.clone(), cx);
@@ -475,7 +524,7 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .hover(|s| s.bg(tag_bg))
                                 .cursor_pointer()
                                 .text_color(muted_text)
-                                .child("×")
+                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.close_forward_modal(cx);
                                 })),
@@ -484,6 +533,10 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                 // Error banner (if validation failed)
                 .children(form.error_message.map(|err| {
                     div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1p5()
                         .px_3()
                         .py_2()
                         .rounded_md()
@@ -492,7 +545,8 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .border_color(rgb(0xef4444))
                         .text_xs()
                         .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
-                        .child(format!("⚠️ {err}"))
+                        .child(svg().data(crate::icons::ALERT_TRIANGLE_SVG).size(px(13.0)).text_color(rgb(0xef4444)))
+                        .child(err)
                 }))
                 // Forward Type Selector (Local vs Reverse)
                 .child(
@@ -667,7 +721,7 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                         .child(format!("{} ({}@{}:{})", conn.label, conn.username, conn.host, conn.port)),
                                                 )
                                                 .child(if is_selected {
-                                                    div().text_xs().text_color(rgb(0x0284c7)).child("✓")
+                                                    div().child(svg().data(crate::icons::CHECK_SVG).size(px(14.0)).text_color(rgb(0x0284c7)))
                                                 } else {
                                                     div()
                                                 }),

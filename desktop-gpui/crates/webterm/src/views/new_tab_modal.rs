@@ -74,7 +74,7 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) }))
                                 .cursor_pointer()
                                 .text_color(muted_text)
-                                .child("×")
+                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.close_new_tab_modal(cx);
                                 })),
@@ -108,7 +108,12 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .flex()
                                         .items_center()
                                         .gap_2()
-                                        .child(div().text_lg().child("💻"))
+                                        .child(
+                                            svg()
+                                                .data(crate::icons::TERMINAL_SVG)
+                                                .size(px(18.0))
+                                                .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }),
+                                        )
                                         .child(
                                             div()
                                                 .text_base()
@@ -129,9 +134,19 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 )
                                 .child(
                                     div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap_1()
                                         .text_xs()
                                         .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
-                                        .child("Click to launch ➔"),
+                                        .child("Launch")
+                                        .child(
+                                            svg()
+                                                .data(crate::icons::ARROW_RIGHT_SVG)
+                                                .size(px(12.0))
+                                                .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }),
+                                        ),
                                 ),
                         )
                         .child(

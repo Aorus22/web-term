@@ -245,7 +245,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .child(Icon::new(IconName::HardDrive).size(px(24.0)).text_color(muted_text)),
+                                .child(svg().data(crate::icons::SERVER_SVG).size(px(24.0)).text_color(muted_text)),
                         )
                         .child(
                             div()
@@ -352,7 +352,8 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                         .items_center()
                                         .justify_center()
                                         .child(
-                                            Icon::new(IconName::HardDrive)
+                                            svg()
+                                                .data(crate::icons::SERVER_SVG)
                                                 .size(px(16.0))
                                                 .text_color(icon_color),
                                         ),
@@ -441,7 +442,8 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                 .rounded_md()
                                                 .hover(|s| s.bg(rgb(0x27272a)))
                                                 .child(
-                                                    Icon::new(IconName::Settings)
+                                                    svg()
+                                                        .data(crate::icons::EDIT_SVG)
                                                         .size(px(13.0))
                                                         .text_color(muted_text),
                                                 )
@@ -459,7 +461,8 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                 .rounded_md()
                                                 .hover(|s| s.bg(rgb(0x27272a)))
                                                 .child(
-                                                    Icon::new(IconName::Close)
+                                                    svg()
+                                                        .data(crate::icons::TRASH_SVG)
                                                         .size(px(13.0))
                                                         .text_color(muted_text),
                                                 )

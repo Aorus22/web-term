@@ -1,7 +1,6 @@
 //! Navigation shell view: left sidebar and main content views.
 
 use gpui::*;
-use gpui_component::{Icon, IconName};
 use webterm_settings::Theme as SettingsTheme;
 use crate::actions::{
     CloseTab, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7, JumpTab8,
@@ -18,12 +17,12 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let active_view = app.active_view;
     let current_theme = app.theme;
 
-    // Sidebar items matching web client
+    // Sidebar items matching web client (Lucide SVGs)
     let items = [
-        (View::Hosts, "Hosts", IconName::HardDrive),
-        (View::Keys, "SSH Keys", IconName::CircleUser),
-        (View::Forwards, "Port Forwards", IconName::Network),
-        (View::Sftp, "SFTP", IconName::Folder),
+        (View::Hosts, "Hosts", crate::icons::SERVER_SVG),
+        (View::Keys, "SSH Keys", crate::icons::KEY_SVG),
+        (View::Forwards, "Port Forwards", crate::icons::ARROW_LEFT_RIGHT_SVG),
+        (View::Sftp, "SFTP", crate::icons::FILES_SVG),
     ];
 
     let is_dark = current_theme != SettingsTheme::Light;
@@ -103,7 +102,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                     .text_xs()
                     .text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) })
                     .hover(|s| s.text_color(text_color))
-                    .child("×")
+                    .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) }))
                     .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                         this.dismiss_notification(cx);
                     })),
@@ -227,7 +226,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                     .bg(item_bg)
                                     .hover(move |s| s.bg(item_hover))
                                     .cursor_pointer()
-                                    .child(Icon::new(icon).size(px(16.0)).text_color(icon_color))
+                                    .child(svg().data(icon).size(px(16.0)).text_color(icon_color))
                                     .child(
                                         div()
                                             .text_sm()
@@ -292,7 +291,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                     .bg(item_bg)
                                     .hover(move |s| s.bg(item_hover))
                                     .cursor_pointer()
-                                    .child(Icon::new(IconName::Settings).size(px(16.0)).text_color(icon_color))
+                                    .child(svg().data(crate::icons::SETTINGS_SVG).size(px(16.0)).text_color(icon_color))
                                     .child(
                                         div()
                                             .text_sm()
