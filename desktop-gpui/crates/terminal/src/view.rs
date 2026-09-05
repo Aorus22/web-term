@@ -194,6 +194,15 @@ impl TerminalView {
         cx.notify();
     }
 
+    /// Dynamically update font family and font size used by this terminal view.
+    pub fn set_font(&mut self, family: String, size: Pixels, cx: &mut Context<Self>) {
+        self.renderer.font_family = family;
+        self.renderer.font_size = size;
+        self.renderer.cell_width = size * 0.6;
+        self.renderer.cell_height = size * self.renderer.line_height_multiplier;
+        cx.notify();
+    }
+
     /// Focus handle for keyboard input routing.
     pub fn focus_handle(&self) -> &FocusHandle {
         &self.focus_handle

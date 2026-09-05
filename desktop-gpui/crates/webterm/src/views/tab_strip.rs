@@ -2,7 +2,7 @@
 
 use gpui::*;
 use crate::app_state::{AppState, View};
-use crate::icons::{COPY_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, PANEL_LEFT_SVG, PLUS_SVG, X_SVG};
+use crate::icons::{COPY_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, RESTORE_SVG, PANEL_LEFT_SVG, PLUS_SVG, X_SVG};
 use crate::session::SessionStatus;
 
 /// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, draggable titlebar area, and custom window controls.
@@ -314,13 +314,19 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .hover(|s| s.bg(hover_bg))
                         .child(
                             svg()
-                                .data(MAXIMIZE_SVG)
+                                .data(if app.is_maximized {
+                                    RESTORE_SVG
+                                } else {
+                                    MAXIMIZE_SVG
+                                })
                                 .size(px(12.0))
                                 .text_color(muted_text),
                         )
-                        .on_mouse_down(MouseButton::Left, |_, window, _| {
-                            window.zoom_window();
-                        }),
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                            let new_max = crate::window_state::toggle_maximize(window);
+                            this.is_maximized = new_max;
+                            cx.notify();
+                        })),
                 )
                 // Close Button (Red on hover)
                 .child(

@@ -7759,6 +7759,7 @@ dependencies = [
  "gpui-pre",
  "gpui-pre-platform",
  "parking_lot",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "tempfile",

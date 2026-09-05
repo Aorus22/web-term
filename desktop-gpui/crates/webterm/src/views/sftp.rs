@@ -464,10 +464,11 @@ fn render_table_header(
                     this.sftp_toggle_sort(pane, SftpSortColumn::Name, cx);
                 })),
         )
-        // 2. Date Modified Column (150px)
+        // 2. Date Modified Column (130px)
         .child(
             div()
-                .w(px(150.0))
+                .w(px(130.0))
+                .flex_shrink_0()
                 .flex()
                 .flex_row()
                 .items_center()
@@ -490,10 +491,11 @@ fn render_table_header(
                     this.sftp_toggle_sort(pane, SftpSortColumn::ModTime, cx);
                 })),
         )
-        // 3. Size Column (100px)
+        // 3. Size Column (80px)
         .child(
             div()
-                .w(px(100.0))
+                .w(px(80.0))
+                .flex_shrink_0()
                 .flex()
                 .flex_row()
                 .items_center()
@@ -579,8 +581,8 @@ fn render_file_rows(
                                 .child(".."),
                         ),
                 )
-                .child(div().w(px(150.0)))
-                .child(div().w(px(100.0)))
+                .child(div().w(px(130.0)).flex_shrink_0())
+                .child(div().w(px(80.0)).flex_shrink_0())
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _window, cx| {
                     if !is_interactive { return; }
                     this.sftp_focus_pane(pane, cx);
@@ -692,18 +694,20 @@ fn render_file_rows(
                                 ),
                         ),
                 )
-                // Column 2: Date Modified (150px)
+                // Column 2: Date Modified (130px)
                 .child(
                     div()
-                        .w(px(150.0))
+                        .w(px(130.0))
+                        .flex_shrink_0()
                         .text_xs()
                         .text_color(muted_text)
                         .child(formatted_date),
                 )
-                // Column 3: Size (100px, centered)
+                // Column 3: Size (80px, centered)
                 .child(
                     div()
-                        .w(px(100.0))
+                        .w(px(80.0))
+                        .flex_shrink_0()
                         .text_xs()
                         .text_color(muted_text)
                         .text_center()

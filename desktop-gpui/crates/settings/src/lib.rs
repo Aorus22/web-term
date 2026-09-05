@@ -54,6 +54,30 @@ fn default_theme_preset() -> String {
     "default-dark".to_string()
 }
 
+fn default_theme_mode_filter() -> String {
+    "all".to_string()
+}
+
+fn default_font_family() -> String {
+    "Geist Mono".to_string()
+}
+
+fn default_font_size() -> f32 {
+    14.0
+}
+
+fn default_cursor_style() -> String {
+    "block".to_string()
+}
+
+fn default_cursor_blink() -> bool {
+    true
+}
+
+fn default_scrollback() -> u32 {
+    1000
+}
+
 /// Desktop settings store holding UI preferences and encryption key custody.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DesktopSettings {
@@ -65,6 +89,18 @@ pub struct DesktopSettings {
     pub theme: Theme,
     #[serde(default = "default_theme_preset")]
     pub theme_preset: String,
+    #[serde(default = "default_theme_mode_filter")]
+    pub theme_mode_filter: String,
+    #[serde(default = "default_font_family")]
+    pub font_family: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: f32,
+    #[serde(default = "default_cursor_style")]
+    pub cursor_style: String,
+    #[serde(default = "default_cursor_blink")]
+    pub cursor_blink: bool,
+    #[serde(default = "default_scrollback")]
+    pub scrollback: u32,
     #[serde(default)]
     pub window_state: Option<WindowState>,
     #[serde(default)]
@@ -83,6 +119,12 @@ impl Default for DesktopSettings {
             encryption_key: None,
             theme: Theme::Dark,
             theme_preset: default_theme_preset(),
+            theme_mode_filter: default_theme_mode_filter(),
+            font_family: default_font_family(),
+            font_size: default_font_size(),
+            cursor_style: default_cursor_style(),
+            cursor_blink: default_cursor_blink(),
+            scrollback: default_scrollback(),
             window_state: None,
             last_backend_url: None,
             open_sessions: Vec::new(),

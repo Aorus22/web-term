@@ -730,6 +730,19 @@ pub struct AppState {
     pub forward_modal: Option<ForwardFormState>,
     pub delete_forward_target: Option<PortForward>,
     pub terminal_font_size: f32,
+    pub terminal_font_family: String,
+    pub cursor_style: String,
+    pub cursor_blink: bool,
+    pub scrollback: u32,
+    pub theme_mode_filter: String,
+    pub show_theme_mode_picker: bool,
+    pub show_cursor_style_picker: bool,
+    pub show_scrollback_picker: bool,
+    pub show_font_dialog: bool,
+    pub font_dialog_family: String,
+    pub font_dialog_size: f32,
+    pub show_font_dialog_picker: bool,
+    pub is_maximized: bool,
     pub backend_path_input: String,
     pub sidebar_open: bool,
 }
@@ -743,6 +756,13 @@ impl AppState {
             .as_ref()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
+        let terminal_font_size = settings.font_size;
+        let terminal_font_family = settings.font_family.clone();
+        let cursor_style = settings.cursor_style.clone();
+        let cursor_blink = settings.cursor_blink;
+        let scrollback = settings.scrollback;
+        let theme_mode_filter = settings.theme_mode_filter.clone();
+        let is_maximized = settings.window_state.as_ref().map(|s| s.maximized).unwrap_or(false);
 
         Self {
             backend_status: BackendStatus::Starting,
@@ -783,7 +803,20 @@ impl AppState {
             is_loading_forwards: false,
             forward_modal: None,
             delete_forward_target: None,
-            terminal_font_size: 14.0,
+            terminal_font_size,
+            terminal_font_family: terminal_font_family.clone(),
+            cursor_style,
+            cursor_blink,
+            scrollback,
+            theme_mode_filter,
+            show_theme_mode_picker: false,
+            show_cursor_style_picker: false,
+            show_scrollback_picker: false,
+            show_font_dialog: false,
+            font_dialog_family: terminal_font_family,
+            font_dialog_size: terminal_font_size,
+            show_font_dialog_picker: false,
+            is_maximized,
             backend_path_input,
             sidebar_open: true,
         }
@@ -2299,6 +2332,8 @@ impl AppState {
     /// Update terminal font size and propagate to all active terminal sessions.
     pub fn set_terminal_font_size(&mut self, size: f32, cx: &mut Context<Self>) {
         self.terminal_font_size = size.clamp(10.0, 24.0);
+        self.settings.font_size = self.terminal_font_size;
+        let _ = self.settings.save();
         let px_size = px(self.terminal_font_size);
         for session in self.session_manager.tabs_mut() {
             if let Some(ref view) = session.view {
@@ -2307,6 +2342,81 @@ impl AppState {
                 });
             }
         }
+        cx.notify();
+    }
+
+    /// Update terminal font family & size and propagate to all active terminal sessions.
+    pub fn set_terminal_font(&mut self, family: String, size: f32, cx: &mut Context<Self>) {
+        self.terminal_font_family = family.clone();
+        self.terminal_font_size = size.clamp(10.0, 24.0);
+        self.settings.font_family = family.clone();
+        self.settings.font_size = self.terminal_font_size;
+        let _ = self.settings.save();
+
+        let px_size = px(self.terminal_font_size);
+        for session in self.session_manager.tabs_mut() {
+            if let Some(ref view) = session.view {
+                let f = family.clone();
+                view.update(cx, |this, cx| {
+                    this.set_font(f, px_size, cx);
+                });
+            }
+        }
+        cx.notify();
+    }
+
+    /// Set theme mode filter ("all", "dark", "light") and auto-match active theme.
+    pub fn set_theme_mode_filter(&mut self, mode: &str, cx: &mut Context<Self>) {
+        self.theme_mode_filter = mode.to_string();
+        self.settings.theme_mode_filter = mode.to_string();
+        let _ = self.settings.save();
+        self.show_theme_mode_picker = false;
+
+        // Auto-match theme when switching filter mode
+        if mode != "all" {
+            let current_preset = self.current_theme();
+            let target_dark = mode == "dark";
+            if current_preset.is_dark != target_dark {
+                let current_id = current_preset.id;
+                let base = current_id.trim_end_matches("-dark").trim_end_matches("-light");
+                let counterpart = if target_dark {
+                    format!("{base}-dark")
+                } else {
+                    format!("{base}-light")
+                };
+                if crate::theme::THEME_PRESETS.iter().any(|p| p.id == counterpart) {
+                    self.set_theme_preset(&counterpart, cx);
+                } else if let Some(first_match) = crate::theme::THEME_PRESETS.iter().find(|p| p.is_dark == target_dark) {
+                    self.set_theme_preset(first_match.id, cx);
+                }
+            }
+        }
+        cx.notify();
+    }
+
+    /// Set cursor style ("block", "underline", "bar").
+    pub fn set_cursor_style(&mut self, style: String, cx: &mut Context<Self>) {
+        self.cursor_style = style.clone();
+        self.settings.cursor_style = style;
+        self.show_cursor_style_picker = false;
+        let _ = self.settings.save();
+        cx.notify();
+    }
+
+    /// Set cursor blink toggle.
+    pub fn set_cursor_blink(&mut self, blink: bool, cx: &mut Context<Self>) {
+        self.cursor_blink = blink;
+        self.settings.cursor_blink = blink;
+        let _ = self.settings.save();
+        cx.notify();
+    }
+
+    /// Set scrollback buffer lines (1000, 5000, 10000, 50000, 0).
+    pub fn set_scrollback(&mut self, lines: u32, cx: &mut Context<Self>) {
+        self.scrollback = lines;
+        self.settings.scrollback = lines;
+        self.show_scrollback_picker = false;
+        let _ = self.settings.save();
         cx.notify();
     }
 
