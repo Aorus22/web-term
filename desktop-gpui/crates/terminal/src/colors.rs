@@ -181,6 +181,31 @@ impl ColorPalette {
             NamedColor::DimForeground => self.ansi[7],
         }
     }
+
+    /// Create a palette from raw RGB u32 hex values (0xRRGGBB).
+    pub fn from_rgb_u32(
+        foreground: u32,
+        background: u32,
+        cursor: u32,
+        selection: u32,
+        ansi: [u32; 16],
+    ) -> Self {
+        let foreground_hsla = hex_to_hsla((foreground << 8) | 0xff);
+        let background_hsla = hex_to_hsla((background << 8) | 0xff);
+        let cursor_hsla = hex_to_hsla((cursor << 8) | 0xff);
+        let selection_hsla = hex_to_hsla((selection << 8) | 0x66);
+        let ansi_hsla = ansi.map(|c| hex_to_hsla((c << 8) | 0xff));
+        let indexed = Self::generate_256_table(&ansi_hsla);
+
+        Self {
+            foreground: foreground_hsla,
+            background: background_hsla,
+            cursor: cursor_hsla,
+            selection: selection_hsla,
+            ansi: ansi_hsla,
+            indexed,
+        }
+    }
 }
 
 #[cfg(test)]

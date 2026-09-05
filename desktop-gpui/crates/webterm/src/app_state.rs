@@ -707,13 +707,31 @@ impl AppState {
         crate::theme::find_theme_preset(&self.settings.theme_preset)
     }
 
-    /// Set a new theme preset, synchronize settings, and trigger live redraw.
+    /// Derive the terminal ColorPalette for the currently active theme preset.
+    pub fn current_terminal_palette(&self) -> webterm_terminal::ColorPalette {
+        crate::theme::terminal_palette_for_preset(self.current_theme())
+    }
+
+    /// Set a new theme preset, synchronize settings, update terminal palette, and trigger live redraw.
     pub fn set_theme_preset(&mut self, preset_id: &str, cx: &mut Context<Self>) {
         self.settings.theme_preset = preset_id.to_string();
         let preset = crate::theme::find_theme_preset(preset_id);
         self.theme = if preset.is_dark { SettingsTheme::Dark } else { SettingsTheme::Light };
         self.settings.theme = self.theme;
         let _ = self.settings.save();
+
+        crate::theme::apply_theme(self.theme, cx);
+
+        let palette = self.current_terminal_palette();
+        for session in self.session_manager.tabs_mut() {
+            if let Some(ref view) = session.view {
+                let p = palette.clone();
+                view.update(cx, |this, cx| {
+                    this.set_palette(p, cx);
+                });
+            }
+        }
+
         cx.notify();
     }
 
@@ -1591,7 +1609,6 @@ impl AppState {
         };
 
         let saved_sessions = self.settings.open_sessions.clone();
-        let is_dark = self.theme != SettingsTheme::Light;
         let view_weak = cx.entity().downgrade();
 
         let (tx, mut rx) =
@@ -1647,12 +1664,13 @@ impl AppState {
                             } else {
                                 for (session_id, title, stype, conn_id) in to_attach {
                                     let tab_id = this.session_manager.alloc_tab_id();
+                                    let palette = this.current_terminal_palette();
                                     let mut tab = TerminalTab::new(
                                         tab_id,
                                         title,
                                         stype,
                                         conn_id,
-                                        is_dark,
+                                        palette,
                                         cx,
                                     );
                                     tab.session_id = Some(session_id.clone());
@@ -1702,13 +1720,13 @@ impl AppState {
         };
 
         let tab_id = self.session_manager.alloc_tab_id();
-        let is_dark = self.theme != SettingsTheme::Light;
+        let palette = self.current_terminal_palette();
         let mut tab = TerminalTab::new(
             tab_id,
             "Local Shell",
             "local",
             Some("local".to_string()),
-            is_dark,
+            palette,
             cx,
         );
         let connect_req = WsConnectRequest::for_local_with_cwd(80, 24, cwd);
@@ -1778,13 +1796,13 @@ impl AppState {
         };
 
         let tab_id = self.session_manager.alloc_tab_id();
-        let is_dark = self.theme != SettingsTheme::Light;
+        let palette = self.current_terminal_palette();
         let mut tab = TerminalTab::new(
             tab_id,
             title,
             "ssh",
             req.connection_id.clone(),
-            is_dark,
+            palette,
             cx,
         );
         tab.last_connect_req = Some(req.clone());
@@ -2062,16 +2080,17 @@ impl AppState {
     pub fn set_theme(&mut self, theme: SettingsTheme, cx: &mut Context<Self>) {
         self.theme = theme;
         self.settings.theme = self.theme;
+        let current_preset = self.current_theme();
+        if theme == SettingsTheme::Dark && !current_preset.is_dark {
+            self.settings.theme_preset = "default-dark".to_string();
+        } else if theme == SettingsTheme::Light && current_preset.is_dark {
+            self.settings.theme_preset = "default-light".to_string();
+        }
         let _ = self.settings.save();
 
         crate::theme::apply_theme(self.theme, cx);
 
-        let is_dark = self.theme != SettingsTheme::Light;
-        let palette = if is_dark {
-            webterm_terminal::ColorPalette::dark_default()
-        } else {
-            webterm_terminal::ColorPalette::light_default()
-        };
+        let palette = self.current_terminal_palette();
 
         for session in self.session_manager.tabs_mut() {
             if let Some(ref view) = session.view {

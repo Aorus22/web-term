@@ -1,17 +1,19 @@
 //! New Tab launcher modal for Local Shell and Quick SSH connection.
 
 use gpui::*;
-use webterm_settings::Theme as SettingsTheme;
 use crate::app_state::AppState;
 
 /// Renders the modal overlay allowing user to spawn a Local Shell or Quick SSH session.
 pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.theme != SettingsTheme::Light;
-    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let input_bg = if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) };
+    let _is_dark = app.is_dark();
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let input_bg = app.bg_color();
+    let tag_bg = app.accent_color();
+    let primary_color = app.primary_color();
+    let primary_fg = rgb(0xffffff);
 
     let host_display: SharedString = if app.new_tab_host.is_empty() {
         "e.g. 192.168.1.100 or server.com".into()
@@ -71,7 +73,7 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .justify_center()
                                 .size(px(24.0))
                                 .rounded_md()
-                                .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) }))
+                                .hover(|s| s.bg(tag_bg))
                                 .cursor_pointer()
                                 .text_color(muted_text)
                                 .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
@@ -88,10 +90,10 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .gap_1()
                         .p_4()
                         .rounded_lg()
-                        .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) })
+                        .bg(tag_bg)
                         .border_1()
-                        .border_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
-                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                        .border_color(primary_color)
+                        .hover(|s| s.bg(border_color))
                         .cursor_pointer()
                         .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                             this.close_new_tab_modal(cx);
@@ -112,7 +114,7 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                             svg()
                                                 .data(crate::icons::TERMINAL_SVG)
                                                 .size(px(18.0))
-                                                .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }),
+                                                .text_color(primary_color),
                                         )
                                         .child(
                                             div()
@@ -127,8 +129,8 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .px_1p5()
                                                 .py_0p5()
                                                 .rounded_md()
-                                                .bg(if is_dark { rgb(0x0369a1) } else { rgb(0xe0f2fe) })
-                                                .text_color(if is_dark { rgb(0xe0f2fe) } else { rgb(0x0369a1) })
+                                                .bg(primary_color)
+                                                .text_color(primary_fg)
                                                 .child(if cfg!(windows) { "ConPTY" } else { "POSIX PTY" }),
                                         ),
                                 )
@@ -139,13 +141,13 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .items_center()
                                         .gap_1()
                                         .text_xs()
-                                        .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
+                                        .text_color(primary_color)
                                         .child("Launch")
                                         .child(
                                             svg()
                                                 .data(crate::icons::ARROW_RIGHT_SVG)
                                                 .size(px(12.0))
-                                                .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }),
+                                                .text_color(primary_color),
                                         ),
                                 ),
                         )
@@ -253,8 +255,8 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .px_4()
                                         .py_2()
                                         .rounded_md()
-                                        .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
-                                        .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
+                                        .bg(tag_bg)
+                                        .hover(|s| s.bg(border_color))
                                         .cursor_pointer()
                                         .text_sm()
                                         .text_color(text_color)
@@ -268,12 +270,12 @@ pub fn render_new_tab_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .px_4()
                                         .py_2()
                                         .rounded_md()
-                                        .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x0ea5e9) })
-                                        .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                        .bg(primary_color)
+                                        .hover(|s| s.opacity(0.9))
                                         .cursor_pointer()
                                         .text_sm()
                                         .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(rgb(0xffffff))
+                                        .text_color(primary_fg)
                                         .child("Connect SSH")
                                         .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                             this.open_quick_ssh_tab(cx);

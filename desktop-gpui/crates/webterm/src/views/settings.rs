@@ -16,7 +16,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let tag_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
+    let tag_bg = app.accent_color();
+    let primary_color = app.primary_color();
     let current_theme = app.theme;
     let active_preset_id = app.settings.theme_preset.clone();
 
@@ -119,14 +120,14 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .rounded_lg()
                                         .border_1()
                                         .border_color(if current_theme == SettingsTheme::Dark {
-                                            if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                            primary_color
                                         } else {
                                             border_color
                                         })
                                         .bg(if current_theme == SettingsTheme::Dark {
-                                            if is_dark { rgb(0x0c4a6e) } else { rgb(0xe0f2fe) }
-                                        } else {
                                             tag_bg
+                                        } else {
+                                            card_bg
                                         })
                                         .cursor_pointer()
                                         .child(
@@ -149,7 +150,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 .data(crate::icons::MOON_SVG)
                                                                 .size(px(16.0))
                                                                 .text_color(if current_theme == SettingsTheme::Dark {
-                                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                                                    primary_color
                                                                 } else {
                                                                     muted_text
                                                                 }),
@@ -163,8 +164,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                         .items_center()
                                                         .gap_1()
                                                         .text_xs()
-                                                        .text_color(rgb(0x0284c7))
-                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(rgb(0x0284c7)))
+                                                        .text_color(primary_color)
+                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(primary_color))
                                                         .child("Active")
                                                 } else {
                                                     div()
@@ -183,14 +184,14 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .rounded_lg()
                                         .border_1()
                                         .border_color(if current_theme == SettingsTheme::Light {
-                                            if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                            primary_color
                                         } else {
                                             border_color
                                         })
                                         .bg(if current_theme == SettingsTheme::Light {
-                                            if is_dark { rgb(0x0c4a6e) } else { rgb(0xe0f2fe) }
-                                        } else {
                                             tag_bg
+                                        } else {
+                                            card_bg
                                         })
                                         .cursor_pointer()
                                         .child(
@@ -213,7 +214,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 .data(crate::icons::SUN_SVG)
                                                                 .size(px(16.0))
                                                                 .text_color(if current_theme == SettingsTheme::Light {
-                                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                                                    primary_color
                                                                 } else {
                                                                     muted_text
                                                                 }),
@@ -227,8 +228,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                         .items_center()
                                                         .gap_1()
                                                         .text_xs()
-                                                        .text_color(rgb(0x0284c7))
-                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(rgb(0x0284c7)))
+                                                        .text_color(primary_color)
+                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(primary_color))
                                                         .child("Active")
                                                 } else {
                                                     div()
@@ -247,14 +248,14 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .rounded_lg()
                                         .border_1()
                                         .border_color(if current_theme == SettingsTheme::System {
-                                            if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                            primary_color
                                         } else {
                                             border_color
                                         })
                                         .bg(if current_theme == SettingsTheme::System {
-                                            if is_dark { rgb(0x0c4a6e) } else { rgb(0xe0f2fe) }
-                                        } else {
                                             tag_bg
+                                        } else {
+                                            card_bg
                                         })
                                         .cursor_pointer()
                                         .child(
@@ -277,7 +278,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 .data(crate::icons::MONITOR_SVG)
                                                                 .size(px(16.0))
                                                                 .text_color(if current_theme == SettingsTheme::System {
-                                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                                                    primary_color
                                                                 } else {
                                                                     muted_text
                                                                 }),
@@ -291,8 +292,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                         .items_center()
                                                         .gap_1()
                                                         .text_xs()
-                                                        .text_color(rgb(0x0284c7))
-                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(rgb(0x0284c7)))
+                                                        .text_color(primary_color)
+                                                        .child(svg().data(crate::icons::CHECK_SVG).size(px(12.0)).text_color(primary_color))
                                                         .child("Active")
                                                 } else {
                                                     div()
@@ -358,9 +359,9 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                     border_color
                                                 })
                                                 .bg(if is_active {
-                                                    if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) }
+                                                    app.bg_color()
                                                 } else {
-                                                    tag_bg
+                                                    card_bg
                                                 })
                                                 .cursor_pointer()
                                                 .hover(|s| s.border_color(rgb(0x71717a)))
@@ -503,7 +504,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                             div()
                                                 .font_family("JetBrains Mono")
                                                 .text_color(if has_override {
-                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                                    primary_color
                                                 } else {
                                                     muted_text
                                                 })
@@ -586,8 +587,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .items_center()
                                 .gap_1p5()
                                 .text_xs()
-                                .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
-                                .child(svg().data(crate::icons::INFO_SVG).size(px(14.0)).text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }))
+                                .text_color(primary_color)
+                                .child(svg().data(crate::icons::INFO_SVG).size(px(14.0)).text_color(primary_color))
                                 .child("Requirement SET-01 enforced: Browser-based engines (wterm / xterm.js) are excluded from the desktop application."),
                         ),
                 )
@@ -630,18 +631,18 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .cursor_pointer()
                                         .border_1()
                                         .border_color(if is_active {
-                                            if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                                            primary_color
                                         } else {
                                             border_color
                                         })
                                         .bg(if is_active {
-                                            if is_dark { rgb(0x0c4a6e) } else { rgb(0xe0f2fe) }
-                                        } else {
                                             tag_bg
+                                        } else {
+                                            app.bg_color()
                                         })
                                         .text_xs()
                                         .font_weight(if is_active { FontWeight::BOLD } else { FontWeight::NORMAL })
-                                        .text_color(text_color)
+                                        .text_color(if is_active { primary_color } else { text_color })
                                         .child(format!("{sz:.0}px"))
                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                             this.set_terminal_font_size(sz, cx);

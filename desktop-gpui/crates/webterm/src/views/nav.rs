@@ -87,9 +87,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
             .px_4()
             .py_2()
             .rounded_lg()
-            .bg(if is_dark { rgb(0x18181b) } else { rgb(0xffffff) })
+            .bg(app.card_bg())
             .border_1()
-            .border_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) })
+            .border_color(app.primary_color())
             .shadow_lg()
             .text_sm()
             .text_color(text_color)
@@ -98,9 +98,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 div()
                     .cursor_pointer()
                     .text_xs()
-                    .text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) })
+                    .text_color(app.muted_text())
                     .hover(|s| s.text_color(text_color))
-                    .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) }))
+                    .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(app.muted_text()))
                     .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                         this.dismiss_notification(cx);
                     })),
@@ -202,7 +202,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 let item_hover = if is_active {
                                     primary_color
                                 } else {
-                                    if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }
+                                    if is_dark { app.accent_color() } else { rgb(0xe2e8f0) }
                                 };
                                 let item_text_color = if is_active {
                                     primary_fg
@@ -269,7 +269,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 let item_hover = if is_active {
                                     primary_color
                                 } else {
-                                    if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }
+                                    if is_dark { app.accent_color() } else { rgb(0xe2e8f0) }
                                 };
                                 let item_text_color = if is_active {
                                     primary_fg
@@ -357,13 +357,14 @@ fn render_content_pane(
     _is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
+    let bg = app.bg_color();
     match view {
         View::Hosts => {
             let active_tab_view = app.session_manager.active_tab().and_then(|t| t.view.clone());
             let host_or_term = if app.show_hosts_catalog || active_tab_view.is_none() {
                 render_hosts_view(app, cx)
             } else if let Some(term_view) = active_tab_view {
-                div().size_full().child(term_view).into_any_element()
+                div().size_full().bg(bg).child(term_view).into_any_element()
             } else {
                 render_hosts_view(app, cx)
             };
@@ -371,6 +372,7 @@ fn render_content_pane(
             div()
                 .size_full()
                 .overflow_hidden()
+                .bg(bg)
                 .child(host_or_term)
                 .into_any_element()
         }
@@ -380,6 +382,7 @@ fn render_content_pane(
                 .flex_col()
                 .size_full()
                 .overflow_hidden()
+                .bg(bg)
                 .child(crate::views::keys::render_keys_view(app, cx))
                 .into_any_element()
         }
@@ -389,6 +392,7 @@ fn render_content_pane(
                 .flex_col()
                 .size_full()
                 .overflow_hidden()
+                .bg(bg)
                 .child(crate::views::forwards::render_forwards_view(app, cx))
                 .into_any_element()
         }
@@ -398,6 +402,7 @@ fn render_content_pane(
                 .flex_col()
                 .size_full()
                 .overflow_hidden()
+                .bg(bg)
                 .child(crate::views::sftp::render_sftp_view(app, cx))
                 .into_any_element()
         }
@@ -407,6 +412,7 @@ fn render_content_pane(
                 .flex_col()
                 .size_full()
                 .overflow_hidden()
+                .bg(bg)
                 .child(crate::views::settings::render_settings_view(app, cx))
                 .into_any_element()
         }

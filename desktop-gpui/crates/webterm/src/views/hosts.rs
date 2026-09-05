@@ -13,6 +13,10 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
+    let card_bg = app.card_bg();
+    let accent_color = app.accent_color();
+    let primary_color = app.primary_color();
+    let primary_fg = rgb(app.current_theme().primary_foreground);
 
     // Extract tags & filter connections
     let all_tags = extract_unique_tags(&app.connections);
@@ -158,13 +162,13 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .px_3()
                                 .py_1p5()
                                 .rounded_lg()
-                                .bg(if is_dark { rgb(0x18181b) } else { rgb(0xffffff) })
+                                .bg(card_bg)
                                 .border_1()
                                 .border_color(border_color)
                                 .text_xs()
                                 .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) }).text_color(text_color))
+                                .hover(move |s| s.bg(accent_color).text_color(text_color))
                                 .child(
                                     svg()
                                         .data(ARROW_DOWN_SVG)
@@ -186,13 +190,13 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .px_3()
                                 .py_1p5()
                                 .rounded_lg()
-                                .bg(if is_dark { rgb(0x18181b) } else { rgb(0xffffff) })
+                                .bg(card_bg)
                                 .border_1()
                                 .border_color(border_color)
                                 .text_xs()
                                 .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) }).text_color(text_color))
+                                .hover(move |s| s.bg(accent_color).text_color(text_color))
                                 .child(
                                     svg()
                                         .data(ARROW_UP_SVG)
@@ -204,7 +208,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                     this.open_import_modal(cx);
                                 })),
                         )
-                        // + New Host button (Lilac/Purple pill button with black text)
+                        // + New Host button
                         .child(
                             div()
                                 .flex()
@@ -214,17 +218,17 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .px_3p5()
                                 .py_1p5()
                                 .rounded_lg()
-                                .bg(rgb(0xc084fc))
-                                .hover(|s| s.bg(rgb(0xa855f7)))
+                                .bg(primary_color)
+                                .hover(|s| s.opacity(0.9))
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(0x000000))
+                                .text_color(primary_fg)
                                 .cursor_pointer()
                                 .child(
                                     svg()
                                         .data(PLUS_SVG)
                                         .size(px(13.0))
-                                        .text_color(rgb(0x000000)),
+                                        .text_color(primary_fg),
                                 )
                                 .child("New Host")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
@@ -310,33 +314,29 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                             };
 
                             let card_bg = if is_active {
-                                rgb(0x1a1424) // Dark purple tint
+                                app.accent_color()
                             } else {
-                                rgb(0x18181b) // Dark zinc
+                                app.card_bg()
                             };
 
                             let card_border = if is_active {
-                                rgb(0x581c87) // Purple border
+                                app.primary_color()
                             } else {
                                 border_color
                             };
 
-                            let card_hover_border = if is_active {
-                                rgb(0x7e22ce)
-                            } else {
-                                rgb(0x3f3f46)
-                            };
+                            let card_hover_border = app.primary_color();
 
                             let icon_bg = if is_active {
-                                rgb(0x3b0764)
+                                app.primary_color()
                             } else {
-                                rgb(0x27272a)
+                                app.accent_color()
                             };
 
                             let icon_color = if is_active {
-                                rgb(0xc084fc)
+                                rgb(app.current_theme().primary_foreground)
                             } else {
-                                rgb(0xa1a1aa)
+                                muted_text
                             };
 
                             div()
@@ -408,7 +408,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                             .py_0()
                                                             .rounded_sm()
                                                             .text_xs()
-                                                            .bg(rgb(0x27272a))
+                                                            .bg(app.accent_color())
                                                             .text_color(muted_text)
                                                             .child(tag)
                                                     })),
@@ -430,7 +430,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                 div()
                                                     .size(px(20.0))
                                                     .rounded_full()
-                                                    .bg(rgb(0xc084fc))
+                                                    .bg(app.primary_color())
                                                     .flex()
                                                     .items_center()
                                                     .justify_center()
@@ -438,7 +438,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                         div()
                                                             .text_xs()
                                                             .font_weight(FontWeight::BOLD)
-                                                            .text_color(rgb(0x000000))
+                                                            .text_color(rgb(app.current_theme().primary_foreground))
                                                             .child(conn_sessions.to_string()),
                                                     ),
                                             )
@@ -453,7 +453,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                 .justify_center()
                                                 .size(px(24.0))
                                                 .rounded_md()
-                                                .hover(|s| s.bg(rgb(0x27272a)))
+                                                .hover(move |s| s.bg(accent_color))
                                                 .child(
                                                     svg()
                                                         .data(crate::icons::EDIT_SVG)
@@ -472,7 +472,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                 .justify_center()
                                                 .size(px(24.0))
                                                 .rounded_md()
-                                                .hover(|s| s.bg(rgb(0x27272a)))
+                                                .hover(move |s| s.bg(accent_color))
                                                 .child(
                                                     svg()
                                                         .data(crate::icons::TRASH_SVG)

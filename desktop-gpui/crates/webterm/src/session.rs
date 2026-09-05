@@ -36,14 +36,9 @@ impl TerminalTab {
         title: impl Into<String>,
         session_type: impl Into<String>,
         connection_id: Option<String>,
-        is_dark: bool,
+        palette: ColorPalette,
         cx: &mut App,
     ) -> Self {
-        let palette = if is_dark {
-            ColorPalette::dark_default()
-        } else {
-            ColorPalette::light_default()
-        };
 
         let view = cx.new(|cx| {
             let terminal = Terminal::new(80, 24);

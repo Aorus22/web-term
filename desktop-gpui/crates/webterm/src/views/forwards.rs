@@ -1,19 +1,20 @@
 //! Port Forwarding rules management view: rule cards, toggle, create/edit, and deletion modals.
 
 use gpui::*;
-use gpui_component::{Icon, IconName};
-use webterm_settings::Theme as SettingsTheme;
 use crate::app_state::{AppState, ForwardModalMode};
 
 /// Render the Port Forwarding rules management view.
 pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.theme != SettingsTheme::Light;
-    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let tag_bg = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let hover_bg = if is_dark { rgb(0x323238) } else { rgb(0xf1f5f9) };
+    let is_dark = app.is_dark();
+    let bg_color = app.bg_color();
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
+    let hover_bg = if is_dark { app.accent_color() } else { rgb(0xf1f5f9) };
+    let primary_color = app.primary_color();
+    let primary_fg = rgb(app.current_theme().primary_foreground);
 
     let forwards = app.forwards.clone();
     let count = forwards.len();
@@ -29,7 +30,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
         .flex()
         .flex_col()
         .size_full()
-        .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) })
+        .bg(bg_color)
         .text_color(text_color)
         // Top Toolbar
         .child(
@@ -90,8 +91,8 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .text_xs()
                                 .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(|s| s.bg(tag_bg).text_color(text_color))
-                                .child(Icon::new(IconName::RotateCw).size(px(12.0)))
+                                .hover(move |s| s.bg(tag_bg).text_color(text_color))
+                                .child(svg().data(crate::icons::REFRESH_CW_SVG).size(px(12.0)).text_color(muted_text))
                                 .child(if is_loading { "Loading..." } else { "Refresh" })
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.fetch_forwards(cx);
@@ -107,13 +108,13 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .px_3p5()
                                 .py_1p5()
                                 .rounded_lg()
-                                .bg(rgb(0xc084fc))
-                                .hover(|s| s.bg(rgb(0xa855f7)))
+                                .bg(primary_color)
+                                .hover(|s| s.opacity(0.9))
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(0x000000))
+                                .text_color(primary_fg)
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Plus).size(px(13.0)).text_color(rgb(0x000000)))
+                                .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
                                 .child("Create Forward")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.open_create_forward_modal(cx);
@@ -129,7 +130,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                 .w_full()
                 .overflow_y_scroll()
                 .p_4()
-                .child(if forwards.is_empty() {
+                .child(if count == 0 {
                     div()
                         .flex()
                         .flex_col()
@@ -145,7 +146,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                             div()
                                 .size(px(48.0))
                                 .rounded_full()
-                                .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) })
+                                .bg(tag_bg)
                                 .flex()
                                 .items_center()
                                 .justify_center()
@@ -177,13 +178,13 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .px_4()
                                 .py_2()
                                 .rounded_lg()
-                                .bg(rgb(0xc084fc))
-                                .hover(|s| s.bg(rgb(0xa855f7)))
+                                .bg(primary_color)
+                                .hover(|s| s.opacity(0.9))
                                 .cursor_pointer()
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(0x000000))
-                                .child(Icon::new(IconName::Plus).size(px(13.0)).text_color(rgb(0x000000)))
+                                .text_color(primary_fg)
+                                .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
                                 .child("Create First Forward")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.open_create_forward_modal(cx);
@@ -455,13 +456,15 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
 
 /// Render Create / Edit Port Forward modal dialog overlay.
 pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.theme != SettingsTheme::Light;
-    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let input_bg = if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) };
-    let tag_bg = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
+    let is_dark = app.is_dark();
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let input_bg = app.bg_color();
+    let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
+    let primary_color = app.primary_color();
+    let primary_fg = rgb(app.current_theme().primary_foreground);
 
     let form = match &app.forward_modal {
         Some(f) => f.clone(),
@@ -865,35 +868,35 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                     this.close_forward_modal(cx);
                                 })),
                         )
-                        .child(
-                            div()
-                                .px_4()
-                                .py_2()
-                                .rounded_md()
-                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x0ea5e9) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
-                                .cursor_pointer()
-                                .text_sm()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(rgb(0xffffff))
-                                .child(if is_edit { "Save Changes" } else { "Create Forward" })
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.save_forward_form(cx);
-                                })),
+                                .child(
+                                    div()
+                                        .px_4()
+                                        .py_2()
+                                        .rounded_md()
+                                        .bg(primary_color)
+                                        .hover(|s| s.opacity(0.9))
+                                        .cursor_pointer()
+                                        .text_sm()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(primary_fg)
+                                        .child(if is_edit { "Save Changes" } else { "Create Forward" })
+                                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                            this.save_forward_form(cx);
+                                        })),
+                                ),
                         ),
-                ),
-        )
-        .into_any_element()
-}
+                )
+                .into_any_element()
+        }
 
-/// Render Delete Confirmation modal dialog overlay.
-pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.theme != SettingsTheme::Light;
-    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let tag_bg = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
+        /// Render Delete Confirmation modal dialog overlay.
+        pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
+            let is_dark = app.is_dark();
+            let card_bg = app.card_bg();
+            let border_color = app.border_color();
+            let text_color = app.text_color();
+            let muted_text = app.muted_text();
+            let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
 
     let target = match &app.delete_forward_target {
         Some(t) => t.clone(),

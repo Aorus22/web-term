@@ -7,13 +7,13 @@ use crate::session::SessionStatus;
 
 /// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, draggable titlebar area, and custom window controls.
 pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl IntoElement {
-    let is_dark = app.is_dark();
     let active_index = app.session_manager.active_index();
     let border_color = app.border_color();
     let bar_bg = app.bg_color();
     let muted_text = app.muted_text();
 
     let tabs_len = app.session_manager.tab_count();
+    let hover_bg = app.accent_color();
 
     div()
         .flex()
@@ -36,7 +36,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .size(px(28.0))
                 .rounded_md()
                 .cursor_pointer()
-                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                .hover(|s| s.bg(hover_bg))
                 .child(
                     svg()
                         .data(PANEL_LEFT_SVG)
@@ -93,7 +93,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .hover(|s| s.bg(if is_active {
                     tab_bg
                 } else {
-                    if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
+                    hover_bg
                 }))
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                     this.show_hosts_catalog = false;
@@ -123,7 +123,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .justify_center()
                         .size(px(16.0))
                         .rounded_sm()
-                        .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
+                        .hover(|s| s.bg(border_color))
                         .child(
                             svg()
                                 .data(X_SVG)
@@ -144,7 +144,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .size(px(28.0))
                 .rounded_md()
                 .cursor_pointer()
-                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                .hover(|s| s.bg(hover_bg))
                 .child(
                     svg()
                         .data(PLUS_SVG)
@@ -178,7 +178,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .w(px(44.0))
                         .h_full()
                         .cursor_pointer()
-                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                        .hover(|s| s.bg(hover_bg))
                         .child(
                             svg()
                                 .data(MINIMIZE_SVG)
@@ -198,7 +198,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .w(px(44.0))
                         .h_full()
                         .cursor_pointer()
-                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                        .hover(|s| s.bg(hover_bg))
                         .child(
                             svg()
                                 .data(MAXIMIZE_SVG)

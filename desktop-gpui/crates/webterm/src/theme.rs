@@ -820,3 +820,94 @@ pub fn toggle_theme(current: SettingsTheme) -> SettingsTheme {
         SettingsTheme::Dark | SettingsTheme::System => SettingsTheme::Light,
     }
 }
+
+/// Derive a full terminal ColorPalette for the given theme preset.
+pub fn terminal_palette_for_preset(preset: &ThemePreset) -> webterm_terminal::ColorPalette {
+    let fg = preset.foreground;
+    let bg = preset.background;
+    let cursor = preset.primary;
+    let selection = preset.primary;
+
+    let ansi = match preset.id {
+        "dracula-dark" => [
+            0x21222c, 0xff5555, 0x50fa7b, 0xf1fa8c, 0xbd93f9, 0xff79c6, 0x8be9fd, 0xf8f8f2,
+            0x6272a4, 0xff6e6e, 0x69ff94, 0xffffa5, 0xd6acff, 0xff92df, 0xa4ffff, 0xffffff,
+        ],
+        "monokai-dark" => [
+            0x272822, 0xf92672, 0xa6e22e, 0xf4bf75, 0x66d9ef, 0xae81ff, 0xa1efe4, 0xf8f8f2,
+            0x75715e, 0xf92672, 0xa6e22e, 0xf4bf75, 0x66d9ef, 0xae81ff, 0xa1efe4, 0xf9f8f5,
+        ],
+        "tokyo-night-dark" => [
+            0x15161e, 0xf7768e, 0x9ece6a, 0xe0af68, 0x7aa2f7, 0xbb9af7, 0x7dcfff, 0xa9b1d6,
+            0x414868, 0xf7768e, 0x9ece6a, 0xe0af68, 0x7aa2f7, 0xbb9af7, 0x7dcfff, 0xc0caf5,
+        ],
+        "nord-dark" => [
+            0x3b4252, 0xbf616a, 0xa3be8c, 0xebcb8b, 0x81a1c1, 0xb48ead, 0x88c0d0, 0xe5e9f0,
+            0x4c566a, 0xbf616a, 0xa3be8c, 0xebcb8b, 0x81a1c1, 0xb48ead, 0x8fbcbb, 0xeceff4,
+        ],
+        "nord-light" => [
+            0xe5e9f0, 0xbf616a, 0xa3be8c, 0xebcb8b, 0x81a1c1, 0xb48ead, 0x88c0d0, 0x3b4252,
+            0x4c566a, 0xbf616a, 0xa3be8c, 0xebcb8b, 0x81a1c1, 0xb48ead, 0x8fbcbb, 0x2e3440,
+        ],
+        "gruvbox-dark" => [
+            0x282828, 0xcc241d, 0x98971a, 0xd79921, 0x458588, 0xb16286, 0x689d6a, 0xa89984,
+            0x928374, 0xfb4934, 0xb8bb26, 0xfabd2f, 0x83a598, 0xd3869b, 0x8ec07c, 0xebdbb2,
+        ],
+        "gruvbox-light" => [
+            0xfbf1c7, 0xcc241d, 0x98971a, 0xd79921, 0x458588, 0xb16286, 0x689d6a, 0x7c6f64,
+            0x928374, 0x9d0006, 0x79740e, 0xb57614, 0x076678, 0x8f3f71, 0x427b58, 0x3c3836,
+        ],
+        "catppuccin-dark" => [
+            0x45475a, 0xf38ba8, 0xa6e3a1, 0xf9e2af, 0x89b4fa, 0xf5c2e7, 0x94e2d5, 0xbac2de,
+            0x585b70, 0xf38ba8, 0xa6e3a1, 0xf9e2af, 0x89b4fa, 0xf5c2e7, 0x94e2d5, 0xa6adc8,
+        ],
+        "one-dark" => [
+            0x282c34, 0xe06c75, 0x98c379, 0xe5c07b, 0x61afef, 0xc678dd, 0x56b6c2, 0xabb2bf,
+            0x5c6370, 0xe06c75, 0x98c379, 0xe5c07b, 0x61afef, 0xc678dd, 0x56b6c2, 0xffffff,
+        ],
+        "github-dark" => [
+            0x24292e, 0xea4a5a, 0x34d058, 0xffea7f, 0x2188ff, 0xb392f0, 0x39c5bb, 0xd1d5da,
+            0x6a737d, 0xf97583, 0x85e89d, 0xffea7f, 0x79b8ff, 0xb392f0, 0x56d4dd, 0xfafbfc,
+        ],
+        "github-light" => [
+            0x24292e, 0xd73a49, 0x28a745, 0xdbab09, 0x0366d6, 0x5a32a3, 0x0598bc, 0x6a737d,
+            0x959da5, 0xcb2431, 0x22863a, 0xb08800, 0x005cc5, 0x4c2889, 0x005cc5, 0x24292e,
+        ],
+        "solarized-dark" => [
+            0x073642, 0xdc322f, 0x859900, 0xb58900, 0x268bd2, 0xd33682, 0x2aa198, 0xeee8d5,
+            0x586e75, 0xcb4b16, 0x586e75, 0x657b83, 0x839496, 0x6c71c4, 0x93a1a1, 0xfdf6e3,
+        ],
+        "solarized-light" => [
+            0xeee8d5, 0xdc322f, 0x859900, 0xb58900, 0x268bd2, 0xd33682, 0x2aa198, 0x073642,
+            0x93a1a1, 0xcb4b16, 0x93a1a1, 0x839496, 0x657b83, 0x6c71c4, 0x586e75, 0x002b36,
+        ],
+        _ => {
+            let red = preset.destructive;
+            let green = if preset.is_dark { 0x22c55e } else { 0x16a34a };
+            let yellow = if preset.is_dark { 0xeab308 } else { 0xca8a04 };
+            let blue = preset.primary;
+            let magenta = preset.accent;
+            let cyan = if preset.is_dark { 0x06b6d4 } else { 0x0891b2 };
+            [
+                bg,
+                red,
+                green,
+                yellow,
+                blue,
+                magenta,
+                cyan,
+                fg,
+                preset.muted_foreground,
+                red,
+                0x4ade80,
+                0xfacc15,
+                blue,
+                magenta,
+                0x22d3ee,
+                fg,
+            ]
+        }
+    };
+
+    webterm_terminal::ColorPalette::from_rgb_u32(fg, bg, cursor, selection, ansi)
+}

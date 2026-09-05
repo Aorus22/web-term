@@ -2,7 +2,6 @@
 
 use gpui::*;
 use webterm_backend_client::SftpFileInfo;
-use webterm_settings::Theme as SettingsTheme;
 
 use crate::app_state::{
     format_file_size, join_path, split_breadcrumbs, AppState, SftpActivePane,
@@ -37,11 +36,14 @@ impl Render for SftpDragPreview {
 
 /// Renders the complete dual-pane SFTP file manager view.
 pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.theme != SettingsTheme::Light;
-    let bg_color = if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let is_dark = app.is_dark();
+    let bg_color = app.bg_color();
+    let _card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let primary_color = app.primary_color();
+    let primary_fg = rgb(app.current_theme().primary_foreground);
 
     let focus_handle = app
         .sftp_manager
@@ -188,14 +190,14 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 .px_3()
                                 .py_2()
                                 .rounded_md()
-                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                .bg(primary_color)
+                                .hover(|s| s.opacity(0.9))
                                 .cursor_pointer()
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(0xffffff))
+                                .text_color(primary_fg)
                                 .child("Transfer")
-                                .child(svg().data(crate::icons::ARROW_RIGHT_SVG).size(px(12.0)).text_color(rgb(0xffffff)))
+                                .child(svg().data(crate::icons::ARROW_RIGHT_SVG).size(px(12.0)).text_color(primary_fg))
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.sftp_transfer_selected(SftpActivePane::Left, cx);
                                 })),
@@ -209,13 +211,13 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 .px_3()
                                 .py_2()
                                 .rounded_md()
-                                .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x0369a1) } else { rgb(0x0284c7) }))
+                                .bg(primary_color)
+                                .hover(|s| s.opacity(0.9))
                                 .cursor_pointer()
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(0xffffff))
-                                .child(svg().data(crate::icons::ARROW_LEFT_SVG).size(px(12.0)).text_color(rgb(0xffffff)))
+                                .text_color(primary_fg)
+                                .child(svg().data(crate::icons::ARROW_LEFT_SVG).size(px(12.0)).text_color(primary_fg))
                                 .child("Transfer")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.sftp_transfer_selected(SftpActivePane::Right, cx);
@@ -248,13 +250,13 @@ fn render_pane(
     let state = app.sftp_pane(pane);
     let is_focused = app.sftp_manager.focused_pane == pane;
 
-    let card_bg = if is_dark { rgb(0x1e1e24) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let header_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let header_bg = app.card_bg();
     let focus_indicator = if is_focused {
-        if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+        app.primary_color()
     } else {
         border_color
     };
@@ -383,7 +385,7 @@ fn render_pane(
                 .py_1p5()
                 .border_b_1()
                 .border_color(border_color)
-                .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) })
+                .bg(app.bg_color())
                 .child(
                     div()
                         .flex()
@@ -633,7 +635,7 @@ fn render_pane(
                 ),
         )
         // Table Header: Name, Size, Modified
-        .child(render_table_header(state.sort_column, state.sort_order, pane, is_dark, cx))
+        .child(render_table_header(app, state.sort_column, state.sort_order, pane, cx))
         // File Listing or Status State
         .child(
             div()
@@ -723,16 +725,16 @@ fn render_pane(
 
 /// Render table header row with clickable sort columns.
 fn render_table_header(
+    app: &AppState,
     sort_column: SftpSortColumn,
     sort_order: SftpSortOrder,
     pane: SftpActivePane,
-    is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let header_bg = if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let header_bg = app.bg_color();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
 
     let is_asc = matches!(sort_order, SftpSortOrder::Ascending);
 
