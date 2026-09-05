@@ -1,19 +1,18 @@
-//! Terminal Tab Strip UI component.
+//! Terminal Tab Strip UI component: frameless header with sidebar toggle, active session tabs, and new tab button.
 
 use gpui::*;
 use gpui_component::{Icon, IconName};
 use webterm_settings::Theme as SettingsTheme;
-use crate::app_state::AppState;
+use crate::app_state::{AppState, View};
 use crate::session::SessionStatus;
 
-/// Renders the horizontal tab strip for open terminal sessions.
+/// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, and new tab button.
 pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl IntoElement {
     let is_dark = app.theme != SettingsTheme::Light;
     let active_index = app.session_manager.active_index();
-    let border_color = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
-    let bar_bg = if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) };
+    let border_color = if is_dark { rgb(0x1e1e24) } else { rgb(0xe2e8f0) };
+    let bar_bg = if is_dark { rgb(0x09090b) } else { rgb(0xf8fafc) };
     let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let active_color = if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) };
 
     let tabs_len = app.session_manager.tab_count();
 
@@ -22,67 +21,34 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
         .flex_row()
         .items_center()
         .w_full()
-        .h(px(38.0))
+        .h(px(40.0))
         .bg(bar_bg)
         .border_b_1()
         .border_color(border_color)
-        .px_2()
-        .gap_1()
-        // Persistent Hosts Catalog Tab
-        .child({
-            let is_active = app.show_hosts_catalog;
-            let tab_bg = if is_active {
-                if is_dark { rgb(0x27272a) } else { rgb(0xffffff) }
-            } else {
-                if is_dark { rgb(0x1e1e24) } else { rgb(0xf1f5f9) }
-            };
-            let text_color = if is_active {
-                if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) }
-            } else {
-                muted_text
-            };
-
+        .px_3()
+        .gap_2()
+        // Left: Sidebar Toggle Button (PanelLeft)
+        .child(
             div()
                 .flex()
-                .flex_row()
                 .items_center()
-                .h(px(30.0))
-                .px_3()
-                .gap_2()
-                .rounded_t_md()
-                .bg(tab_bg)
-                .border_t_2()
-                .border_color(if is_active {
-                    active_color
-                } else {
-                    rgba(0x00000000)
-                })
+                .justify_center()
+                .size(px(28.0))
+                .rounded_md()
                 .cursor_pointer()
-                .hover(|s| s.bg(if is_active {
-                    tab_bg
-                } else {
-                    if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
-                }))
+                .hover(|s| s.bg(if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }))
+                .child(
+                    Icon::new(IconName::PanelLeft)
+                        .size(px(16.0))
+                        .text_color(muted_text),
+                )
                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                    this.show_hosts_catalog = true;
-                    cx.notify();
-                }))
-                .child(
-                    Icon::new(IconName::HardDrive)
-                        .size(px(13.0))
-                        .text_color(if is_active { active_color } else { muted_text })
-                )
-                .child(
-                    div()
-                        .text_xs()
-                        .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-                        .text_color(text_color)
-                        .child("Hosts"),
-                )
-        })
+                    this.toggle_sidebar(cx);
+                })),
+        )
         // Tabs container
         .children((0..tabs_len).map(|idx| {
-            let is_active = !app.show_hosts_catalog && idx == active_index;
+            let is_active = !app.show_hosts_catalog && app.active_view == View::Hosts && idx == active_index;
             let tab = &app.session_manager.tabs()[idx];
             let title = tab.title.clone();
             let status = tab.status.clone();
@@ -94,9 +60,15 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
             };
 
             let tab_bg = if is_active {
-                if is_dark { rgb(0x27272a) } else { rgb(0xffffff) }
+                if is_dark { rgb(0x18181b) } else { rgb(0xffffff) }
             } else {
-                if is_dark { rgb(0x1e1e24) } else { rgb(0xf1f5f9) }
+                rgba(0x00000000)
+            };
+
+            let tab_border = if is_active {
+                if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
+            } else {
+                rgba(0x00000000)
             };
 
             let text_color = if is_active {
@@ -109,25 +81,22 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .flex()
                 .flex_row()
                 .items_center()
-                .h(px(30.0))
-                .px_3()
+                .h(px(28.0))
+                .px_2p5()
                 .gap_2()
-                .rounded_t_md()
+                .rounded_md()
                 .bg(tab_bg)
-                .border_t_2()
-                .border_color(if is_active {
-                    active_color
-                } else {
-                    rgba(0x00000000)
-                })
+                .border_1()
+                .border_color(tab_border)
                 .cursor_pointer()
                 .hover(|s| s.bg(if is_active {
                     tab_bg
                 } else {
-                    if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
+                    if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }
                 }))
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                     this.show_hosts_catalog = false;
+                    this.active_view = View::Hosts;
                     this.switch_tab(idx, cx);
                 }))
                 // Status dot
@@ -136,12 +105,6 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .size(px(6.0))
                         .rounded_full()
                         .bg(dot_color),
-                )
-                // Terminal icon
-                .child(
-                    Icon::new(IconName::SquareTerminal)
-                        .size(px(13.0))
-                        .text_color(if is_active { active_color } else { muted_text })
                 )
                 // Tab title
                 .child(
@@ -159,10 +122,10 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .justify_center()
                         .size(px(16.0))
                         .rounded_sm()
-                        .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
+                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xcbd5e1) }))
                         .child(
                             Icon::new(IconName::Close)
-                                .size(px(11.0))
+                                .size(px(10.0))
                                 .text_color(if is_dark { rgb(0x71717a) } else { rgb(0x94a3b8) })
                         )
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
@@ -176,15 +139,14 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .flex()
                 .items_center()
                 .justify_center()
-                .size(px(24.0))
+                .size(px(28.0))
                 .rounded_md()
-                .bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) })
-                .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
                 .cursor_pointer()
+                .hover(|s| s.bg(if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }))
                 .child(
                     Icon::new(IconName::Plus)
-                        .size(px(13.0))
-                        .text_color(muted_text)
+                        .size(px(14.0))
+                        .text_color(muted_text),
                 )
                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                     this.toggle_new_tab_modal(cx);

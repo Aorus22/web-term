@@ -646,6 +646,7 @@ pub struct AppState {
     pub delete_forward_target: Option<PortForward>,
     pub terminal_font_size: f32,
     pub backend_path_input: String,
+    pub sidebar_open: bool,
 }
 
 impl AppState {
@@ -697,6 +698,7 @@ impl AppState {
             delete_forward_target: None,
             terminal_font_size: 14.0,
             backend_path_input,
+            sidebar_open: true,
         }
     }
 
@@ -1016,6 +1018,12 @@ impl AppState {
             }
         })
         .detach();
+    }
+
+    /// Toggle left navigation sidebar visibility.
+    pub fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
+        self.sidebar_open = !self.sidebar_open;
+        cx.notify();
     }
 
     /// Set search filter query.
@@ -1682,6 +1690,7 @@ impl AppState {
         let connect_req = WsConnectRequest::for_local_with_cwd(80, 24, cwd);
         tab.last_connect_req = Some(connect_req.clone());
         self.show_hosts_catalog = false;
+        self.active_view = View::Hosts;
         self.session_manager.add_tab(tab);
         cx.notify();
 
@@ -1756,6 +1765,7 @@ impl AppState {
         );
         tab.last_connect_req = Some(req.clone());
         self.show_hosts_catalog = false;
+        self.active_view = View::Hosts;
         self.session_manager.add_tab(tab);
         cx.notify();
 

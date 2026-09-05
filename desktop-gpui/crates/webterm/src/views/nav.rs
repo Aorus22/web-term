@@ -18,21 +18,20 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let active_view = app.active_view;
     let current_theme = app.theme;
 
-    // Sidebar items with modern icons
+    // Sidebar items matching web client
     let items = [
         (View::Hosts, "Hosts", IconName::HardDrive),
         (View::Keys, "SSH Keys", IconName::CircleUser),
         (View::Forwards, "Port Forwards", IconName::Network),
-        (View::Sftp, "Files", IconName::Folder),
-        (View::Settings, "Settings", IconName::Settings),
+        (View::Sftp, "SFTP", IconName::Folder),
     ];
 
     let is_dark = current_theme != SettingsTheme::Light;
-    let bg_color = if is_dark { rgb(0x121214) } else { rgb(0xf8fafc) };
-    let sidebar_bg = if is_dark { rgb(0x18181b) } else { rgb(0xffffff) };
+    let bg_color = if is_dark { rgb(0x09090b) } else { rgb(0xf8fafc) };
+    let sidebar_bg = if is_dark { rgb(0x09090b) } else { rgb(0xffffff) };
     let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let border_color = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
+    let _muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let border_color = if is_dark { rgb(0x1e1e24) } else { rgb(0xe2e8f0) };
 
     let show_modal = app.show_new_tab_modal;
     let content_pane = render_content_pane(app, active_view, is_dark, cx);
@@ -159,164 +158,163 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .on_action(cx.listener(|this, _: &JumpTab9, _window, cx| {
             this.jump_to_tab(8, cx);
         }))
-        // Left Sidebar
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .w(px(220.0))
-                .h_full()
-                .bg(sidebar_bg)
-                .border_r_1()
-                .border_color(border_color)
-                .p_3()
-                .justify_between()
-                // Top header & items
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        // Brand Header
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_2p5()
-                                .px_2()
-                                .py_2()
-                                .mb_2()
-                                .child(
-                                    div()
-                                        .size(px(28.0))
-                                        .rounded_lg()
-                                        .bg(rgb(0x0284c7))
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .text_color(rgb(0xffffff))
-                                        .child(Icon::new(IconName::SquareTerminal).size(px(16.0))),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .child(
-                                            div()
-                                                .text_sm()
-                                                .font_weight(FontWeight::BOLD)
-                                                .text_color(text_color)
-                                                .child("WebTerm"),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(muted_text)
-                                                .child("Desktop Client"),
-                                        ),
-                                ),
-                        )
-                        // Navigation items
-                        .children(items.into_iter().map(|(view, label, icon)| {
-                            let is_active = active_view == view;
-                            let item_bg = if is_active {
-                                if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
-                            } else {
-                                sidebar_bg
-                            };
-                            let item_hover = if is_dark { rgb(0x202024) } else { rgb(0xf1f5f9) };
-                            let icon_color = if is_active {
-                                if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
-                            } else {
-                                muted_text
-                            };
+        // Left Sidebar (collapsible)
+        .children(if app.sidebar_open {
+            Some(
+                div()
+                    .flex()
+                    .flex_col()
+                    .w(px(200.0))
+                    .h_full()
+                    .bg(sidebar_bg)
+                    .border_r_1()
+                    .border_color(border_color)
+                    .px_3()
+                    .py_4()
+                    .justify_between()
+                    // Top header & items
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            // Brand Header: Clean "WebTerm" matching web client
+                            .child(
+                                div()
+                                    .px_2()
+                                    .py_1()
+                                    .mb_3()
+                                    .child(
+                                        div()
+                                            .text_lg()
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(rgb(0xffffff))
+                                            .child("WebTerm"),
+                                    ),
+                            )
+                            // Navigation items
+                            .children(items.into_iter().map(|(view, label, icon)| {
+                                let is_active = active_view == view && (view != View::Hosts || app.show_hosts_catalog);
+                                let item_bg = if is_active {
+                                    rgb(0x00df9a) // Vibrant mint green
+                                } else {
+                                    sidebar_bg
+                                };
+                                let item_hover = if is_active {
+                                    rgb(0x00df9a)
+                                } else {
+                                    rgb(0x18181b)
+                                };
+                                let item_text_color = if is_active {
+                                    rgb(0x000000) // Black text on mint pill
+                                } else {
+                                    rgb(0xd4d4d8)
+                                };
+                                let icon_color = if is_active {
+                                    rgb(0x000000) // Black icon on mint pill
+                                } else {
+                                    rgb(0xa1a1aa)
+                                };
 
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_2p5()
-                                .px_3()
-                                .py_2()
-                                .rounded_lg()
-                                .bg(item_bg)
-                                .hover(move |s| s.bg(item_hover))
-                                .cursor_pointer()
-                                .child(Icon::new(icon).size(px(16.0)).text_color(icon_color))
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(if is_active {
-                                            FontWeight::SEMIBOLD
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap_3()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_lg()
+                                    .bg(item_bg)
+                                    .hover(move |s| s.bg(item_hover))
+                                    .cursor_pointer()
+                                    .child(Icon::new(icon).size(px(16.0)).text_color(icon_color))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(if is_active {
+                                                FontWeight::BOLD
+                                            } else {
+                                                FontWeight::MEDIUM
+                                            })
+                                            .text_color(item_text_color)
+                                            .child(label),
+                                    )
+                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                        if view == View::Sftp {
+                                            this.navigate_to_sftp(cx);
                                         } else {
-                                            FontWeight::NORMAL
-                                        })
-                                        .text_color(if is_active { text_color } else { muted_text })
-                                        .child(label),
-                                )
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                    if view == View::Sftp {
-                                        this.navigate_to_sftp(cx);
-                                    } else {
-                                        this.active_view = view;
-                                        if view == View::Hosts {
-                                            this.show_hosts_catalog = true;
+                                            this.active_view = view;
+                                            if view == View::Hosts {
+                                                this.show_hosts_catalog = true;
+                                            }
+                                            cx.notify();
                                         }
+                                    }))
+                            })),
+                    )
+                    // Bottom footer: Settings pinned to bottom
+                    .child(
+                        div()
+                            .pt_2()
+                            .border_t_1()
+                            .border_color(border_color)
+                            .child({
+                                let is_active = active_view == View::Settings;
+                                let item_bg = if is_active {
+                                    rgb(0x00df9a)
+                                } else {
+                                    sidebar_bg
+                                };
+                                let item_hover = if is_active {
+                                    rgb(0x00df9a)
+                                } else {
+                                    rgb(0x18181b)
+                                };
+                                let item_text_color = if is_active {
+                                    rgb(0x000000)
+                                } else {
+                                    rgb(0xd4d4d8)
+                                };
+                                let icon_color = if is_active {
+                                    rgb(0x000000)
+                                } else {
+                                    rgb(0xa1a1aa)
+                                };
+
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap_3()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_lg()
+                                    .bg(item_bg)
+                                    .hover(move |s| s.bg(item_hover))
+                                    .cursor_pointer()
+                                    .child(Icon::new(IconName::Settings).size(px(16.0)).text_color(icon_color))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(if is_active {
+                                                FontWeight::BOLD
+                                            } else {
+                                                FontWeight::MEDIUM
+                                            })
+                                            .text_color(item_text_color)
+                                            .child("Settings"),
+                                    )
+                                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                        this.active_view = View::Settings;
+                                        this.show_hosts_catalog = false;
                                         cx.notify();
-                                    }
-                                }))
-                        })),
-                )
-                // Bottom footer: Theme Toggle
-                .child(
-                    div()
-                        .pt_3()
-                        .border_t_1()
-                        .border_color(border_color)
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .justify_between()
-                                .px_3()
-                                .py_2()
-                                .rounded_lg()
-                                .bg(if is_dark { rgb(0x202024) } else { rgb(0xf1f5f9) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
-                                .cursor_pointer()
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_row()
-                                        .items_center()
-                                        .gap_2()
-                                        .child(
-                                            Icon::new(if is_dark { IconName::Moon } else { IconName::Sun })
-                                                .size(px(14.0))
-                                                .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0xf59e0b) }),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .font_weight(FontWeight::MEDIUM)
-                                                .text_color(text_color)
-                                                .child(if is_dark { "Dark Theme" } else { "Light Theme" }),
-                                        ),
-                                )
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(muted_text)
-                                        .child("Switch"),
-                                )
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.toggle_theme(cx);
-                                })),
-                        ),
-                ),
-        )
+                                    }))
+                            }),
+                    ),
+            )
+        } else {
+            None
+        })
         // Main Content Area
         .child(
             div()
@@ -324,7 +322,22 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .flex_col()
                 .flex_1()
                 .h_full()
-                .child(content_pane),
+                .overflow_hidden()
+                // Top Tab Strip across all views
+                .child(render_tab_strip(app, cx))
+                // Reconnection banner (when active tab is reconnecting or disconnected and viewing terminal)
+                .children(if active_view == View::Hosts && !app.show_hosts_catalog {
+                    render_reconnect_banner(app, cx)
+                } else {
+                    None
+                })
+                .child(
+                    div()
+                        .flex_1()
+                        .w_full()
+                        .overflow_hidden()
+                        .child(content_pane),
+                ),
         )
         .children(modal_overlay)
         .children(conn_modal_overlay)
@@ -346,31 +359,18 @@ fn render_content_pane(
     match view {
         View::Hosts => {
             let active_tab_view = app.session_manager.active_tab().and_then(|t| t.view.clone());
+            let host_or_term = if app.show_hosts_catalog || active_tab_view.is_none() {
+                render_hosts_view(app, cx)
+            } else if let Some(term_view) = active_tab_view {
+                div().size_full().child(term_view).into_any_element()
+            } else {
+                render_hosts_view(app, cx)
+            };
+
             div()
-                .flex()
-                .flex_col()
                 .size_full()
                 .overflow_hidden()
-                // Top Tab Strip
-                .child(render_tab_strip(app, cx))
-                // Reconnection banner (when active tab is reconnecting or disconnected)
-                .children(render_reconnect_banner(app, cx))
-                // Active Terminal or Hosts Catalog
-                .child({
-                    let host_or_term = if app.show_hosts_catalog || active_tab_view.is_none() {
-                        render_hosts_view(app, cx)
-                    } else if let Some(term_view) = active_tab_view {
-                        div().size_full().child(term_view).into_any_element()
-                    } else {
-                        render_hosts_view(app, cx)
-                    };
-
-                    div()
-                        .flex_1()
-                        .w_full()
-                        .overflow_hidden()
-                        .child(host_or_term)
-                })
+                .child(host_or_term)
                 .into_any_element()
         }
         View::Keys => {
