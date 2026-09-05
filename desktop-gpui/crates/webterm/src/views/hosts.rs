@@ -339,6 +339,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
 
                                     div()
                                         .flex_1()
+                                        .min_w_0()
                                         .flex()
                                         .flex_row()
                                         .items_center()
@@ -499,7 +500,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 }))
                                 // Spacer cards for last row so cards stay 1/3 width
                                 .children((0..(3 - chunk_len)).map(|_| {
-                                    div().flex_1()
+                                    div().flex_1().min_w_0()
                                 }))
                         }))
                         .into_any_element()

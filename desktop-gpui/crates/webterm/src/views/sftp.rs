@@ -408,6 +408,12 @@ fn render_pane(
         } else {
             None
         })
+        // Path Picker Dropdown (if open) - rendered last to float on top of file rows
+        .children(if state.show_path_picker {
+            Some(render_path_picker_dropdown(app, pane, is_dark, cx))
+        } else {
+            None
+        })
         .into_any_element()
 }
 
@@ -600,8 +606,13 @@ fn render_file_rows(
         let is_dir = file.is_dir;
         let file_name = file.name.clone();
         let file_name_right = file.name.clone();
+        let is_drive_item = is_dir && file.name.len() == 2 && file.name.ends_with(':');
         let target_path = if is_dir {
-            join_path(current_path, &file.name)
+            if (current_path == "/" || current_path.is_empty()) && is_drive_item {
+                format!("{}/", file.name)
+            } else {
+                join_path(current_path, &file.name)
+            }
         } else {
             String::new()
         };
@@ -661,10 +672,17 @@ fn render_file_rows(
                         .gap_2p5()
                         .child(
                             if is_dir {
-                                svg()
-                                    .data(crate::icons::BLUE_FOLDER_SVG)
-                                    .size(px(16.0))
-                                    .text_color(rgb(0x3b82f6))
+                                if is_drive_item {
+                                    svg()
+                                        .data(crate::icons::DRIVE_SVG)
+                                        .size(px(16.0))
+                                        .text_color(rgb(0xf59e0b))
+                                } else {
+                                    svg()
+                                        .data(crate::icons::BLUE_FOLDER_SVG)
+                                        .size(px(16.0))
+                                        .text_color(rgb(0x3b82f6))
+                                }
                             } else {
                                 svg()
                                     .data(crate::icons::FILE_SVG)
@@ -762,51 +780,146 @@ fn render_breadcrumbs_segments(
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let hover_bg = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
+    let active_trigger_bg = if is_dark { rgb(0x9a3412) } else { rgb(0xfef3c7) };
+    let active_trigger_text = if is_dark { rgb(0xffedd5) } else { rgb(0x9a3412) };
 
     let segments = split_breadcrumbs(path);
     let mut elements = Vec::new();
 
     let is_windows_local = state.source_id == "local" && path.len() >= 2 && path.chars().nth(1) == Some(':');
+    let max_segments = 4;
+    let tail_count = 2;
+    let collapsed = segments.len() > max_segments;
 
-    for (idx, (seg_name, target_path)) in segments.into_iter().enumerate() {
-        let is_first = idx == 0;
-        let nav_path = target_path.clone();
+    let sep = || {
+        div()
+            .text_xs()
+            .text_color(rgb(0x71717a))
+            .px_0p5()
+            .child("›")
+            .into_any_element()
+    };
 
-        if !is_first {
-            // Separator: subtle chevron
-            elements.push(
-                div()
-                    .text_xs()
-                    .text_color(rgb(0x71717a))
-                    .px_0p5()
-                    .child("›")
-                    .into_any_element(),
-            );
+    if !collapsed {
+        for (idx, (seg_name, target_path)) in segments.into_iter().enumerate() {
+            let is_first = idx == 0;
+            let nav_path = target_path.clone();
+
+            if !is_first {
+                elements.push(sep());
+            }
+
+            if is_first && is_windows_local {
+                let is_open = state.show_drive_picker;
+                elements.push(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1()
+                        .child(svg().data(crate::icons::DRIVE_SVG).size(px(14.0)).text_color(rgb(0xf59e0b)))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_0p5()
+                                .px_1p5()
+                                .py_0p5()
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .bg(if is_open { active_trigger_bg } else { rgba(0x00000000) })
+                                .hover(move |s| if is_open { s } else { s.bg(hover_bg) })
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(if is_open { active_trigger_text } else { text_color })
+                                        .child(seg_name),
+                                )
+                                .child(
+                                    svg()
+                                        .data(crate::icons::CHEVRON_DOWN_SVG)
+                                        .size(px(10.0))
+                                        .text_color(if is_open { active_trigger_text } else { muted_text }),
+                                )
+                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                    this.sftp_toggle_drive_picker(pane, cx);
+                                })),
+                        )
+                        .into_any_element(),
+                );
+            } else {
+                elements.push(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1()
+                        .px_1p5()
+                        .py_0p5()
+                        .rounded_sm()
+                        .hover(|s| s.bg(hover_bg))
+                        .cursor_pointer()
+                        .child(svg().data(crate::icons::BLUE_FOLDER_SVG).size(px(14.0)).text_color(rgb(0x3b82f6)))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(text_color)
+                                .max_w(px(140.0))
+                                .truncate()
+                                .child(seg_name),
+                        )
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                            this.sftp_navigate(pane, nav_path.clone(), cx);
+                        }))
+                        .into_any_element(),
+                );
+            }
         }
-
-        if is_first && is_windows_local {
-            // Amber drive button: [DriveSvg] C: v
+    } else {
+        // Collapsed: head + ... + tail
+        // 1. Head (first segment)
+        let (head_name, head_path) = segments[0].clone();
+        if is_windows_local {
+            let is_open = state.show_drive_picker;
             elements.push(
                 div()
                     .flex()
                     .flex_row()
                     .items_center()
                     .gap_1()
-                    .px_1p5()
-                    .py_0p5()
-                    .rounded_sm()
-                    .hover(|s| s.bg(hover_bg))
-                    .cursor_pointer()
                     .child(svg().data(crate::icons::DRIVE_SVG).size(px(14.0)).text_color(rgb(0xf59e0b)))
-                    .child(div().text_sm().text_color(text_color).child(seg_name))
-                    .child(svg().data(crate::icons::CHEVRON_DOWN_SVG).size(px(10.0)).text_color(muted_text))
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                        this.sftp_toggle_drive_picker(pane, cx);
-                    }))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_0p5()
+                            .px_1p5()
+                            .py_0p5()
+                            .rounded_sm()
+                            .cursor_pointer()
+                            .bg(if is_open { active_trigger_bg } else { rgba(0x00000000) })
+                            .hover(move |s| if is_open { s } else { s.bg(hover_bg) })
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(if is_open { active_trigger_text } else { text_color })
+                                    .child(head_name),
+                            )
+                            .child(
+                                svg()
+                                    .data(crate::icons::CHEVRON_DOWN_SVG)
+                                    .size(px(10.0))
+                                    .text_color(if is_open { active_trigger_text } else { muted_text }),
+                            )
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                this.sftp_toggle_drive_picker(pane, cx);
+                            })),
+                    )
                     .into_any_element(),
             );
         } else {
-            // Directory segment with blue folder icon
             elements.push(
                 div()
                     .flex()
@@ -819,7 +932,74 @@ fn render_breadcrumbs_segments(
                     .hover(|s| s.bg(hover_bg))
                     .cursor_pointer()
                     .child(svg().data(crate::icons::BLUE_FOLDER_SVG).size(px(14.0)).text_color(rgb(0x3b82f6)))
-                    .child(div().text_sm().text_color(text_color).child(seg_name))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(text_color)
+                            .max_w(px(140.0))
+                            .truncate()
+                            .child(head_name),
+                    )
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                        this.sftp_navigate(pane, head_path.clone(), cx);
+                    }))
+                    .into_any_element(),
+            );
+        }
+
+        // 2. Ellipsis button ("...")
+        let is_path_open = state.show_path_picker;
+        elements.push(
+            div()
+                .flex()
+                .items_center()
+                .justify_center()
+                .mx_0p5()
+                .px_1p5()
+                .py_0p5()
+                .rounded_sm()
+                .cursor_pointer()
+                .bg(if is_path_open { active_trigger_bg } else { rgba(0x00000000) })
+                .hover(move |s| if is_path_open { s } else { s.bg(hover_bg) })
+                .child(
+                    div()
+                        .text_xs()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(if is_path_open { active_trigger_text } else { muted_text })
+                        .child("..."),
+                )
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                    this.sftp_toggle_path_picker(pane, cx);
+                }))
+                .into_any_element(),
+        );
+
+        // 3. Tail segments
+        let tail_start = segments.len() - tail_count;
+        for (seg_name, target_path) in &segments[tail_start..] {
+            let nav_path = target_path.clone();
+            let name = seg_name.clone();
+            elements.push(sep());
+            elements.push(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_1()
+                    .px_1p5()
+                    .py_0p5()
+                    .rounded_sm()
+                    .hover(|s| s.bg(hover_bg))
+                    .cursor_pointer()
+                    .child(svg().data(crate::icons::BLUE_FOLDER_SVG).size(px(14.0)).text_color(rgb(0x3b82f6)))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(text_color)
+                            .max_w(px(140.0))
+                            .truncate()
+                            .child(name),
+                    )
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                         this.sftp_navigate(pane, nav_path.clone(), cx);
                     }))
@@ -1162,11 +1342,11 @@ fn render_drive_picker_dropdown(
                 .w(px(160.0))
                 .absolute()
                 .top(px(72.0))
-                .left(px(36.0))
+                .left(px(54.0))
                 .bg(card_bg)
                 .border_1()
                 .border_color(border_color)
-                .rounded_md()
+                .rounded_lg()
                 .shadow_xl()
                 .p_1()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {})
@@ -1179,7 +1359,7 @@ fn render_drive_picker_dropdown(
                         .child("Volumes"),
                 )
                 .children(drives.into_iter().map(|drive| {
-                    let drive_path = format!("{}\\", drive);
+                    let drive_path = format!("{}/", drive);
                     let drive_label = drive.clone();
                     div()
                         .flex()
@@ -1198,6 +1378,83 @@ fn render_drive_picker_dropdown(
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                             this.sftp_pane_mut(pane).show_drive_picker = false;
                             this.sftp_navigate(pane, drive_path.clone(), cx);
+                        }))
+                })),
+        )
+        .into_any_element()
+}
+
+/// Render popover dropdown for collapsed intermediate breadcrumb folders.
+fn render_path_picker_dropdown(
+    app: &AppState,
+    pane: SftpActivePane,
+    is_dark: bool,
+    cx: &mut Context<AppState>,
+) -> AnyElement {
+    let card_bg = if is_dark { rgb(0x18181b) } else { rgb(0xffffff) };
+    let border_color = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
+    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
+    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let hover_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
+
+    let state = app.sftp_pane(pane);
+    let segments = split_breadcrumbs(&state.current_path);
+    let tail_count = 2;
+    let hidden_segments: Vec<(String, String)> = if segments.len() > 4 {
+        segments[1..segments.len() - tail_count].to_vec()
+    } else {
+        Vec::new()
+    };
+
+    div()
+        .absolute()
+        .inset_0()
+        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+            this.sftp_pane_mut(pane).show_path_picker = false;
+            cx.notify();
+        }))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .w(px(200.0))
+                .absolute()
+                .top(px(72.0))
+                .left(px(96.0))
+                .bg(card_bg)
+                .border_1()
+                .border_color(border_color)
+                .rounded_lg()
+                .shadow_xl()
+                .p_1()
+                .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                .child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(muted_text)
+                        .child("Path"),
+                )
+                .children(hidden_segments.into_iter().map(|(name, target_path)| {
+                    let nav_path = target_path.clone();
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2()
+                        .px_2p5()
+                        .py_1p5()
+                        .rounded_sm()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(hover_bg))
+                        .text_xs()
+                        .text_color(text_color)
+                        .child(svg().data(crate::icons::BLUE_FOLDER_SVG).size(px(14.0)).text_color(rgb(0x3b82f6)))
+                        .child(div().truncate().child(name))
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                            this.sftp_pane_mut(pane).show_path_picker = false;
+                            this.sftp_navigate(pane, nav_path.clone(), cx);
                         }))
                 })),
         )

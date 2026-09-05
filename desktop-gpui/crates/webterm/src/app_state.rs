@@ -320,6 +320,7 @@ pub struct SftpPaneState {
     pub show_source_picker: bool,
     pub show_actions_menu: bool,
     pub show_drive_picker: bool,
+    pub show_path_picker: bool,
     pub history: Vec<String>,
     pub history_index: usize,
 }
@@ -342,6 +343,7 @@ impl SftpPaneState {
             show_source_picker: false,
             show_actions_menu: false,
             show_drive_picker: false,
+            show_path_picker: false,
             history: vec![p],
             history_index: 0,
         }
@@ -486,11 +488,36 @@ pub struct SftpManager {
     pub focus_handle: Option<FocusHandle>,
 }
 
+/// Return the default local home directory path for file browsing (e.g. C:/Users/name on Windows).
+pub fn local_home_path() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(profile) = std::env::var("USERPROFILE") {
+            let s = profile.replace('\\', "/");
+            if !s.is_empty() {
+                return s;
+            }
+        }
+        if let (Ok(drive), Ok(path)) = (std::env::var("HOMEDRIVE"), std::env::var("HOMEPATH")) {
+            let s = format!("{}{}", drive, path).replace('\\', "/");
+            if !s.is_empty() {
+                return s;
+            }
+        }
+        "C:/".to_string()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::var("HOME").unwrap_or_else(|_| "/".to_string())
+    }
+}
+
 impl Default for SftpManager {
     fn default() -> Self {
+        let home = local_home_path();
         Self {
-            left_pane: SftpPaneState::new("local", "Local Filesystem", "."),
-            right_pane: SftpPaneState::new("local", "Local Filesystem", "."),
+            left_pane: SftpPaneState::new("local", "Local Filesystem", &home),
+            right_pane: SftpPaneState::new("local", "Local Filesystem", &home),
             focused_pane: SftpActivePane::Left,
             modal: None,
             context_menu: None,
@@ -657,11 +684,15 @@ pub fn format_date_modified(iso: &str) -> String {
 pub fn get_available_drives() -> Vec<String> {
     #[cfg(target_os = "windows")]
     {
+        extern "system" {
+            fn GetLogicalDrives() -> u32;
+        }
+        let mask = unsafe { GetLogicalDrives() };
         let mut drives = Vec::new();
-        for letter in b'A'..=b'Z' {
-            let p = format!("{}:\\", letter as char);
-            if std::path::Path::new(&p).exists() {
-                drives.push(format!("{}:", letter as char));
+        for i in 0..26 {
+            if (mask & (1 << i)) != 0 {
+                let letter = (b'A' + i as u8) as char;
+                drives.push(format!("{}:", letter));
             }
         }
         if drives.is_empty() {
@@ -2503,6 +2534,19 @@ impl AppState {
         if state.show_drive_picker {
             state.show_source_picker = false;
             state.show_actions_menu = false;
+            state.show_path_picker = false;
+        }
+        cx.notify();
+    }
+
+    /// Toggle breadcrumb ellipsis path picker popover for a pane.
+    pub fn sftp_toggle_path_picker(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let state = self.sftp_pane_mut(pane);
+        state.show_path_picker = !state.show_path_picker;
+        if state.show_path_picker {
+            state.show_source_picker = false;
+            state.show_actions_menu = false;
+            state.show_drive_picker = false;
         }
         cx.notify();
     }
@@ -2517,16 +2561,23 @@ impl AppState {
             format!("Host ({})", conn_id)
         };
 
+        let initial_path = if conn_id == "local" || conn_id.is_empty() {
+            local_home_path()
+        } else {
+            ".".to_string()
+        };
+
         let state = self.sftp_pane_mut(pane);
         state.source_id = conn_id;
         state.source_label = label;
-        state.current_path = ".".to_string();
+        state.current_path = initial_path.clone();
         state.selected.clear();
         state.search_query.clear();
         state.show_source_picker = false;
         state.show_actions_menu = false;
         state.show_drive_picker = false;
-        state.history = vec![".".to_string()];
+        state.show_path_picker = false;
+        state.history = vec![initial_path];
         state.history_index = 0;
         self.sftp_load_pane(pane, cx);
     }
@@ -2551,6 +2602,7 @@ impl AppState {
         state.show_source_picker = false;
         state.show_actions_menu = false;
         state.show_drive_picker = false;
+        state.show_path_picker = false;
         self.sftp_load_pane(pane, cx);
     }
 
@@ -2565,6 +2617,7 @@ impl AppState {
             state.show_source_picker = false;
             state.show_actions_menu = false;
             state.show_drive_picker = false;
+            state.show_path_picker = false;
             self.sftp_load_pane(pane, cx);
         }
     }
@@ -2580,6 +2633,7 @@ impl AppState {
             state.show_source_picker = false;
             state.show_actions_menu = false;
             state.show_drive_picker = false;
+            state.show_path_picker = false;
             self.sftp_load_pane(pane, cx);
         }
     }
