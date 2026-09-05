@@ -13,6 +13,10 @@ use webterm_settings::DesktopSettings;
 use webterm_supervisor::SpawnOptions;
 
 fn main() {
+    // 0. Enter Tokio runtime context so all Tokio primitives (timers, channels, reqwest)
+    // work across the main GPUI thread and foreground async tasks.
+    let _tokio_guard = webterm::app_state::TOKIO_RT.enter();
+
     // 1. Headless bootstrap: load settings, ensure encryption key, resolve paths
     let mut settings = DesktopSettings::load().unwrap_or_default();
     let encryption_key = settings.ensure_encryption_key();

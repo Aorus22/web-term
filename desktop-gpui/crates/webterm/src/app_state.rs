@@ -5,8 +5,8 @@ use std::sync::LazyLock;
 use gpui::*;
 use webterm_backend_client::{
     BackendClient, Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
-    ImportResult, PortForward, SftpFileInfo, SftpTransferStatus, SshKey, TerminalWsHandle,
-    UpdateConnectionRequest, UpdateForwardRequest, WsConnectRequest,
+    ImportResult, PortForward, SessionInfo, SftpFileInfo, SftpTransferStatus, SshKey,
+    TerminalWsHandle, UpdateConnectionRequest, UpdateForwardRequest, WsConnectRequest,
 };
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
 use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
@@ -1562,11 +1562,19 @@ impl AppState {
         let is_dark = self.theme != SettingsTheme::Light;
         let view_weak = cx.entity().downgrade();
 
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Vec<SessionInfo>>();
+
+        TOKIO_RT.spawn(async move {
+            let backend_sessions = client.list_sessions().await.unwrap_or_default();
+            let _ = tx.send(backend_sessions);
+        });
+
         cx.spawn(move |_view, cx: &mut AsyncApp| {
             let view_weak = view_weak.clone();
             let cx_handle = cx.clone();
             async move {
-                let backend_sessions = client.list_sessions().await.unwrap_or_default();
+                let backend_sessions = rx.recv().await.unwrap_or_default();
 
                 let mut to_attach: Vec<(String, String, String, Option<String>)> = Vec::new();
 
@@ -1831,28 +1839,35 @@ impl AppState {
         cx: &mut Context<Self>,
     ) {
         let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+        TOKIO_RT.spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(delay_secs as u64)).await;
+            let _ = tx.send(());
+        });
+
         cx.spawn(move |_view, cx: &mut AsyncApp| {
             let view_weak = view_weak.clone();
             let cx_handle = cx.clone();
             async move {
-                tokio::time::sleep(std::time::Duration::from_secs(delay_secs as u64)).await;
-                cx_handle.update(|cx: &mut App| {
-                    if let Some(app) = view_weak.upgrade() {
-                        app.update(cx, |this, cx| {
-                            let should_reconnect = if let Some(tab) =
-                                this.session_manager.tabs().iter().find(|t| t.id == tab_id)
-                            {
-                                matches!(tab.status, SessionStatus::Reconnecting { .. })
-                            } else {
-                                false
-                            };
+                if rx.recv().await.is_some() {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                let should_reconnect = if let Some(tab) =
+                                    this.session_manager.tabs().iter().find(|t| t.id == tab_id)
+                                {
+                                    matches!(tab.status, SessionStatus::Reconnecting { .. })
+                                } else {
+                                    false
+                                };
 
-                            if should_reconnect {
-                                this.reconnect_tab(tab_id, cx);
-                            }
-                        });
-                    }
-                });
+                                if should_reconnect {
+                                    this.reconnect_tab(tab_id, cx);
+                                }
+                            });
+                        }
+                    });
+                }
             }
         }).detach();
     }
