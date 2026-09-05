@@ -51,6 +51,7 @@ fn main() {
             window_bounds: Some(initial_bounds),
             titlebar: Some(TitlebarOptions {
                 title: Some("WebTerm Desktop".into()),
+                appears_transparent: true,
                 ..Default::default()
             }),
             ..Default::default()

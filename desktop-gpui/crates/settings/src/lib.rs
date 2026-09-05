@@ -50,8 +50,12 @@ pub struct SavedSessionTab {
     pub connection_id: Option<String>,
 }
 
+fn default_theme_preset() -> String {
+    "default-dark".to_string()
+}
+
 /// Desktop settings store holding UI preferences and encryption key custody.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DesktopSettings {
     #[serde(default)]
     pub backend_path: Option<PathBuf>,
@@ -59,6 +63,8 @@ pub struct DesktopSettings {
     pub encryption_key: Option<String>,
     #[serde(default)]
     pub theme: Theme,
+    #[serde(default = "default_theme_preset")]
+    pub theme_preset: String,
     #[serde(default)]
     pub window_state: Option<WindowState>,
     #[serde(default)]
@@ -68,6 +74,21 @@ pub struct DesktopSettings {
 
     #[serde(skip)]
     pub custom_base: Option<PathBuf>,
+}
+
+impl Default for DesktopSettings {
+    fn default() -> Self {
+        Self {
+            backend_path: None,
+            encryption_key: None,
+            theme: Theme::Dark,
+            theme_preset: default_theme_preset(),
+            window_state: None,
+            last_backend_url: None,
+            open_sessions: Vec::new(),
+            custom_base: None,
+        }
+    }
 }
 
 impl DesktopSettings {

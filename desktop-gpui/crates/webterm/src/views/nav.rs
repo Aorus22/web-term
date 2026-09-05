@@ -1,7 +1,6 @@
 //! Navigation shell view: left sidebar and main content views.
 
 use gpui::*;
-use webterm_settings::Theme as SettingsTheme;
 use crate::actions::{
     CloseTab, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7, JumpTab8,
     JumpTab9, NewTab, NextTab, PrevTab,
@@ -15,7 +14,6 @@ use crate::views::tab_strip::render_tab_strip;
 /// Render the left navigation sidebar and active content pane.
 pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let active_view = app.active_view;
-    let current_theme = app.theme;
 
     // Sidebar items matching web client (Lucide SVGs)
     let items = [
@@ -25,12 +23,12 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         (View::Sftp, "SFTP", crate::icons::FILES_SVG),
     ];
 
-    let is_dark = current_theme != SettingsTheme::Light;
-    let bg_color = if is_dark { rgb(0x09090b) } else { rgb(0xf8fafc) };
-    let sidebar_bg = if is_dark { rgb(0x09090b) } else { rgb(0xffffff) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let _muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let border_color = if is_dark { rgb(0x1e1e24) } else { rgb(0xe2e8f0) };
+    let is_dark = app.is_dark();
+    let bg_color = app.bg_color();
+    let sidebar_bg = app.bg_color();
+    let text_color = app.text_color();
+    let _muted_text = app.muted_text();
+    let border_color = app.border_color();
 
     let show_modal = app.show_new_tab_modal;
     let content_pane = render_content_pane(app, active_view, is_dark, cx);
@@ -187,32 +185,34 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                         div()
                                             .text_lg()
                                             .font_weight(FontWeight::BOLD)
-                                            .text_color(rgb(0xffffff))
+                                            .text_color(text_color)
                                             .child("WebTerm"),
                                     ),
                             )
                             // Navigation items
                             .children(items.into_iter().map(|(view, label, icon)| {
                                 let is_active = active_view == view && (view != View::Hosts || app.show_hosts_catalog);
+                                let primary_color = app.primary_color();
+                                let primary_fg = rgb(app.current_theme().primary_foreground);
                                 let item_bg = if is_active {
-                                    rgb(0x00df9a) // Vibrant mint green
+                                    primary_color
                                 } else {
                                     sidebar_bg
                                 };
                                 let item_hover = if is_active {
-                                    rgb(0x00df9a)
+                                    primary_color
                                 } else {
-                                    rgb(0x18181b)
+                                    if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }
                                 };
                                 let item_text_color = if is_active {
-                                    rgb(0x000000) // Black text on mint pill
+                                    primary_fg
                                 } else {
-                                    rgb(0xd4d4d8)
+                                    text_color
                                 };
                                 let icon_color = if is_active {
-                                    rgb(0x000000) // Black icon on mint pill
+                                    primary_fg
                                 } else {
-                                    rgb(0xa1a1aa)
+                                    app.muted_text()
                                 };
 
                                 div()
@@ -259,25 +259,27 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                             .border_color(border_color)
                             .child({
                                 let is_active = active_view == View::Settings;
+                                let primary_color = app.primary_color();
+                                let primary_fg = rgb(app.current_theme().primary_foreground);
                                 let item_bg = if is_active {
-                                    rgb(0x00df9a)
+                                    primary_color
                                 } else {
                                     sidebar_bg
                                 };
                                 let item_hover = if is_active {
-                                    rgb(0x00df9a)
+                                    primary_color
                                 } else {
-                                    rgb(0x18181b)
+                                    if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }
                                 };
                                 let item_text_color = if is_active {
-                                    rgb(0x000000)
+                                    primary_fg
                                 } else {
-                                    rgb(0xd4d4d8)
+                                    text_color
                                 };
                                 let icon_color = if is_active {
-                                    rgb(0x000000)
+                                    primary_fg
                                 } else {
-                                    rgb(0xa1a1aa)
+                                    app.muted_text()
                                 };
 
                                 div()

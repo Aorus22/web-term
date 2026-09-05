@@ -702,6 +702,30 @@ impl AppState {
         }
     }
 
+    /// Retrieve the currently active ThemePreset.
+    pub fn current_theme(&self) -> &'static crate::theme::ThemePreset {
+        crate::theme::find_theme_preset(&self.settings.theme_preset)
+    }
+
+    /// Set a new theme preset, synchronize settings, and trigger live redraw.
+    pub fn set_theme_preset(&mut self, preset_id: &str, cx: &mut Context<Self>) {
+        self.settings.theme_preset = preset_id.to_string();
+        let preset = crate::theme::find_theme_preset(preset_id);
+        self.theme = if preset.is_dark { SettingsTheme::Dark } else { SettingsTheme::Light };
+        self.settings.theme = self.theme;
+        let _ = self.settings.save();
+        cx.notify();
+    }
+
+    pub fn bg_color(&self) -> Rgba { self.current_theme().bg() }
+    pub fn card_bg(&self) -> Rgba { self.current_theme().card_bg() }
+    pub fn border_color(&self) -> Rgba { self.current_theme().border() }
+    pub fn text_color(&self) -> Rgba { self.current_theme().fg() }
+    pub fn muted_text(&self) -> Rgba { self.current_theme().muted_fg() }
+    pub fn primary_color(&self) -> Rgba { self.current_theme().primary() }
+    pub fn accent_color(&self) -> Rgba { self.current_theme().accent() }
+    pub fn is_dark(&self) -> bool { self.current_theme().is_dark }
+
     /// Toggle new tab launcher modal.
     pub fn toggle_new_tab_modal(&mut self, cx: &mut Context<Self>) {
         self.show_new_tab_modal = !self.show_new_tab_modal;

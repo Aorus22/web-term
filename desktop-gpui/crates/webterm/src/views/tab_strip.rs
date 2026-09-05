@@ -1,18 +1,17 @@
-//! Terminal Tab Strip UI component: frameless header with sidebar toggle, active session tabs, and new tab button.
+//! Terminal Tab Strip UI component: frameless titlebar with sidebar toggle, active session tabs, new tab button, draggable region, and custom window controls.
 
 use gpui::*;
-use gpui_component::{Icon, IconName};
-use webterm_settings::Theme as SettingsTheme;
 use crate::app_state::{AppState, View};
+use crate::icons::{MINIMIZE_SVG, MAXIMIZE_SVG, PANEL_LEFT_SVG, PLUS_SVG, X_SVG};
 use crate::session::SessionStatus;
 
-/// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, and new tab button.
+/// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, draggable titlebar area, and custom window controls.
 pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl IntoElement {
-    let is_dark = app.theme != SettingsTheme::Light;
+    let is_dark = app.is_dark();
     let active_index = app.session_manager.active_index();
-    let border_color = if is_dark { rgb(0x1e1e24) } else { rgb(0xe2e8f0) };
-    let bar_bg = if is_dark { rgb(0x09090b) } else { rgb(0xf8fafc) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let border_color = app.border_color();
+    let bar_bg = app.bg_color();
+    let muted_text = app.muted_text();
 
     let tabs_len = app.session_manager.tab_count();
 
@@ -25,7 +24,8 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
         .bg(bar_bg)
         .border_b_1()
         .border_color(border_color)
-        .px_3()
+        .pl_2()
+        .pr_0()
         .gap_2()
         // Left: Sidebar Toggle Button (PanelLeft)
         .child(
@@ -36,9 +36,10 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .size(px(28.0))
                 .rounded_md()
                 .cursor_pointer()
-                .hover(|s| s.bg(if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }))
+                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
                 .child(
-                    Icon::new(IconName::PanelLeft)
+                    svg()
+                        .data(PANEL_LEFT_SVG)
                         .size(px(16.0))
                         .text_color(muted_text),
                 )
@@ -60,19 +61,19 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
             };
 
             let tab_bg = if is_active {
-                if is_dark { rgb(0x18181b) } else { rgb(0xffffff) }
+                app.card_bg()
             } else {
                 rgba(0x00000000)
             };
 
             let tab_border = if is_active {
-                if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
+                app.border_color()
             } else {
                 rgba(0x00000000)
             };
 
             let text_color = if is_active {
-                if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) }
+                app.text_color()
             } else {
                 muted_text
             };
@@ -92,7 +93,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .hover(|s| s.bg(if is_active {
                     tab_bg
                 } else {
-                    if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }
+                    if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
                 }))
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                     this.show_hosts_catalog = false;
@@ -122,11 +123,12 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .justify_center()
                         .size(px(16.0))
                         .rounded_sm()
-                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xcbd5e1) }))
+                        .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) }))
                         .child(
-                            Icon::new(IconName::Close)
+                            svg()
+                                .data(X_SVG)
                                 .size(px(10.0))
-                                .text_color(if is_dark { rgb(0x71717a) } else { rgb(0x94a3b8) })
+                                .text_color(muted_text),
                         )
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                             this.close_tab(idx, cx);
@@ -142,14 +144,90 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .size(px(28.0))
                 .rounded_md()
                 .cursor_pointer()
-                .hover(|s| s.bg(if is_dark { rgb(0x18181b) } else { rgb(0xe2e8f0) }))
+                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
                 .child(
-                    Icon::new(IconName::Plus)
+                    svg()
+                        .data(PLUS_SVG)
                         .size(px(14.0))
                         .text_color(muted_text),
                 )
                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                     this.toggle_new_tab_modal(cx);
                 })),
+        )
+        // Center: Draggable Title Bar Area
+        .child(
+            div()
+                .flex_1()
+                .h_full()
+                .window_control_area(WindowControlArea::Drag),
+        )
+        // Right: Custom Window Controls (Minimize, Maximize/Restore, Close)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .h_full()
+                // Minimize Button
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .w(px(44.0))
+                        .h_full()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                        .child(
+                            svg()
+                                .data(MINIMIZE_SVG)
+                                .size(px(12.0))
+                                .text_color(muted_text),
+                        )
+                        .on_mouse_down(MouseButton::Left, |_, window, _| {
+                            window.minimize_window();
+                        }),
+                )
+                // Maximize / Restore Button
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .w(px(44.0))
+                        .h_full()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
+                        .child(
+                            svg()
+                                .data(MAXIMIZE_SVG)
+                                .size(px(12.0))
+                                .text_color(muted_text),
+                        )
+                        .on_mouse_down(MouseButton::Left, |_, window, _| {
+                            window.zoom_window();
+                        }),
+                )
+                // Close Button (Red on hover)
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .w(px(46.0))
+                        .h_full()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(rgb(0xe81123)).text_color(rgb(0xffffff)))
+                        .child(
+                            svg()
+                                .data(X_SVG)
+                                .size(px(13.0))
+                                .text_color(muted_text),
+                        )
+                        .on_mouse_down(MouseButton::Left, |_, window, _| {
+                            window.remove_window();
+                        }),
+                ),
         )
 }

@@ -1,20 +1,18 @@
 //! Hosts Catalog view: connection cards grid, tag filtering, and quick-connect matching web client.
 
 use gpui::*;
-use gpui_component::{Icon, IconName};
 use webterm_backend_client::Connection;
-use webterm_settings::Theme as SettingsTheme;
-
+use crate::icons::{ARROW_DOWN_SVG, ARROW_UP_SVG, PLUS_SVG};
 use crate::app_state::AppState;
 
 /// Renders the host connection catalog view matching fe/src/features/hosts/components/HostsPage.tsx.
 pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.theme != SettingsTheme::Light;
-    let bg_color = if is_dark { rgb(0x09090b) } else { rgb(0xf8fafc) };
-    let toolbar_bg = if is_dark { rgb(0x09090b) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x1e1e24) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let is_dark = app.is_dark();
+    let bg_color = app.bg_color();
+    let toolbar_bg = app.bg_color();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
 
     // Extract tags & filter connections
     let all_tags = extract_unique_tags(&app.connections);
@@ -167,7 +165,12 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .text_color(muted_text)
                                 .cursor_pointer()
                                 .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) }).text_color(text_color))
-                                .child(Icon::new(IconName::ArrowDown).size(px(12.0)))
+                                .child(
+                                    svg()
+                                        .data(ARROW_DOWN_SVG)
+                                        .size(px(12.0))
+                                        .text_color(muted_text),
+                                )
                                 .child("Export")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.export_connections_to_disk(cx);
@@ -190,7 +193,12 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .text_color(muted_text)
                                 .cursor_pointer()
                                 .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) }).text_color(text_color))
-                                .child(Icon::new(IconName::ArrowUp).size(px(12.0)))
+                                .child(
+                                    svg()
+                                        .data(ARROW_UP_SVG)
+                                        .size(px(12.0))
+                                        .text_color(muted_text),
+                                )
                                 .child("Import")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.open_import_modal(cx);
@@ -212,7 +220,12 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .font_weight(FontWeight::BOLD)
                                 .text_color(rgb(0x000000))
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Plus).size(px(13.0)).text_color(rgb(0x000000)))
+                                .child(
+                                    svg()
+                                        .data(PLUS_SVG)
+                                        .size(px(13.0))
+                                        .text_color(rgb(0x000000)),
+                                )
                                 .child("New Host")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.open_create_connection_modal(cx);

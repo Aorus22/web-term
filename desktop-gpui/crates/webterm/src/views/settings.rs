@@ -11,14 +11,14 @@ use crate::app_state::AppState;
 
 /// Render the comprehensive desktop Settings page.
 pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
+    let is_dark = app.is_dark();
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let tag_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
     let current_theme = app.theme;
-    let is_dark = current_theme != SettingsTheme::Light;
-
-    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-    let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
-    let tag_bg = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
+    let active_preset_id = app.settings.theme_preset.clone();
 
     let backend_path_str = app
         .spawn_opts
@@ -300,6 +300,129 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         )
                                         .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                             this.set_theme(SettingsTheme::System, cx);
+                                        })),
+                                ),
+                        )
+                        // Theme Presets Grid (Parity with Web Client)
+                        .child(
+                            div()
+                                .mt_5()
+                                .pt_4()
+                                .border_t_1()
+                                .border_color(border_color)
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .justify_between()
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .font_weight(FontWeight::SEMIBOLD)
+                                                .text_color(text_color)
+                                                .child("Color Presets"),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(muted_text)
+                                                .child("38 Presets from Web Client"),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .mt_3()
+                                        .flex()
+                                        .flex_row()
+                                        .flex_wrap()
+                                        .gap_2p5()
+                                        .children(crate::theme::THEME_PRESETS.iter().map(|preset| {
+                                            let is_active = preset.id == active_preset_id;
+                                            let preset_id = preset.id;
+                                            let p_bg = rgb(preset.background);
+                                            let p_primary = rgb(preset.primary);
+                                            let p_accent = rgb(preset.accent);
+                                            let p_destructive = rgb(preset.destructive);
+                                            let p_fg = rgb(preset.foreground);
+                                            let p_muted_fg = rgb(preset.muted_foreground);
+
+                                            div()
+                                                .w(px(226.0))
+                                                .p_2()
+                                                .rounded_lg()
+                                                .border_2()
+                                                .border_color(if is_active {
+                                                    p_primary
+                                                } else {
+                                                    border_color
+                                                })
+                                                .bg(if is_active {
+                                                    if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) }
+                                                } else {
+                                                    tag_bg
+                                                })
+                                                .cursor_pointer()
+                                                .hover(|s| s.border_color(rgb(0x71717a)))
+                                                // Mini preview swatch box
+                                                .child(
+                                                    div()
+                                                        .h(px(48.0))
+                                                        .w_full()
+                                                        .rounded_md()
+                                                        .p_2()
+                                                        .flex()
+                                                        .flex_col()
+                                                        .justify_between()
+                                                        .bg(p_bg)
+                                                        .child(
+                                                            div()
+                                                                .flex()
+                                                                .flex_row()
+                                                                .gap_1p5()
+                                                                .child(div().size(px(7.0)).rounded_full().bg(p_primary))
+                                                                .child(div().size(px(7.0)).rounded_full().bg(p_accent))
+                                                                .child(div().size(px(7.0)).rounded_full().bg(p_destructive)),
+                                                        )
+                                                        .child(
+                                                            div()
+                                                                .flex()
+                                                                .flex_row()
+                                                                .items_center()
+                                                                .gap_1()
+                                                                .child(div().w(px(60.0)).h(px(3.0)).rounded_sm().bg(p_fg))
+                                                                .child(div().w(px(30.0)).h(px(3.0)).rounded_sm().bg(p_muted_fg)),
+                                                        ),
+                                                )
+                                                // Theme Label & Active Checkmark
+                                                .child(
+                                                    div()
+                                                        .mt_1p5()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .justify_between()
+                                                        .child(
+                                                            div()
+                                                                .text_xs()
+                                                                .font_weight(FontWeight::MEDIUM)
+                                                                .text_color(if is_active { text_color } else { muted_text })
+                                                                .child(preset.label),
+                                                        )
+                                                        .children(if is_active {
+                                                            Some(
+                                                                svg()
+                                                                    .data(crate::icons::CHECK_SVG)
+                                                                    .size(px(13.0))
+                                                                    .text_color(p_primary),
+                                                            )
+                                                        } else {
+                                                            None
+                                                        }),
+                                                )
+                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                    this.set_theme_preset(preset_id, cx);
+                                                }))
                                         })),
                                 ),
                         ),
