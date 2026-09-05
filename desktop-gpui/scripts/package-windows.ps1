@@ -1,8 +1,15 @@
+param(
+    [switch]$Release
+)
+
+$Profile = if ($Release) { "release" } else { "debug" }
+$CargoArgs = if ($Release) { @("build", "--release") } else { @("build") }
+
 # WebTerm Desktop Packaging Script for Windows
 $ErrorActionPreference = "Stop"
 
 Write-Host "=======================================================" -ForegroundColor Cyan
-Write-Host "Building WebTerm Desktop Distribution Bundle (Windows)" -ForegroundColor Cyan
+Write-Host "Building WebTerm Desktop Distribution Bundle ($Profile)" -ForegroundColor Cyan
 Write-Host "=======================================================" -ForegroundColor Cyan
 
 $Root = Resolve-Path "$PSScriptRoot\..\.."
@@ -20,7 +27,7 @@ try {
     Pop-Location
 }
 
-# Ensure shader compiler is available for GPUI release build
+# Ensure shader compiler is available for GPUI build
 $FxcTool = "$Root\desktop-gpui\tools\fxc\fxc.exe"
 if ([string]::IsNullOrEmpty($env:GPUI_FXC_PATH) -or -not (Test-Path $env:GPUI_FXC_PATH -ErrorAction SilentlyContinue)) {
     if (-not (Test-Path $FxcTool)) {
@@ -30,13 +37,17 @@ if ([string]::IsNullOrEmpty($env:GPUI_FXC_PATH) -or -not (Test-Path $env:GPUI_FX
     $env:GPUI_FXC_PATH = $FxcTool
 }
 
-Write-Host "[2/3] Compiling GPUI desktop client in release mode..." -ForegroundColor Yellow
-cargo build --release --manifest-path "$Root\desktop-gpui\Cargo.toml" --package webterm
+Write-Host "[2/3] Compiling GPUI desktop client in $Profile mode..." -ForegroundColor Yellow
+if ($Release) {
+    cargo build --release --manifest-path "$Root\desktop-gpui\Cargo.toml" --package webterm
+} else {
+    cargo build --manifest-path "$Root\desktop-gpui\Cargo.toml" --package webterm
+}
 
 Write-Host "[3/3] Assembling distribution bundle..." -ForegroundColor Yellow
 Stop-Process -Name webterm, backend -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 200
-Copy-Item "$Root\desktop-gpui\target\release\webterm.exe" "$DistDir\webterm.exe" -Force
+Copy-Item "$Root\desktop-gpui\target\$Profile\webterm.exe" "$DistDir\webterm.exe" -Force
 
 if (Test-Path "$Root\desktop-gpui\crates\webterm\assets") {
     Copy-Item "$Root\desktop-gpui\crates\webterm\assets\*" "$DistDir\assets" -Recurse -Force

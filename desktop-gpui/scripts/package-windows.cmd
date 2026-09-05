@@ -1,8 +1,19 @@
 @echo off
 setlocal enabledelayedexpansion
 
+set "PROFILE=debug"
+set "CARGO_RELEASE="
+if /i "%1"=="--release" (
+    set "PROFILE=release"
+    set "CARGO_RELEASE=--release"
+)
+if /i "%1"=="/release" (
+    set "PROFILE=release"
+    set "CARGO_RELEASE=--release"
+)
+
 echo =======================================================
-echo Building WebTerm Desktop Distribution Bundle (Windows)
+echo Building WebTerm Desktop Distribution Bundle (%PROFILE%)
 echo =======================================================
 
 cd /d "%~dp0\..\.."
@@ -21,7 +32,7 @@ if errorlevel 1 (
 )
 cd ..
 
-rem Ensure shader compiler is available for GPUI release build
+rem Ensure shader compiler is available for GPUI build
 set "FXC_TOOL=%CD%\desktop-gpui\tools\fxc\fxc.exe"
 if not defined GPUI_FXC_PATH (
     if not exist "!FXC_TOOL!" (
@@ -31,15 +42,15 @@ if not defined GPUI_FXC_PATH (
     set "GPUI_FXC_PATH=!FXC_TOOL!"
 )
 
-echo [2/3] Compiling GPUI desktop client in release mode...
-cargo build --release --manifest-path desktop-gpui/Cargo.toml --package webterm
+echo [2/3] Compiling GPUI desktop client in %PROFILE% mode...
+cargo build %CARGO_RELEASE% --manifest-path desktop-gpui/Cargo.toml --package webterm
 if errorlevel 1 (
     echo [ERROR] Failed to compile GPUI desktop client.
     exit /b 1
 )
 
 echo [3/3] Assembling distribution bundle...
-copy /Y "desktop-gpui\target\release\webterm.exe" "%DIST_DIR%\webterm.exe" >nul
+copy /Y "desktop-gpui\target\%PROFILE%\webterm.exe" "%DIST_DIR%\webterm.exe" >nul
 if exist "desktop-gpui\crates\webterm\assets" (
     xcopy /E /I /Y "desktop-gpui\crates\webterm\assets" "%DIST_DIR%\assets" >nul
 )
