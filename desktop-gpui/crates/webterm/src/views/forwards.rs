@@ -112,8 +112,10 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
         // Main Content Area
         .child(
             div()
+                .id("forwards-scroll-area")
                 .flex_1()
-                .overflow_hidden()
+                .w_full()
+                .overflow_y_scroll()
                 .p_4()
                 .child(if forwards.is_empty() {
                     div()

@@ -45,10 +45,12 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let font_sizes = [12.0f32, 14.0f32, 16.0f32, 18.0f32, 20.0f32];
 
     div()
+        .id("settings-scroll-area")
         .flex()
         .flex_col()
         .size_full()
-        .overflow_hidden()
+        .overflow_y_scroll()
+        .p_6()
         .child(
             div()
                 .text_2xl()

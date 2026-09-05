@@ -1,6 +1,7 @@
 //! Navigation shell view: left sidebar and main content views.
 
 use gpui::*;
+use gpui_component::{Icon, IconName};
 use webterm_settings::Theme as SettingsTheme;
 use crate::actions::{
     CloseTab, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7, JumpTab8,
@@ -17,27 +18,24 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let active_view = app.active_view;
     let current_theme = app.theme;
 
-    // Sidebar items
+    // Sidebar items with modern icons
     let items = [
-        (View::Hosts, "Hosts"),
-        (View::Keys, "SSH Keys"),
-        (View::Forwards, "Port Forwards"),
-        (View::Sftp, "📁 Files"),
-        (View::Settings, "Settings"),
+        (View::Hosts, "Hosts", IconName::HardDrive),
+        (View::Keys, "SSH Keys", IconName::CircleUser),
+        (View::Forwards, "Port Forwards", IconName::Network),
+        (View::Sftp, "Files", IconName::Folder),
+        (View::Settings, "Settings", IconName::Settings),
     ];
 
     let is_dark = current_theme != SettingsTheme::Light;
-    let bg_color = if is_dark { rgb(0x18181b) } else { rgb(0xf8fafc) };
-    let sidebar_bg = if is_dark { rgb(0x27272a) } else { rgb(0xf1f5f9) };
+    let bg_color = if is_dark { rgb(0x121214) } else { rgb(0xf8fafc) };
+    let sidebar_bg = if is_dark { rgb(0x18181b) } else { rgb(0xffffff) };
     let text_color = if is_dark { rgb(0xf4f4f5) } else { rgb(0x0f172a) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
+    let muted_text = if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) };
+    let border_color = if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) };
 
     let show_modal = app.show_new_tab_modal;
-    let content_pane = if active_view == View::Settings {
-        crate::views::settings::render_settings_view(app, cx)
-    } else {
-        render_content_pane(app, active_view, is_dark, cx)
-    };
+    let content_pane = render_content_pane(app, active_view, is_dark, cx);
 
     let modal_overlay = if show_modal {
         Some(render_new_tab_modal(app, cx))
@@ -120,7 +118,6 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .size_full()
         .bg(bg_color)
         .text_color(text_color)
-        .font_family("JetBrains Mono")
         // Tab shortcuts
         .on_action(cx.listener(|this, _: &NewTab, _window, cx| {
             this.toggle_new_tab_modal(cx);
@@ -167,44 +164,97 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
             div()
                 .flex()
                 .flex_col()
-                .w(px(240.0))
+                .w(px(220.0))
                 .h_full()
                 .bg(sidebar_bg)
                 .border_r_1()
                 .border_color(border_color)
-                .p_4()
+                .p_3()
                 .justify_between()
                 // Top header & items
                 .child(
                     div()
                         .flex()
                         .flex_col()
-                        .gap_2()
+                        .gap_1()
+                        // Brand Header
                         .child(
                             div()
-                                .text_lg()
-                                .font_weight(FontWeight::BOLD)
-                                .pb_4()
-                                .child("WebTerm Desktop"),
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_2p5()
+                                .px_2()
+                                .py_2()
+                                .mb_2()
+                                .child(
+                                    div()
+                                        .size(px(28.0))
+                                        .rounded_lg()
+                                        .bg(rgb(0x0284c7))
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .text_color(rgb(0xffffff))
+                                        .child(Icon::new(IconName::SquareTerminal).size(px(16.0))),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_color(text_color)
+                                                .child("WebTerm"),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(muted_text)
+                                                .child("Desktop Client"),
+                                        ),
+                                ),
                         )
-                        .children(items.into_iter().map(|(view, label)| {
+                        // Navigation items
+                        .children(items.into_iter().map(|(view, label, icon)| {
                             let is_active = active_view == view;
                             let item_bg = if is_active {
-                                if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) }
+                                if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
                             } else {
                                 sidebar_bg
                             };
+                            let item_hover = if is_dark { rgb(0x202024) } else { rgb(0xf1f5f9) };
+                            let icon_color = if is_active {
+                                if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
+                            } else {
+                                muted_text
+                            };
 
                             div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_2p5()
                                 .px_3()
                                 .py_2()
-                                .rounded_md()
+                                .rounded_lg()
                                 .bg(item_bg)
-                                .hover(|s| s.bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) }))
+                                .hover(move |s| s.bg(item_hover))
                                 .cursor_pointer()
-                                .text_sm()
-                                .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-                                .child(label)
+                                .child(Icon::new(icon).size(px(16.0)).text_color(icon_color))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(if is_active {
+                                            FontWeight::SEMIBOLD
+                                        } else {
+                                            FontWeight::NORMAL
+                                        })
+                                        .text_color(if is_active { text_color } else { muted_text })
+                                        .child(label),
+                                )
                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                     if view == View::Sftp {
                                         this.navigate_to_sftp(cx);
@@ -221,22 +271,46 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 // Bottom footer: Theme Toggle
                 .child(
                     div()
-                        .flex()
-                        .flex_col()
-                        .gap_2()
-                        .pt_4()
+                        .pt_3()
                         .border_t_1()
                         .border_color(border_color)
                         .child(
                             div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .justify_between()
                                 .px_3()
                                 .py_2()
-                                .rounded_md()
-                                .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
-                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
+                                .rounded_lg()
+                                .bg(if is_dark { rgb(0x202024) } else { rgb(0xf1f5f9) })
+                                .hover(|s| s.bg(if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }))
                                 .cursor_pointer()
-                                .text_sm()
-                                .child(if is_dark { "Theme: Dark 🌙" } else { "Theme: Light ☀️" })
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap_2()
+                                        .child(
+                                            Icon::new(if is_dark { IconName::Moon } else { IconName::Sun })
+                                                .size(px(14.0))
+                                                .text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0xf59e0b) }),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .font_weight(FontWeight::MEDIUM)
+                                                .text_color(text_color)
+                                                .child(if is_dark { "Dark Theme" } else { "Light Theme" }),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(muted_text)
+                                        .child("Switch"),
+                                )
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                     this.toggle_theme(cx);
                                 })),
@@ -250,7 +324,6 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .flex_col()
                 .flex_1()
                 .h_full()
-                .p_6()
                 .child(content_pane),
         )
         .children(modal_overlay)
@@ -267,44 +340,16 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
 fn render_content_pane(
     app: &mut AppState,
     view: View,
-    is_dark: bool,
+    _is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let (header, phase_note) = match view {
-        View::Hosts => ("Hosts & Terminal", "Host connection catalog — arrives in Phase 23"),
-        View::Keys => ("SSH Keys", "Key vault and passphrases — arrives in Phase 23"),
-        View::Forwards => ("Port Forwards", "Port forwarding rules — arrives in Phase 26"),
-        View::Sftp => ("SFTP", "SFTP Dual-Pane File Manager — arrives in Phase 25"),
-        View::Settings => ("Settings", "Settings"),
-    };
-
-    let card_bg = if is_dark { rgb(0x27272a) } else { rgb(0xffffff) };
-    let border_color = if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) };
-
-    let mut content = div()
-        .flex()
-        .flex_col()
-        .size_full()
-        .child(
-            div()
-                .text_2xl()
-                .font_weight(FontWeight::BOLD)
-                .child(header),
-        );
-
-    if view == View::Hosts {
-        let active_tab_view = app.session_manager.active_tab().and_then(|t| t.view.clone());
-
-        content = content.child(
+    match view {
+        View::Hosts => {
+            let active_tab_view = app.session_manager.active_tab().and_then(|t| t.view.clone());
             div()
                 .flex()
                 .flex_col()
-                .flex_1()
-                .mt_4()
-                .rounded_lg()
-                .bg(card_bg)
-                .border_1()
-                .border_color(border_color)
+                .size_full()
                 .overflow_hidden()
                 // Top Tab Strip
                 .child(render_tab_strip(app, cx))
@@ -325,67 +370,44 @@ fn render_content_pane(
                         .w_full()
                         .overflow_hidden()
                         .child(host_or_term)
-                }),
-        );
-    } else if view == View::Keys {
-        content = content.child(
+                })
+                .into_any_element()
+        }
+        View::Keys => {
             div()
                 .flex()
                 .flex_col()
-                .flex_1()
-                .mt_4()
-                .rounded_lg()
-                .bg(card_bg)
-                .border_1()
-                .border_color(border_color)
+                .size_full()
                 .overflow_hidden()
-                .child(crate::views::keys::render_keys_view(app, cx)),
-        );
-    } else if view == View::Forwards {
-        content = content.child(
+                .child(crate::views::keys::render_keys_view(app, cx))
+                .into_any_element()
+        }
+        View::Forwards => {
             div()
                 .flex()
                 .flex_col()
-                .flex_1()
-                .mt_4()
-                .rounded_lg()
-                .bg(card_bg)
-                .border_1()
-                .border_color(border_color)
+                .size_full()
                 .overflow_hidden()
-                .child(crate::views::forwards::render_forwards_view(app, cx)),
-        );
-    } else if view == View::Sftp {
-        content = content.child(
+                .child(crate::views::forwards::render_forwards_view(app, cx))
+                .into_any_element()
+        }
+        View::Sftp => {
             div()
                 .flex()
                 .flex_col()
-                .flex_1()
-                .mt_4()
-                .rounded_lg()
-                .bg(card_bg)
-                .border_1()
-                .border_color(border_color)
+                .size_full()
                 .overflow_hidden()
-                .child(crate::views::sftp::render_sftp_view(app, cx)),
-        );
-    } else {
-        content = content.child(
+                .child(crate::views::sftp::render_sftp_view(app, cx))
+                .into_any_element()
+        }
+        View::Settings => {
             div()
-                .mt_4()
-                .p_4()
-                .rounded_lg()
-                .bg(card_bg)
-                .border_1()
-                .border_color(border_color)
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(if is_dark { rgb(0xa1a1aa) } else { rgb(0x64748b) })
-                        .child(phase_note),
-                ),
-        );
+                .flex()
+                .flex_col()
+                .size_full()
+                .overflow_hidden()
+                .child(crate::views::settings::render_settings_view(app, cx))
+                .into_any_element()
+        }
     }
-
-    content.into_any_element()
 }

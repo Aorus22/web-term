@@ -103,7 +103,13 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 ),
         )
         // Main Content Area: Key Cards Grid or Empty State
-        .child(if count == 0 {
+        .child(
+            div()
+                .id("keys-scroll-area")
+                .flex_1()
+                .w_full()
+                .overflow_y_scroll()
+                .child(if count == 0 {
             div()
                 .flex()
                 .flex_col()
@@ -248,6 +254,7 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 }))
                 .into_any_element()
         })
+        )
         .into_any_element()
 }
 
