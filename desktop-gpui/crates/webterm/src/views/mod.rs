@@ -10,3 +10,4 @@ pub mod status;
 pub mod tab_strip;
 pub mod sftp;
 pub mod forwards;
+pub mod new_tab;

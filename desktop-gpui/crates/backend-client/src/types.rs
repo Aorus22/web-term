@@ -60,6 +60,8 @@ pub struct SshKey {
     pub key_type: String,
     pub fingerprint: String,
     #[serde(default)]
+    pub has_passphrase: bool,
+    #[serde(default)]
     pub created_at: Option<String>,
     #[serde(default)]
     pub updated_at: Option<String>,

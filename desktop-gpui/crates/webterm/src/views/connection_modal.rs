@@ -11,9 +11,9 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let input_bg = app.bg_color();
-    let tag_bg = app.accent_color();
+    let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(0xffffff);
+    let primary_fg = app.primary_fg();
 
     let form = match &app.connection_modal {
         Some(f) => f.clone(),
@@ -508,9 +508,9 @@ pub fn render_import_modal(app: &mut AppState, cx: &mut Context<AppState>) -> An
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let input_bg = app.bg_color();
-    let tag_bg = app.accent_color();
+    let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(0xffffff);
+    let primary_fg = app.primary_fg();
 
     let export_file_exists = std::path::Path::new("webterm-connections-export.json").exists();
 

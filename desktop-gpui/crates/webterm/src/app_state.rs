@@ -273,6 +273,7 @@ impl ForwardFormState {
 /// Active view in the main navigation sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
+    NewTab,
     Hosts,
     Keys,
     Forwards,
@@ -616,6 +617,8 @@ pub struct AppState {
     pub spawn_opts: Option<SpawnOptions>,
     pub session_manager: TerminalSessionManager,
     pub show_new_tab_modal: bool,
+    pub show_new_tab_popover: bool,
+    pub quick_connect_query: String,
     pub new_tab_host: String,
     pub new_tab_user: String,
     pub new_tab_port: String,
@@ -668,6 +671,8 @@ impl AppState {
             spawn_opts,
             session_manager: TerminalSessionManager::new(),
             show_new_tab_modal: false,
+            show_new_tab_popover: false,
+            quick_connect_query: String::new(),
             new_tab_host: String::new(),
             new_tab_user: "root".to_string(),
             new_tab_port: "22".to_string(),
@@ -737,12 +742,111 @@ impl AppState {
 
     pub fn bg_color(&self) -> Rgba { self.current_theme().bg() }
     pub fn card_bg(&self) -> Rgba { self.current_theme().card_bg() }
+    pub fn card_fg(&self) -> Rgba { self.current_theme().card_fg() }
     pub fn border_color(&self) -> Rgba { self.current_theme().border() }
     pub fn text_color(&self) -> Rgba { self.current_theme().fg() }
     pub fn muted_text(&self) -> Rgba { self.current_theme().muted_fg() }
+    pub fn muted_bg(&self) -> Rgba { self.current_theme().muted() }
     pub fn primary_color(&self) -> Rgba { self.current_theme().primary() }
+    pub fn primary_fg(&self) -> Rgba { self.current_theme().primary_fg() }
     pub fn accent_color(&self) -> Rgba { self.current_theme().accent() }
+    pub fn accent_fg(&self) -> Rgba { self.current_theme().accent_fg() }
+    pub fn secondary_bg(&self) -> Rgba { self.current_theme().secondary() }
+    pub fn secondary_fg(&self) -> Rgba { self.current_theme().secondary_fg() }
+    pub fn destructive_color(&self) -> Rgba { self.current_theme().destructive() }
     pub fn is_dark(&self) -> bool { self.current_theme().is_dark }
+
+    /// Toggle new tab launcher popover on the plus button.
+    pub fn toggle_new_tab_popover(&mut self, cx: &mut Context<Self>) {
+        self.show_new_tab_popover = !self.show_new_tab_popover;
+        cx.notify();
+    }
+
+    /// Open the onboarding / New Tab page (Welcome to WebTerm).
+    pub fn open_new_tab_page(&mut self, cx: &mut Context<Self>) {
+        self.show_new_tab_popover = false;
+        self.show_new_tab_modal = false;
+        self.show_hosts_catalog = false;
+        self.active_view = View::NewTab;
+        self.quick_connect_query.clear();
+        cx.notify();
+    }
+
+    /// Duplicate current active session (either local shell or SSH).
+    pub fn duplicate_active_tab(&mut self, cx: &mut Context<Self>) {
+        self.show_new_tab_popover = false;
+        let active_tab = match self.session_manager.active_tab() {
+            Some(t) => t,
+            None => {
+                cx.notify();
+                return;
+            }
+        };
+
+        let session_type = active_tab.session_type.clone();
+        let title = active_tab.title.clone();
+        let last_req = active_tab.last_connect_req.clone();
+
+        if session_type == "local" {
+            let cwd = last_req.and_then(|r| r.cwd);
+            self.open_local_tab_with_cwd(cwd, cx);
+        } else if let Some(req) = last_req {
+            self.open_ssh_tab(req, &title, cx);
+        } else if let Some(conn_id) = active_tab.connection_id.clone() {
+            self.connect_to_host(&conn_id, cx);
+        } else {
+            self.open_local_tab(cx);
+        }
+    }
+
+    /// Parse and submit quick connect text (e.g. user@host[:port] or saved connection match).
+    pub fn quick_connect_submit(&mut self, text: &str, cx: &mut Context<Self>) {
+        let input = text.trim();
+        if input.is_empty() {
+            return;
+        }
+
+        // Check if matching a saved connection
+        if let Some(saved) = self.connections.iter().find(|c| {
+            c.label.eq_ignore_ascii_case(input)
+                || format!("{}@{}:{}", c.username, c.host, c.port).eq_ignore_ascii_case(input)
+                || format!("{}@{}", c.username, c.host).eq_ignore_ascii_case(input)
+                || c.host.eq_ignore_ascii_case(input)
+        }).cloned() {
+            self.connect_to_host(&saved.id, cx);
+            self.quick_connect_query.clear();
+            return;
+        }
+
+        // Parse user@host[:port]
+        let at_idx = match input.find('@') {
+            Some(i) => i,
+            None => return,
+        };
+
+        let username = input[..at_idx].trim().to_string();
+        let rest = input[at_idx + 1..].trim();
+        if username.is_empty() || rest.is_empty() {
+            return;
+        }
+
+        let (host, port) = if let Some(colon_idx) = rest.find(':') {
+            let h = rest[..colon_idx].trim().to_string();
+            let p = rest[colon_idx + 1..].trim().parse::<u16>().unwrap_or(22);
+            (h, p)
+        } else {
+            (rest.to_string(), 22)
+        };
+
+        if host.is_empty() {
+            return;
+        }
+
+        let title = format!("{}@{}", username, host);
+        let req = WsConnectRequest::for_quick_connect(host, port, username, "", 80, 24);
+        self.open_ssh_tab(req, &title, cx);
+        self.quick_connect_query.clear();
+    }
 
     /// Toggle new tab launcher modal.
     pub fn toggle_new_tab_modal(&mut self, cx: &mut Context<Self>) {

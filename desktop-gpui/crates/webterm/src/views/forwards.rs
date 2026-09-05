@@ -5,16 +5,16 @@ use crate::app_state::{AppState, ForwardModalMode};
 
 /// Render the Port Forwarding rules management view.
 pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.is_dark();
     let bg_color = app.bg_color();
+    let toolbar_bg = app.bg_color();
     let card_bg = app.card_bg();
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
-    let hover_bg = if is_dark { app.accent_color() } else { rgb(0xf1f5f9) };
+    let muted_bg = app.muted_bg();
+    let destructive_color = app.destructive_color();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(app.current_theme().primary_foreground);
+    let primary_fg = app.primary_fg();
 
     let forwards = app.forwards.clone();
     let count = forwards.len();
@@ -32,94 +32,62 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
         .size_full()
         .bg(bg_color)
         .text_color(text_color)
-        // Top Toolbar
+        // Top Toolbar matching fe/ PortForwardsPage header
         .child(
             div()
                 .flex()
                 .flex_row()
                 .items_center()
                 .justify_between()
-                .px_4()
+                .w_full()
+                .px_6()
                 .py_3()
+                .bg(toolbar_bg)
                 .border_b_1()
                 .border_color(border_color)
-                .bg(card_bg)
-                // Left: Title + Count badge
+                // Left: Title + "SSH TUNNELING" subtitle
                 .child(
                     div()
                         .flex()
                         .flex_row()
                         .items_center()
-                        .gap_2()
+                        .gap_4()
                         .child(
                             div()
-                                .text_base()
+                                .text_lg()
                                 .font_weight(FontWeight::BOLD)
+                                .text_color(text_color)
                                 .child("Port Forwards"),
                         )
                         .child(
                             div()
-                                .px_2p5()
-                                .py_0p5()
-                                .rounded_full()
-                                .bg(tag_bg)
                                 .text_xs()
+                                .font_weight(FontWeight::BOLD)
                                 .text_color(muted_text)
-                                .child(format!("{count} rule{}", if count == 1 { "" } else { "s" })),
+                                .child("SSH TUNNELING"),
                         ),
                 )
-                // Right: Actions (Refresh, + Create Forward)
+                // Right: Action (+ Create Forward)
                 .child(
                     div()
                         .flex()
                         .flex_row()
                         .items_center()
-                        .gap_2()
-                        // Refresh
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_1p5()
-                                .rounded_lg()
-                                .bg(card_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_xs()
-                                .text_color(muted_text)
-                                .cursor_pointer()
-                                .hover(move |s| s.bg(tag_bg).text_color(text_color))
-                                .child(svg().data(crate::icons::REFRESH_CW_SVG).size(px(12.0)).text_color(muted_text))
-                                .child(if is_loading { "Loading..." } else { "Refresh" })
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.fetch_forwards(cx);
-                                })),
-                        )
-                        // + Create Forward button
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3p5()
-                                .py_1p5()
-                                .rounded_lg()
-                                .bg(primary_color)
-                                .hover(|s| s.opacity(0.9))
-                                .text_xs()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(primary_fg)
-                                .cursor_pointer()
-                                .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
-                                .child("Create Forward")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.open_create_forward_modal(cx);
-                                })),
-                        ),
+                        .gap_1p5()
+                        .px_3p5()
+                        .py_1p5()
+                        .rounded_lg()
+                        .bg(primary_color)
+                        .hover(|s| s.opacity(0.9))
+                        .text_xs()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(primary_fg)
+                        .cursor_pointer()
+                        .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
+                        .child("Create Forward")
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                            this.open_create_forward_modal(cx);
+                        })),
                 ),
         )
         // Main Content Area
@@ -129,14 +97,14 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                 .flex_1()
                 .w_full()
                 .overflow_y_scroll()
-                .p_4()
+                .p_6()
                 .child(if count == 0 {
                     div()
                         .flex()
                         .flex_col()
                         .items_center()
                         .justify_center()
-                        .p_12()
+                        .py_24()
                         .gap_3()
                         .rounded_xl()
                         .border_1()
@@ -146,7 +114,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                             div()
                                 .size(px(48.0))
                                 .rounded_full()
-                                .bg(tag_bg)
+                                .bg(muted_bg)
                                 .flex()
                                 .items_center()
                                 .justify_center()
@@ -215,16 +183,18 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .flex_row()
                                 .items_center()
                                 .justify_between()
-                                .p_4()
+                                .py_3()
+                                .px_4()
+                                .gap_4()
                                 .rounded_xl()
                                 .bg(card_bg)
                                 .border_1()
                                 .border_color(if is_active {
-                                    if is_dark { rgb(0x166534) } else { rgb(0x86efac) }
+                                    primary_color
                                 } else {
                                     border_color
                                 })
-                                .hover(|s| s.bg(hover_bg))
+                                .hover(move |s| s.border_color(primary_color))
                                 // Left & Middle: Status Icon + Rule Info
                                 .child(
                                     div()
@@ -232,6 +202,8 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .flex_row()
                                         .items_center()
                                         .gap_3()
+                                        .flex_1()
+                                        .min_w_0()
                                         // Status Icon Pill
                                         .child(
                                             div()
@@ -239,18 +211,15 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .items_center()
                                                 .justify_center()
                                                 .size(px(36.0))
-                                                .rounded_lg()
-                                                .bg(if is_active {
-                                                    if is_dark { rgb(0x14532d) } else { rgb(0xdcfce7) }
-                                                } else {
-                                                    tag_bg
-                                                })
+                                                .rounded_md()
+                                                .bg(muted_bg)
+                                                .flex_shrink_0()
                                                 .child(
                                                     svg()
                                                         .data(crate::icons::ARROW_LEFT_RIGHT_SVG)
                                                         .size(px(16.0))
                                                         .text_color(if is_active {
-                                                            if is_dark { rgb(0x4ade80) } else { rgb(0x16a34a) }
+                                                            primary_color
                                                         } else {
                                                             muted_text
                                                         }),
@@ -261,7 +230,9 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                             div()
                                                 .flex()
                                                 .flex_col()
-                                                .gap_1()
+                                                .flex_1()
+                                                .min_w_0()
+                                                .gap_0p5()
                                                 // Header row: Name + Type Badge + Active Badge
                                                 .child(
                                                     div()
@@ -271,81 +242,66 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                         .gap_2()
                                                         .child(
                                                             div()
-                                                                .text_sm()
+                                                                .text_base()
                                                                 .font_weight(FontWeight::BOLD)
                                                                 .text_color(text_color)
+                                                                .truncate()
                                                                 .child(forward.name.clone()),
                                                         )
-                                                        .child(
-                                                            div()
-                                                                .px_2()
-                                                                .py_0p5()
-                                                                .rounded_full()
-                                                                .bg(if is_reverse {
-                                                                    if is_dark { rgb(0x78350f) } else { rgb(0xfef3c7) }
-                                                                } else {
-                                                                    if is_dark { rgb(0x1e3a8a) } else { rgb(0xdbeafe) }
-                                                                })
-                                                                .text_xs()
-                                                                .font_weight(FontWeight::MEDIUM)
-                                                                .text_color(if is_reverse {
-                                                                    if is_dark { rgb(0xfcd34d) } else { rgb(0xb45309) }
-                                                                } else {
-                                                                    if is_dark { rgb(0x93c5fd) } else { rgb(0x1d4ed8) }
-                                                                })
-                                                                .child(if is_reverse { "Reverse (ssh -R)" } else { "Local (ssh -L)" }),
-                                                        )
-                                                        .child(
-                                                            div()
-                                                                .px_2()
-                                                                .py_0p5()
-                                                                .rounded_full()
-                                                                .bg(if is_active {
-                                                                    if is_dark { rgb(0x14532d) } else { rgb(0xdcfce7) }
-                                                                } else {
-                                                                    tag_bg
-                                                                })
-                                                                .text_xs()
-                                                                .font_weight(FontWeight::SEMIBOLD)
-                                                                .text_color(if is_active {
-                                                                    if is_dark { rgb(0x4ade80) } else { rgb(0x16a34a) }
-                                                                } else {
-                                                                    muted_text
-                                                                })
-                                                                .child(if is_active { "Active" } else { "Inactive" }),
-                                                        ),
+                                                        .children(if is_reverse {
+                                                            Some(
+                                                                div()
+                                                                    .px_1p5()
+                                                                    .py_0()
+                                                                    .rounded_sm()
+                                                                    .text_xs()
+                                                                    .font_weight(FontWeight::MEDIUM)
+                                                                    .bg(muted_bg)
+                                                                    .text_color(rgb(0xd97706))
+                                                                    .child("Reverse"),
+                                                            )
+                                                        } else {
+                                                            None
+                                                        })
+                                                        .children(if is_active {
+                                                            Some(
+                                                                div()
+                                                                    .px_1p5()
+                                                                    .py_0()
+                                                                    .rounded_sm()
+                                                                    .text_xs()
+                                                                    .font_weight(FontWeight::MEDIUM)
+                                                                    .bg(muted_bg)
+                                                                    .text_color(primary_color)
+                                                                    .child("Active"),
+                                                            )
+                                                        } else {
+                                                            None
+                                                        }),
                                                 )
-                                                // Connection label & Mapping string
+                                                // Connection label
                                                 .child(
                                                     div()
-                                                        .flex()
-                                                        .flex_row()
-                                                        .items_center()
-                                                        .gap_3()
                                                         .text_xs()
-                                                        .child(
-                                                            div()
-                                                                .text_color(muted_text)
-                                                                .child(format!("via: {conn_label}")),
-                                                        )
-                                                        .child(
-                                                            div()
-                                                                .font_family("JetBrains Mono")
-                                                                .font_weight(FontWeight::MEDIUM)
-                                                                .text_color(if is_active {
-                                                                    if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }
-                                                                } else {
-                                                                    text_color
-                                                                })
-                                                                .child(mapping_str),
-                                                        ),
+                                                        .text_color(muted_text)
+                                                        .truncate()
+                                                        .child(conn_label),
+                                                )
+                                                // Mapping string
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(muted_text)
+                                                        .truncate()
+                                                        .child(mapping_str),
                                                 )
                                                 // Error message (if any)
                                                 .children(if has_error {
                                                     Some(
                                                         div()
                                                             .text_xs()
-                                                            .text_color(rgb(0xef4444))
+                                                            .text_color(destructive_color)
+                                                            .truncate()
                                                             .child(format!("Error: {error_msg}")),
                                                     )
                                                 } else {
@@ -353,53 +309,43 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 }),
                                         ),
                                 )
-                                // Right: Active Toggle Switch + Edit + Delete
+                                // Right: Modern Switch Toggle + Edit + Delete
                                 .child(
                                     div()
                                         .flex()
                                         .flex_row()
                                         .items_center()
-                                        .gap_2()
-                                        // Start/Stop Toggle Button
+                                        .gap_3()
+                                        .flex_shrink_0()
+                                        // Modern Switch Toggle
                                         .child(
                                             div()
-                                                .flex()
-                                                .flex_row()
-                                                .items_center()
-                                                .gap_1p5()
-                                                .px_3()
-                                                .py_1p5()
-                                                .rounded_md()
+                                                .w(px(40.0))
+                                                .h(px(22.0))
+                                                .rounded_full()
                                                 .cursor_pointer()
+                                                .bg(if is_active { primary_color } else { muted_bg })
                                                 .border_1()
-                                                .border_color(if is_active {
-                                                    if is_dark { rgb(0x22c55e) } else { rgb(0x16a34a) }
-                                                } else {
-                                                    border_color
-                                                })
-                                                .bg(if is_active {
-                                                    if is_dark { rgb(0x14532d) } else { rgb(0xdcfce7) }
-                                                } else {
-                                                    tag_bg
-                                                })
-                                                .text_xs()
-                                                .font_weight(FontWeight::SEMIBOLD)
-                                                .text_color(if is_active {
-                                                    if is_dark { rgb(0x4ade80) } else { rgb(0x16a34a) }
-                                                } else {
-                                                    text_color
-                                                })
+                                                .border_color(if is_active { primary_color } else { border_color })
+                                                .p(px(2.0))
+                                                .flex()
+                                                .items_center()
                                                 .child(
-                                                    svg()
-                                                        .data(if is_active { crate::icons::SQUARE_SVG } else { crate::icons::PLAY_SVG })
-                                                        .size(px(12.0))
-                                                        .text_color(if is_active {
-                                                            if is_dark { rgb(0x4ade80) } else { rgb(0x16a34a) }
-                                                        } else {
-                                                            text_color
-                                                        }),
+                                                    if is_active {
+                                                        div()
+                                                            .size(px(16.0))
+                                                            .rounded_full()
+                                                            .bg(primary_fg)
+                                                            .shadow_sm()
+                                                            .ml_auto()
+                                                    } else {
+                                                        div()
+                                                            .size(px(16.0))
+                                                            .rounded_full()
+                                                            .bg(muted_text)
+                                                            .shadow_sm()
+                                                    }
                                                 )
-                                                .child(if is_active { "Stop Tunnel" } else { "Start Tunnel" })
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                     this.toggle_forward_active(&id_toggle, cx);
                                                 })),
@@ -408,19 +354,13 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .child(
                                             div()
                                                 .flex()
-                                                .flex_row()
                                                 .items_center()
-                                                .gap_1()
-                                                .px_2p5()
-                                                .py_1p5()
+                                                .justify_center()
+                                                .size(px(26.0))
                                                 .rounded_md()
                                                 .cursor_pointer()
-                                                .bg(tag_bg)
-                                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
-                                                .text_xs()
-                                                .text_color(text_color)
-                                                .child(svg().data(crate::icons::EDIT_SVG).size(px(12.0)).text_color(muted_text))
-                                                .child("Edit")
+                                                .hover(move |s| s.bg(muted_bg))
+                                                .child(svg().data(crate::icons::EDIT_SVG).size(px(14.0)).text_color(muted_text))
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                     this.open_edit_forward_modal(&id_edit, cx);
                                                 })),
@@ -429,19 +369,13 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .child(
                                             div()
                                                 .flex()
-                                                .flex_row()
                                                 .items_center()
-                                                .gap_1()
-                                                .px_2p5()
-                                                .py_1p5()
+                                                .justify_center()
+                                                .size(px(26.0))
                                                 .rounded_md()
                                                 .cursor_pointer()
-                                                .bg(if is_dark { rgb(0x451a1a) } else { rgb(0xfee2e2) })
-                                                .hover(|s| s.bg(if is_dark { rgb(0x7f1d1d) } else { rgb(0xfecaca) }))
-                                                .text_xs()
-                                                .text_color(rgb(0xef4444))
-                                                .child(svg().data(crate::icons::TRASH_SVG).size(px(12.0)).text_color(rgb(0xef4444)))
-                                                .child("Delete")
+                                                .hover(move |s| s.bg(muted_bg))
+                                                .child(svg().data(crate::icons::TRASH_SVG).size(px(14.0)).text_color(muted_text))
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                     this.open_delete_forward_modal(forward_del.clone(), cx);
                                                 })),
@@ -462,9 +396,9 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let input_bg = app.bg_color();
-    let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
+    let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(app.current_theme().primary_foreground);
+    let primary_fg = app.primary_fg();
 
     let form = match &app.forward_modal {
         Some(f) => f.clone(),
@@ -896,7 +830,7 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
             let border_color = app.border_color();
             let text_color = app.text_color();
             let muted_text = app.muted_text();
-            let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
+            let tag_bg = app.muted_bg();
 
     let target = match &app.delete_forward_target {
         Some(t) => t.clone(),

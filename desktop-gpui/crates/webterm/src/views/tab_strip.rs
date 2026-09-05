@@ -2,7 +2,7 @@
 
 use gpui::*;
 use crate::app_state::{AppState, View};
-use crate::icons::{MINIMIZE_SVG, MAXIMIZE_SVG, PANEL_LEFT_SVG, PLUS_SVG, X_SVG};
+use crate::icons::{COPY_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, PANEL_LEFT_SVG, PLUS_SVG, X_SVG};
 use crate::session::SessionStatus;
 
 /// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, draggable titlebar area, and custom window controls.
@@ -135,25 +135,138 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         })),
                 )
         }))
-        // '+' New Tab button
+        // '+' New Tab button with Popover
         .child(
             div()
-                .flex()
-                .items_center()
-                .justify_center()
-                .size(px(28.0))
-                .rounded_md()
-                .cursor_pointer()
-                .hover(|s| s.bg(hover_bg))
+                .relative()
                 .child(
-                    svg()
-                        .data(PLUS_SVG)
-                        .size(px(14.0))
-                        .text_color(muted_text),
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .size(px(28.0))
+                        .rounded_md()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(hover_bg))
+                        .child(
+                            svg()
+                                .data(PLUS_SVG)
+                                .size(px(14.0))
+                                .text_color(muted_text),
+                        )
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                            let has_active_session = this.session_manager.tab_count() > 0
+                                && this.active_view == View::Hosts
+                                && !this.show_hosts_catalog;
+                            if has_active_session {
+                                this.toggle_new_tab_popover(cx);
+                            } else {
+                                this.open_new_tab_page(cx);
+                            }
+                        })),
                 )
-                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                    this.toggle_new_tab_modal(cx);
-                })),
+                // Popover dropdown menu
+                .children(if app.show_new_tab_popover {
+                    Some(
+                        div()
+                            .absolute()
+                            .top(px(32.0))
+                            .left(px(0.0))
+                            .w(px(220.0))
+                            .p_1p5()
+                            .rounded_xl()
+                            .bg(app.card_bg())
+                            .border_1()
+                            .border_color(border_color)
+                            .shadow_lg()
+                            .gap_1()
+                            .flex()
+                            .flex_col()
+                            .on_mouse_down(MouseButton::Left, |_, _, _| {}) // stop propagation
+                            // Option 1: Duplicate
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap_3()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_lg()
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(hover_bg))
+                                    .child(
+                                        svg()
+                                            .data(COPY_SVG)
+                                            .size(px(16.0))
+                                            .text_color(muted_text),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .font_weight(FontWeight::SEMIBOLD)
+                                                    .text_color(app.text_color())
+                                                    .child("Duplicate"),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(muted_text)
+                                                    .child("Same connection & directory"),
+                                            ),
+                                    )
+                                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                        this.duplicate_active_tab(cx);
+                                    })),
+                            )
+                            // Option 2: New Connection
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap_3()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_lg()
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(hover_bg))
+                                    .child(
+                                        svg()
+                                            .data(PLUS_SVG)
+                                            .size(px(16.0))
+                                            .text_color(muted_text),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .font_weight(FontWeight::SEMIBOLD)
+                                                    .text_color(app.text_color())
+                                                    .child("New Connection"),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(muted_text)
+                                                    .child("Connect to a server"),
+                                            ),
+                                    )
+                                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                        this.open_new_tab_page(cx);
+                                    })),
+                            ),
+                    )
+                } else {
+                    None
+                }),
         )
         // Center: Draggable Title Bar Area
         .child(

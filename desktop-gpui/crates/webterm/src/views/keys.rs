@@ -5,15 +5,15 @@ use crate::app_state::AppState;
 
 /// Render the SSH Keys management view.
 pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.is_dark();
     let bg_color = app.bg_color();
+    let toolbar_bg = app.bg_color();
     let card_bg = app.card_bg();
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
+    let muted_bg = app.muted_bg();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(app.current_theme().primary_foreground);
+    let primary_fg = app.primary_fg();
 
     let count = app.ssh_keys.len();
     let is_loading = app.is_loading_keys;
@@ -24,94 +24,62 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .flex_col()
         .size_full()
         .bg(bg_color)
-        .p_4()
-        .gap_4()
-        // Top Toolbar
+        // Top Toolbar matching fe/ SSHKeysPage header
         .child(
             div()
                 .flex()
                 .flex_row()
                 .items_center()
                 .justify_between()
-                .flex_wrap()
-                .gap_3()
-                // Left: Title and key count badge
+                .w_full()
+                .px_6()
+                .py_3()
+                .bg(toolbar_bg)
+                .border_b_1()
+                .border_color(border_color)
+                // Left: Title and "SECURE STORAGE" subtitle
                 .child(
                     div()
                         .flex()
                         .flex_row()
                         .items_center()
-                        .gap_3()
+                        .gap_4()
                         .child(
                             div()
                                 .text_lg()
                                 .font_weight(FontWeight::BOLD)
                                 .text_color(text_color)
-                                .child("SSH Key Vault"),
+                                .child("SSH Keys"),
                         )
                         .child(
                             div()
-                                .px_2p5()
-                                .py_0p5()
-                                .rounded_full()
-                                .bg(tag_bg)
                                 .text_xs()
+                                .font_weight(FontWeight::BOLD)
                                 .text_color(muted_text)
-                                .child(format!("{count} key{}", if count == 1 { "" } else { "s" })),
+                                .child("SECURE STORAGE"),
                         ),
                 )
-                // Right: Actions (Refresh, + Add Key)
+                // Right: Action button (+ Upload Key)
                 .child(
                     div()
                         .flex()
                         .flex_row()
                         .items_center()
-                        .gap_2()
-                        // Refresh
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_1p5()
-                                .rounded_lg()
-                                .bg(card_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_xs()
-                                .text_color(muted_text)
-                                .cursor_pointer()
-                                .hover(move |s| s.bg(tag_bg).text_color(text_color))
-                                .child(svg().data(crate::icons::REFRESH_CW_SVG).size(px(12.0)).text_color(muted_text))
-                                .child(if is_loading { "Loading..." } else { "Refresh" })
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.fetch_ssh_keys(cx);
-                                })),
-                        )
-                        // + Add Key button
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3p5()
-                                .py_1p5()
-                                .rounded_lg()
-                                .bg(primary_color)
-                                .hover(|s| s.opacity(0.9))
-                                .text_xs()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(primary_fg)
-                                .cursor_pointer()
-                                .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
-                                .child("Add SSH Key")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.open_add_key_modal(cx);
-                                })),
-                        ),
+                        .gap_1p5()
+                        .px_3p5()
+                        .py_1p5()
+                        .rounded_lg()
+                        .bg(primary_color)
+                        .hover(|s| s.opacity(0.9))
+                        .text_xs()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(primary_fg)
+                        .cursor_pointer()
+                        .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
+                        .child("Upload Key")
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                            this.open_add_key_modal(cx);
+                        })),
                 ),
         )
         // Main Content Area: Key Cards Grid or Empty State
@@ -121,20 +89,21 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .flex_1()
                 .w_full()
                 .overflow_y_scroll()
+                .p_6()
                 .child(if count == 0 {
             div()
                 .flex()
                 .flex_col()
                 .items_center()
                 .justify_center()
-                .py_16()
+                .py_24()
                 .gap_3()
                 .text_color(muted_text)
                 .child(
                     div()
                         .size(px(48.0))
                         .rounded_full()
-                        .bg(tag_bg)
+                        .bg(muted_bg)
                         .flex()
                         .items_center()
                         .justify_center()
@@ -142,10 +111,10 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 )
                 .child(
                     div()
-                        .text_base()
-                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_sm()
+                        .font_weight(FontWeight::MEDIUM)
                         .text_color(text_color)
-                        .child("No SSH keys in vault"),
+                        .child(if is_loading { "Loading SSH keys..." } else { "No SSH keys in vault" }),
                 )
                 .child(
                     div()
@@ -178,118 +147,138 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 )
                 .into_any_element()
         } else {
+            // Chunk keys into rows of 3 to produce 1:1 grid-cols-3 layout matching Electron
+            let chunks: Vec<Vec<_>> = keys
+                .chunks(3)
+                .map(|c| c.to_vec())
+                .collect();
+
             div()
                 .flex()
-                .flex_row()
-                .flex_wrap()
+                .flex_col()
                 .gap_4()
-                .children(keys.into_iter().map(|key| {
-                    let key_id_del = key.id.clone();
-                    let key_type_upper = key.key_type.to_uppercase();
-                    let created_str = key.created_at.clone().unwrap_or_else(|| "Unknown".to_string());
-
+                .w_full()
+                .pb_12()
+                .children(chunks.into_iter().map(|chunk| {
+                    let chunk_len = chunk.len();
                     div()
                         .flex()
-                        .flex_col()
-                        .w(px(380.0))
-                        .rounded_lg()
-                        .bg(card_bg)
-                        .border_1()
-                        .border_color(border_color)
-                        .p_4()
-                        .gap_3()
-                        .shadow_sm()
-                        .hover(|s| s.border_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }))
-                        // Card Header: Name and Type badge
-                        .child(
+                        .flex_row()
+                        .gap_4()
+                        .w_full()
+                        .children(chunk.into_iter().map(|key| {
+                            let key_id_del = key.id.clone();
+
                             div()
+                                .flex_1()
                                 .flex()
                                 .flex_row()
                                 .items_center()
                                 .justify_between()
+                                .py_4()
+                                .px_4()
+                                .gap_3()
+                                .rounded_xl()
+                                .bg(card_bg)
+                                .border_1()
+                                .border_color(border_color)
+                                .hover(move |s| s.border_color(primary_color))
+                                // Left: Key icon box & info
                                 .child(
                                     div()
                                         .flex()
                                         .flex_row()
                                         .items_center()
-                                        .gap_2()
-                                        .child(svg().data(crate::icons::KEY_SVG).size(px(15.0)).text_color(if is_dark { rgb(0x38bdf8) } else { rgb(0x0284c7) }))
+                                        .gap_3()
+                                        .flex_1()
+                                        .min_w_0()
                                         .child(
                                             div()
-                                                .text_sm()
-                                                .font_weight(FontWeight::BOLD)
-                                                .text_color(text_color)
-                                                .child(key.name.clone()),
+                                                .size(px(34.0))
+                                                .rounded_md()
+                                                .bg(muted_bg)
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .flex_shrink_0()
+                                                .child(
+                                                    svg()
+                                                        .data(crate::icons::KEY_SVG)
+                                                        .size(px(16.0))
+                                                        .text_color(muted_text),
+                                                ),
+                                        )
+                                        // Middle: Name + Encrypted pill + Fingerprint
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_col()
+                                                .flex_1()
+                                                .min_w_0()
+                                                .gap_0p5()
+                                                .child(
+                                                    div()
+                                                        .flex()
+                                                        .flex_row()
+                                                        .items_center()
+                                                        .gap_2()
+                                                        .child(
+                                                            div()
+                                                                .text_sm()
+                                                                .font_weight(FontWeight::BOLD)
+                                                                .text_color(text_color)
+                                                                .truncate()
+                                                                .child(key.name.clone()),
+                                                        )
+                                                        .children(if key.has_passphrase {
+                                                            Some(
+                                                                div()
+                                                                    .px_1p5()
+                                                                    .py_0()
+                                                                    .rounded_sm()
+                                                                    .text_xs()
+                                                                    .bg(muted_bg)
+                                                                    .text_color(primary_color)
+                                                                    .child("Encrypted"),
+                                                            )
+                                                        } else {
+                                                            None
+                                                        }),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(muted_text)
+                                                        .truncate()
+                                                        .child(key.fingerprint.clone()),
+                                                ),
                                         ),
                                 )
-                                .child(
-                                    div()
-                                        .px_2()
-                                        .py_0p5()
-                                        .rounded_full()
-                                        .text_xs()
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .bg(tag_bg)
-                                        .text_color(primary_color)
-                                        .child(key_type_upper),
-                                ),
-                        )
-                        // Fingerprint details
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(muted_text)
-                                        .child("SHA256 Fingerprint:"),
-                                 )
-                                .child(
-                                    div()
-                                        .p_2()
-                                        .rounded_md()
-                                        .bg(bg_color)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_xs()
-                                        .font_family("JetBrains Mono")
-                                        .text_color(text_color)
-                                        .child(key.fingerprint.clone()),
-                                ),
-                        )
-                        // Created date & actions
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .justify_between()
-                                .pt_1()
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(muted_text)
-                                        .child(format!("Added: {created_str}")),
-                                )
+                                // Right: Delete icon button
                                 .child(
                                     div()
                                         .flex()
-                                        .flex_row()
                                         .items_center()
-                                        .gap_1p5()
+                                        .justify_center()
+                                        .size(px(24.0))
+                                        .rounded_md()
                                         .cursor_pointer()
-                                        .text_xs()
-                                        .text_color(rgb(0xef4444))
-                                        .hover(|s| s.text_color(rgb(0xdc2626)))
-                                        .child(svg().data(crate::icons::TRASH_SVG).size(px(12.0)).text_color(rgb(0xef4444)))
-                                        .child("Delete")
+                                        .hover(move |s| s.bg(muted_bg))
+                                        .child(
+                                            svg()
+                                                .data(crate::icons::TRASH_SVG)
+                                                .size(px(13.0))
+                                                .text_color(muted_text),
+                                        )
                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                             this.delete_ssh_key(&key_id_del, cx);
-                                        })),
-                                ),
-                        )
+                                        }))
+                                )
+                        }))
+                        // Spacer cards for last row so cards stay 1/3 width
+                        .children((0..(3 - chunk_len)).map(|_| {
+                            div().flex_1()
+                        }))
                 }))
                 .into_any_element()
         })
@@ -308,9 +297,9 @@ pub fn render_add_key_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let input_bg = app.bg_color();
-    let tag_bg = if is_dark { app.accent_color() } else { rgb(0xe2e8f0) };
+    let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(app.current_theme().primary_foreground);
+    let primary_fg = app.primary_fg();
 
     let name_display: SharedString = if app.new_key_name.is_empty() {
         "e.g. id_ed25519_deploy".into()

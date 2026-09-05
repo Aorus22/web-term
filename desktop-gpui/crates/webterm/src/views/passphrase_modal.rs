@@ -11,9 +11,9 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let input_bg = app.bg_color();
-    let tag_bg = app.accent_color();
+    let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(0xffffff);
+    let primary_fg = app.primary_fg();
 
     let pass_display: SharedString = if app.passphrase_input.is_empty() {
         "Enter private key passphrase...".into()

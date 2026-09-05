@@ -23,6 +23,9 @@ fn test_parity_view_routing_coverage() {
     state.active_view = View::Forwards;
     assert_eq!(state.active_view, View::Forwards);
 
+    state.active_view = View::NewTab;
+    assert_eq!(state.active_view, View::NewTab);
+
     state.active_view = View::Settings;
     assert_eq!(state.active_view, View::Settings);
 }
@@ -66,6 +69,7 @@ fn test_parity_data_models_and_contracts() {
         name: "Deploy Key".to_string(),
         key_type: "ed25519".to_string(),
         fingerprint: "SHA256:abc123xyz".to_string(),
+        has_passphrase: false,
         created_at: Some("2026-09-01T00:00:00Z".to_string()),
         updated_at: Some("2026-09-01T00:00:00Z".to_string()),
     };

@@ -16,7 +16,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let tag_bg = app.accent_color();
+    let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
     let current_theme = app.theme;
     let active_preset_id = app.settings.theme_preset.clone();

@@ -7,16 +7,15 @@ use crate::app_state::AppState;
 
 /// Renders the host connection catalog view matching fe/src/features/hosts/components/HostsPage.tsx.
 pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.is_dark();
     let bg_color = app.bg_color();
     let toolbar_bg = app.bg_color();
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
+    let muted_bg = app.muted_bg();
     let card_bg = app.card_bg();
-    let accent_color = app.accent_color();
     let primary_color = app.primary_color();
-    let primary_fg = rgb(app.current_theme().primary_foreground);
+    let primary_fg = app.primary_fg();
 
     // Extract tags & filter connections
     let all_tags = extract_unique_tags(&app.connections);
@@ -92,7 +91,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                     .font_weight(FontWeight::MEDIUM)
                                                     .cursor_pointer()
                                                     .bg(if is_selected {
-                                                        if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
+                                                        muted_bg
                                                     } else {
                                                         rgba(0x00000000)
                                                     })
@@ -119,7 +118,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                     .font_weight(FontWeight::MEDIUM)
                                                     .cursor_pointer()
                                                     .bg(if is_selected {
-                                                        if is_dark { rgb(0x27272a) } else { rgb(0xe2e8f0) }
+                                                        muted_bg
                                                     } else {
                                                         rgba(0x00000000)
                                                     })
@@ -168,7 +167,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .text_xs()
                                 .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(move |s| s.bg(accent_color).text_color(text_color))
+                                .hover(move |s| s.bg(muted_bg).text_color(text_color))
                                 .child(
                                     svg()
                                         .data(ARROW_DOWN_SVG)
@@ -196,7 +195,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .text_xs()
                                 .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(move |s| s.bg(accent_color).text_color(text_color))
+                                .hover(move |s| s.bg(muted_bg).text_color(text_color))
                                 .child(
                                     svg()
                                         .data(ARROW_UP_SVG)
@@ -258,7 +257,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                             div()
                                 .size(px(48.0))
                                 .rounded_full()
-                                .bg(if is_dark { rgb(0x18181b) } else { rgb(0xf1f5f9) })
+                                .bg(muted_bg)
                                 .flex()
                                 .items_center()
                                 .justify_center()
@@ -287,203 +286,221 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                         )
                         .into_any_element()
                 } else {
+                    // Chunk connections into rows of 3 to produce 1:1 grid-cols-3 layout matching Electron
+                    let chunks: Vec<Vec<Connection>> = filtered_connections
+                        .chunks(3)
+                        .map(|c| c.to_vec())
+                        .collect();
+
                     div()
                         .flex()
-                        .flex_row()
-                        .flex_wrap()
+                        .flex_col()
                         .gap_4()
+                        .w_full()
                         .pb_12()
-                        .children(filtered_connections.into_iter().map(|conn| {
-                            let conn_id = conn.id.clone();
-                            let conn_id_click = conn.id.clone();
-                            let conn_id_del = conn.id.clone();
-                            let conn_id_edit = conn.id.clone();
-
-                            // Active session count for this connection
-                            let conn_sessions = app.session_manager.tabs()
-                                .iter()
-                                .filter(|t| t.connection_id.as_deref() == Some(&conn_id))
-                                .count();
-                            let is_active = conn_sessions > 0;
-
-                            // Clean host format: omit :22 when port is 22 or 0
-                            let host_display = if conn.port == 22 || conn.port == 0 {
-                                format!("{}@{}", conn.username, conn.host)
-                            } else {
-                                format!("{}@{}:{}", conn.username, conn.host, conn.port)
-                            };
-
-                            let card_bg = if is_active {
-                                app.accent_color()
-                            } else {
-                                app.card_bg()
-                            };
-
-                            let card_border = if is_active {
-                                app.primary_color()
-                            } else {
-                                border_color
-                            };
-
-                            let card_hover_border = app.primary_color();
-
-                            let icon_bg = if is_active {
-                                app.primary_color()
-                            } else {
-                                app.accent_color()
-                            };
-
-                            let icon_color = if is_active {
-                                rgb(app.current_theme().primary_foreground)
-                            } else {
-                                muted_text
-                            };
-
+                        .children(chunks.into_iter().map(|chunk| {
+                            let chunk_len = chunk.len();
                             div()
                                 .flex()
                                 .flex_row()
-                                .items_center()
-                                .w(px(320.0))
-                                .p_4()
-                                .gap_3()
-                                .rounded_xl()
-                                .bg(card_bg)
-                                .border_1()
-                                .border_color(card_border)
-                                .cursor_pointer()
-                                .hover(move |s| s.border_color(card_hover_border))
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                    this.connect_to_host(&conn_id_click, cx);
-                                }))
-                                // Left: Server icon box
-                                .child(
+                                .gap_4()
+                                .w_full()
+                                .children(chunk.into_iter().map(|conn| {
+                                    let conn_id = conn.id.clone();
+                                    let conn_id_click = conn.id.clone();
+                                    let conn_id_del = conn.id.clone();
+                                    let conn_id_edit = conn.id.clone();
+
+                                    // Active session count for this connection
+                                    let conn_sessions = app.session_manager.tabs()
+                                        .iter()
+                                        .filter(|t| t.connection_id.as_deref() == Some(&conn_id))
+                                        .count();
+                                    let is_active = conn_sessions > 0;
+
+                                    // Clean host format: omit :22 when port is 22 or 0
+                                    let host_display = if conn.port == 22 || conn.port == 0 {
+                                        format!("{}@{}", conn.username, conn.host)
+                                    } else {
+                                        format!("{}@{}:{}", conn.username, conn.host, conn.port)
+                                    };
+
+                                    let card_border = if is_active {
+                                        primary_color
+                                    } else {
+                                        border_color
+                                    };
+
+                                    let icon_color = if is_active {
+                                        primary_color
+                                    } else {
+                                        muted_text
+                                    };
+
                                     div()
-                                        .size(px(34.0))
-                                        .rounded_lg()
-                                        .bg(icon_bg)
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .child(
-                                            svg()
-                                                .data(crate::icons::SERVER_SVG)
-                                                .size(px(16.0))
-                                                .text_color(icon_color),
-                                        ),
-                                )
-                                // Middle: Info (Label + User@Host + Tags)
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_col()
                                         .flex_1()
-                                        .min_w_0()
-                                        .gap_0p5()
-                                        .child(
-                                            div()
-                                                .text_sm()
-                                                .font_weight(FontWeight::BOLD)
-                                                .text_color(text_color)
-                                                .truncate()
-                                                .child(conn.label.clone()),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(muted_text)
-                                                .truncate()
-                                                .child(host_display),
-                                        )
-                                        .children(if !conn.tags.is_empty() {
-                                            Some(
-                                                div()
-                                                    .flex()
-                                                    .flex_row()
-                                                    .flex_wrap()
-                                                    .gap_1()
-                                                    .mt_1()
-                                                    .children(conn.tags.into_iter().map(|tag| {
-                                                        div()
-                                                            .px_1p5()
-                                                            .py_0()
-                                                            .rounded_sm()
-                                                            .text_xs()
-                                                            .bg(app.accent_color())
-                                                            .text_color(muted_text)
-                                                            .child(tag)
-                                                    })),
-                                            )
-                                        } else {
-                                            None
-                                        }),
-                                )
-                                // Right: Active session badge or Quick actions
-                                .child(
-                                    div()
                                         .flex()
                                         .flex_row()
                                         .items_center()
-                                        .gap_2()
-                                        // Active sessions circle badge
-                                        .children(if is_active {
-                                            Some(
-                                                div()
-                                                    .size(px(20.0))
-                                                    .rounded_full()
-                                                    .bg(app.primary_color())
-                                                    .flex()
-                                                    .items_center()
-                                                    .justify_center()
-                                                    .child(
-                                                        div()
-                                                            .text_xs()
-                                                            .font_weight(FontWeight::BOLD)
-                                                            .text_color(rgb(app.current_theme().primary_foreground))
-                                                            .child(conn_sessions.to_string()),
-                                                    ),
-                                            )
-                                        } else {
-                                            None
-                                        })
-                                        // Edit icon button
+                                        .justify_between()
+                                        .py_4()
+                                        .px_4()
+                                        .gap_3()
+                                        .rounded_xl()
+                                        .bg(card_bg)
+                                        .border_1()
+                                        .border_color(card_border)
+                                        .cursor_pointer()
+                                        .hover(move |s| s.border_color(primary_color))
+                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                            this.connect_to_host(&conn_id_click, cx);
+                                        }))
+                                        // Left side: Icon + Info
                                         .child(
                                             div()
                                                 .flex()
+                                                .flex_row()
                                                 .items_center()
-                                                .justify_center()
-                                                .size(px(24.0))
-                                                .rounded_md()
-                                                .hover(move |s| s.bg(accent_color))
+                                                .gap_3()
+                                                .flex_1()
+                                                .min_w_0()
+                                                // Server icon box (subtle muted_bg, NO pink box)
                                                 .child(
-                                                    svg()
-                                                        .data(crate::icons::EDIT_SVG)
-                                                        .size(px(13.0))
-                                                        .text_color(muted_text),
+                                                    div()
+                                                        .size(px(34.0))
+                                                        .rounded_md()
+                                                        .bg(muted_bg)
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .flex_shrink_0()
+                                                        .child(
+                                                            svg()
+                                                                .data(crate::icons::SERVER_SVG)
+                                                                .size(px(16.0))
+                                                                .text_color(icon_color),
+                                                        ),
                                                 )
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    this.open_edit_connection_modal(&conn_id_edit, cx);
-                                                })),
+                                                // Middle: Info (Label + User@Host + Tags)
+                                                .child(
+                                                    div()
+                                                        .flex()
+                                                        .flex_col()
+                                                        .flex_1()
+                                                        .min_w_0()
+                                                        .gap_0p5()
+                                                        .child(
+                                                            div()
+                                                                .text_sm()
+                                                                .font_weight(FontWeight::BOLD)
+                                                                .text_color(text_color)
+                                                                .truncate()
+                                                                .child(conn.label.clone()),
+                                                        )
+                                                        .child(
+                                                            div()
+                                                                .text_xs()
+                                                                .text_color(muted_text)
+                                                                .truncate()
+                                                                .child(host_display),
+                                                        )
+                                                        .children(if !conn.tags.is_empty() {
+                                                            Some(
+                                                                div()
+                                                                    .flex()
+                                                                    .flex_row()
+                                                                    .flex_wrap()
+                                                                    .gap_1()
+                                                                    .mt_1()
+                                                                    .children(conn.tags.into_iter().map(|tag| {
+                                                                        div()
+                                                                            .px_1p5()
+                                                                            .py_0()
+                                                                            .rounded_sm()
+                                                                            .text_xs()
+                                                                            .bg(muted_bg)
+                                                                            .text_color(muted_text)
+                                                                            .child(tag)
+                                                                    })),
+                                                            )
+                                                        } else {
+                                                            None
+                                                        }),
+                                                ),
                                         )
-                                        // Delete icon button
+                                        // Right: Active session green badge & subtle actions
                                         .child(
                                             div()
                                                 .flex()
+                                                .flex_row()
                                                 .items_center()
-                                                .justify_center()
-                                                .size(px(24.0))
-                                                .rounded_md()
-                                                .hover(move |s| s.bg(accent_color))
+                                                .gap_2()
+                                                .flex_shrink_0()
+                                                // Active sessions circular green badge matching Electron (e.g. "1")
+                                                .children(if is_active {
+                                                    Some(
+                                                        div()
+                                                            .size(px(20.0))
+                                                            .rounded_full()
+                                                            .bg(primary_color)
+                                                            .flex()
+                                                            .items_center()
+                                                            .justify_center()
+                                                            .child(
+                                                                div()
+                                                                    .text_xs()
+                                                                    .font_weight(FontWeight::BOLD)
+                                                                    .text_color(primary_fg)
+                                                                    .child(conn_sessions.to_string()),
+                                                            ),
+                                                    )
+                                                } else {
+                                                    None
+                                                })
+                                                // Edit icon button
                                                 .child(
-                                                    svg()
-                                                        .data(crate::icons::TRASH_SVG)
-                                                        .size(px(13.0))
-                                                        .text_color(muted_text),
+                                                    div()
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .size(px(24.0))
+                                                        .rounded_md()
+                                                        .hover(move |s| s.bg(muted_bg))
+                                                        .child(
+                                                            svg()
+                                                                .data(crate::icons::EDIT_SVG)
+                                                                .size(px(13.0))
+                                                                .text_color(muted_text),
+                                                        )
+                                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                            this.open_edit_connection_modal(&conn_id_edit, cx);
+                                                        })),
                                                 )
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    this.delete_connection(&conn_id_del, cx);
-                                                })),
-                                        ),
-                                )
+                                                // Delete icon button
+                                                .child(
+                                                    div()
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .size(px(24.0))
+                                                        .rounded_md()
+                                                        .hover(move |s| s.bg(muted_bg))
+                                                        .child(
+                                                            svg()
+                                                                .data(crate::icons::TRASH_SVG)
+                                                                .size(px(13.0))
+                                                                .text_color(muted_text),
+                                                        )
+                                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                            this.delete_connection(&conn_id_del, cx);
+                                                        })),
+                                                ),
+                                        )
+                                }))
+                                // Spacer cards for last row so cards stay 1/3 width
+                                .children((0..(3 - chunk_len)).map(|_| {
+                                    div().flex_1()
+                                }))
                         }))
                         .into_any_element()
                 }),

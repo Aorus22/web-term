@@ -116,7 +116,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .text_color(text_color)
         // Tab shortcuts
         .on_action(cx.listener(|this, _: &NewTab, _window, cx| {
-            this.toggle_new_tab_modal(cx);
+            this.open_new_tab_page(cx);
         }))
         .on_action(cx.listener(|this, _: &CloseTab, _window, cx| {
             let idx = this.session_manager.active_index();
@@ -192,25 +192,25 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                             // Navigation items
                             .children(items.into_iter().map(|(view, label, icon)| {
                                 let is_active = active_view == view && (view != View::Hosts || app.show_hosts_catalog);
-                                let primary_color = app.primary_color();
-                                let primary_fg = rgb(app.current_theme().primary_foreground);
+                                let accent_color = app.accent_color();
+                                let accent_fg = app.accent_fg();
                                 let item_bg = if is_active {
-                                    primary_color
+                                    accent_color
                                 } else {
                                     sidebar_bg
                                 };
                                 let item_hover = if is_active {
-                                    primary_color
+                                    accent_color
                                 } else {
-                                    if is_dark { app.accent_color() } else { rgb(0xe2e8f0) }
+                                    app.muted_bg()
                                 };
                                 let item_text_color = if is_active {
-                                    primary_fg
+                                    accent_fg
                                 } else {
                                     text_color
                                 };
                                 let icon_color = if is_active {
-                                    primary_fg
+                                    accent_fg
                                 } else {
                                     app.muted_text()
                                 };
@@ -239,6 +239,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                             .child(label),
                                     )
                                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                        this.show_new_tab_popover = false;
                                         if view == View::Sftp {
                                             this.navigate_to_sftp(cx);
                                         } else {
@@ -259,25 +260,25 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                             .border_color(border_color)
                             .child({
                                 let is_active = active_view == View::Settings;
-                                let primary_color = app.primary_color();
-                                let primary_fg = rgb(app.current_theme().primary_foreground);
+                                let accent_color = app.accent_color();
+                                let accent_fg = app.accent_fg();
                                 let item_bg = if is_active {
-                                    primary_color
+                                    accent_color
                                 } else {
                                     sidebar_bg
                                 };
                                 let item_hover = if is_active {
-                                    primary_color
+                                    accent_color
                                 } else {
-                                    if is_dark { app.accent_color() } else { rgb(0xe2e8f0) }
+                                    app.muted_bg()
                                 };
                                 let item_text_color = if is_active {
-                                    primary_fg
+                                    accent_fg
                                 } else {
                                     text_color
                                 };
                                 let icon_color = if is_active {
-                                    primary_fg
+                                    accent_fg
                                 } else {
                                     app.muted_text()
                                 };
@@ -306,6 +307,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                             .child("Settings"),
                                     )
                                     .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                        this.show_new_tab_popover = false;
                                         this.active_view = View::Settings;
                                         this.show_hosts_catalog = false;
                                         cx.notify();
@@ -319,25 +321,55 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         // Main Content Area
         .child(
             div()
-                .flex()
-                .flex_col()
+                .relative()
                 .flex_1()
                 .h_full()
                 .overflow_hidden()
-                // Top Tab Strip across all views
-                .child(render_tab_strip(app, cx))
-                // Reconnection banner (when active tab is reconnecting or disconnected and viewing terminal)
-                .children(if active_view == View::Hosts && !app.show_hosts_catalog {
-                    render_reconnect_banner(app, cx)
+                // Content Pane (occupies full height with 40px top padding for tab strip)
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .size_full()
+                        .pt(px(40.0))
+                        .overflow_hidden()
+                        // Reconnection banner (when active tab is reconnecting or disconnected and viewing terminal)
+                        .children(if active_view == View::Hosts && !app.show_hosts_catalog {
+                            render_reconnect_banner(app, cx)
+                        } else {
+                            None
+                        })
+                        .child(
+                            div()
+                                .flex_1()
+                                .w_full()
+                                .overflow_hidden()
+                                .child(content_pane),
+                        ),
+                )
+                // Backdrop when popover is open to dismiss on click outside
+                .children(if app.show_new_tab_popover {
+                    Some(
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                this.show_new_tab_popover = false;
+                                cx.notify();
+                            })),
+                    )
                 } else {
                     None
                 })
+                // Top Tab Strip across all views (rendered AFTER content_pane so it and its popovers float on top!)
                 .child(
                     div()
-                        .flex_1()
-                        .w_full()
-                        .overflow_hidden()
-                        .child(content_pane),
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .right_0()
+                        .h(px(40.0))
+                        .child(render_tab_strip(app, cx)),
                 ),
         )
         .children(modal_overlay)
@@ -359,6 +391,14 @@ fn render_content_pane(
 ) -> AnyElement {
     let bg = app.bg_color();
     match view {
+        View::NewTab => {
+            div()
+                .size_full()
+                .overflow_hidden()
+                .bg(bg)
+                .child(crate::views::new_tab::render_new_tab_page(app, cx))
+                .into_any_element()
+        }
         View::Hosts => {
             let active_tab_view = app.session_manager.active_tab().and_then(|t| t.view.clone());
             let host_or_term = if app.show_hosts_catalog || active_tab_view.is_none() {
