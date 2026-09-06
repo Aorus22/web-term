@@ -1,0 +1,17 @@
+[package]
+name = "webterm-ui"
+description = "WebTerm pure GPUI presentation layer: views, themes, and icons"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+gpui = { workspace = true }
+gpui-component = { workspace = true }
+webterm-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+webterm-terminal = { workspace = true }

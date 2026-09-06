@@ -95,7 +95,7 @@ fn main() {
             app_state.update(cx, |this, cx| {
                 this.start_supervisor(cx);
             });
-            app_state
+            cx.new(|_cx| webterm::WebTermRoot::new(app_state))
         });
     });
 }

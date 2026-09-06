@@ -11,7 +11,7 @@
 //! 4. Restore settings.json or remove the invalid backend_path override.
 
 use gpui::*;
-use webterm_supervisor::BackendStatus;
+use crate::webterm_supervisor::BackendStatus;
 
 /// Redact encryption key material and secret tokens from stderr lines.
 ///

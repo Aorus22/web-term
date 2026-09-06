@@ -1,7 +1,7 @@
 //! Hosts Catalog view: connection cards grid, tag filtering, and quick-connect matching web client.
 
 use gpui::*;
-use webterm_backend_client::Connection;
+use crate::webterm_backend_client::Connection;
 use crate::icons::{ARROW_DOWN_SVG, ARROW_UP_SVG, PLUS_SVG};
 use crate::app_state::AppState;
 

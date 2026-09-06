@@ -1,7 +1,7 @@
 //! Reconnection banner UI component for disconnected or reconnecting sessions.
 
 use gpui::*;
-use webterm_settings::Theme as SettingsTheme;
+use crate::webterm_settings::Theme as SettingsTheme;
 use crate::app_state::AppState;
 use crate::session::SessionStatus;
 

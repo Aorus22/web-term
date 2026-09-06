@@ -22,6 +22,9 @@ webterm-supervisor = { workspace = true }
 webterm-settings = { workspace = true }
 webterm-backend-client = { workspace = true }
 webterm-terminal = { workspace = true }
+webterm-core = { workspace = true }
+webterm-ui = { workspace = true }
+
 parking_lot = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }

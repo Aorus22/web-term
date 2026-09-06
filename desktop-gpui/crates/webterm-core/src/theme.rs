@@ -2,7 +2,27 @@
 
 use gpui::{rgb, App, Rgba};
 use gpui_component::{Theme, ThemeMode};
-use webterm_settings::Theme as SettingsTheme;
+use crate::app_state::Theme as SettingsTheme;
+
+
+#[cfg(target_arch = "wasm32")]
+pub mod webterm_terminal {
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct ColorPalette {
+        pub foreground: u32,
+        pub background: u32,
+        pub cursor: u32,
+        pub selection: u32,
+        pub ansi: [u32; 16],
+    }
+
+    impl ColorPalette {
+        pub fn from_rgb_u32(fg: u32, bg: u32, cursor: u32, selection: u32, ansi: [u32; 16]) -> Self {
+            Self { foreground: fg, background: bg, cursor, selection, ansi }
+        }
+    }
+}
+
 
 /// Complete theme color palette mirroring web client ThemePreset.
 #[derive(Debug, Clone, Copy, PartialEq)]

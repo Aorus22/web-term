@@ -9,10 +9,12 @@ use webterm_backend_client::{
     TerminalWsHandle, UpdateConnectionRequest, UpdateForwardRequest, WsConnectRequest,
 };
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
+pub use webterm_settings::Theme;
+
 use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
 
 use crate::session::{SessionStatus, TerminalSessionManager, TerminalTab};
-use crate::views::{nav::render_nav_shell, status::render_status_page};
+
 
 /// Standard RFC 4648 Base64 encoding for PEM payloads.
 pub fn encode_base64(bytes: &[u8]) -> String {
@@ -3814,24 +3816,3 @@ impl AppState {
     }
 }
 
-
-impl Render for AppState {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let key_secret = self.settings.encryption_key.as_deref();
-
-        match self.backend_status {
-            BackendStatus::Ready => render_nav_shell(self, cx),
-            _ => {
-                let status = self.backend_status.clone();
-                render_status_page(
-                    &status,
-                    key_secret,
-                    |this, _ev, _window, cx| {
-                        this.start_supervisor(cx);
-                    },
-                    cx,
-                )
-            }
-        }
-    }
-}

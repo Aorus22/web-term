@@ -1,0 +1,13 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+ignore = [
+    "dist",
+]
+
+[serve]
+port = 8085
+open = false
+address = "127.0.0.1"

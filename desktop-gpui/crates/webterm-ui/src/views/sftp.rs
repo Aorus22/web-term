@@ -1,7 +1,7 @@
 //! SFTP Dual-Pane File Manager view: directory browsing, breadcrumbs, sorting, and source selection.
 
 use gpui::*;
-use webterm_backend_client::SftpFileInfo;
+use crate::webterm_backend_client::SftpFileInfo;
 
 use crate::app_state::{
     format_file_size, join_path, split_breadcrumbs, AppState, SftpActivePane,

@@ -5,6 +5,9 @@ members = [
     "crates/settings",
     "crates/backend-client",
     "crates/terminal",
+    "crates/webterm-core",
+    "crates/webterm-ui",
+    "crates/webterm-web",
     "crates/webterm",
 ]
 
@@ -20,9 +23,13 @@ webterm-supervisor = { path = "crates/supervisor" }
 webterm-settings = { path = "crates/settings" }
 webterm-backend-client = { path = "crates/backend-client" }
 webterm-terminal = { path = "crates/terminal" }
+webterm-core = { path = "crates/webterm-core" }
+webterm-ui = { path = "crates/webterm-ui" }
+webterm-web = { path = "crates/webterm-web" }
 
 alacritty_terminal = "=0.25.1"
 flume = "=0.12.0"
+
 anyhow = "=1.0.104"
 tokio-tungstenite = { version = "=0.26.2", default-features = false, features = ["connect", "handshake"] }
 futures-util = "=0.3.32"
@@ -54,6 +61,15 @@ parking_lot = "=0.12.5"
 rand = "=0.10.2"
 tempfile = "=3.27.0"
 libc = "=0.2.189"
+
+# Web dependencies
+wasm-bindgen = "0.2"
+gpui-kit = { version = "0.6.0", default-features = false }
+console_error_panic_hook = "0.1"
+console_log = "1.0"
+log = "0.4"
+
+
 
 [profile.release]
 lto = "thin"
