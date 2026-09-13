@@ -74,7 +74,8 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .size_full()
         .bg(bg_color)
         .text_color(text_color)
-        // Dual Pane Content Area (50/50 horizontal split with 1px divider and grabber handle)
+        // Dual Pane Content Area (resizable horizontal split with divider and
+        // grabber handle; drag to resize, matching the web's split pane)
         .child(
             div()
                 .flex()
@@ -82,34 +83,63 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 .flex_1()
                 .size_full()
                 .overflow_hidden()
-                .child(div().flex_1().h_full().overflow_hidden().child(left_pane))
-                // 1px central divider with grabber handle
+                .on_mouse_move(cx.listener(|this, ev: &MouseMoveEvent, window, cx| {
+                    if this.sftp_manager.split_dragging {
+                        this.sftp_split_drag_move(f32::from(ev.position.x), window, cx);
+                    }
+                }))
+                .on_mouse_up(
+                    MouseButton::Left,
+                    cx.listener(|this, _: &MouseUpEvent, _window, cx| {
+                        this.sftp_split_drag_end(cx);
+                    }),
+                )
                 .child(
-                    div().w(px(1.0)).h_full().bg(border_color).relative().child(
-                        div()
-                            .absolute()
-                            .top(px(260.0))
-                            .left(px(-10.0))
-                            .w(px(21.0))
-                            .h(px(26.0))
-                            .rounded_sm()
-                            .bg(if is_dark {
-                                rgb(0x27272a)
-                            } else {
-                                rgb(0xe2e8f0)
-                            })
-                            .border_1()
-                            .border_color(border_color)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(
-                                svg()
-                                    .data(crate::icons::GRABBER_SVG)
-                                    .size(px(12.0))
-                                    .text_color(muted_text),
-                            ),
-                    ),
+                    div()
+                        .w(gpui::relative(app.sftp_manager.split_ratio))
+                        .h_full()
+                        .overflow_hidden()
+                        .child(left_pane),
+                )
+                // 1px central divider with grabber handle (9px hit area)
+                .child(
+                    div()
+                        .w(px(9.0))
+                        .h_full()
+                        .cursor_col_resize()
+                        .bg(border_color)
+                        .relative()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, ev: &MouseDownEvent, _window, cx| {
+                                this.sftp_split_drag_start(f32::from(ev.position.x), cx);
+                            }),
+                        )
+                        .child(
+                            div()
+                                .absolute()
+                                .top(px(260.0))
+                                .left(px(-10.0))
+                                .w(px(21.0))
+                                .h(px(26.0))
+                                .rounded_sm()
+                                .bg(if is_dark {
+                                    rgb(0x27272a)
+                                } else {
+                                    rgb(0xe2e8f0)
+                                })
+                                .border_1()
+                                .border_color(border_color)
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .child(
+                                    svg()
+                                        .data(crate::icons::GRABBER_SVG)
+                                        .size(px(12.0))
+                                        .text_color(muted_text),
+                                ),
+                        ),
                 )
                 .child(div().flex_1().h_full().overflow_hidden().child(right_pane)),
         )

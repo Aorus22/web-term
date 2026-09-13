@@ -141,7 +141,10 @@ func (h *SFTPHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transferID := uuid.New().String()
+	transferID := r.Header.Get("X-Transfer-Id")
+	if transferID == "" {
+		transferID = uuid.New().String()
+	}
 	h.TM.CreateTransfer(transferID, header.Size)
 
 	// Return transferId immediately

@@ -623,6 +623,7 @@ impl BackendClient {
         path: &str,
         filename: &str,
         data: Vec<u8>,
+        transfer_id: &str,
     ) -> Result<String, ClientError> {
         let url = format!("{}/api/sftp/upload", self.base_url);
         let part = reqwest::multipart::Part::bytes(data).file_name(filename.to_string());
@@ -640,6 +641,7 @@ impl BackendClient {
             .http
             .post(&url)
             .query(&[("connectionId", connection_id), ("path", &full_path)])
+            .header("X-Transfer-Id", transfer_id)
             .multipart(form)
             .send()
             .await
@@ -665,6 +667,33 @@ impl BackendClient {
             .await
             .map_err(|e| ClientError::Decode { url, source: e })?;
         Ok(parsed.transfer_id)
+    }
+
+    /// Open the SSE progress stream for a transfer id (GET
+    /// /api/sftp/transfer/{id}/progress). The response body streams
+    /// `data: {json}` lines every ~200ms until the transfer completes.
+    pub async fn sftp_open_progress_stream(
+        &self,
+        transfer_id: &str,
+    ) -> Result<reqwest::Response, ClientError> {
+        let url = format!("{}/api/sftp/transfer/{}/progress", self.base_url, transfer_id);
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        Ok(resp)
     }
 
     /// Query all active and recent background transfers via GET /api/sftp/transfers.

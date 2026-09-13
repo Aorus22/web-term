@@ -48,7 +48,7 @@ impl TerminalTab {
         let config = webterm_terminal::terminal::TerminalConfig { scrollback_limit };
 
         let view = cx.new(|cx| {
-            let terminal = webterm_terminal::terminal::Terminal::with_config(80, 24, config);
+            let terminal = Terminal::with_config(80, 24, config);
             let mut renderer =
                 TerminalRenderer::new("JetBrains Mono".to_string(), px(14.0), 1.2, palette);
             renderer.cursor_shape_override = cursor_shape;

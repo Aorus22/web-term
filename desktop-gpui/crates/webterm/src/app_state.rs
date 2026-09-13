@@ -204,6 +204,24 @@ impl AppState {
     }
 }
 
+/// Locate the end of the next SSE frame ("...\n\n") in the buffer.
+fn find_sse_frame(buf: &[u8]) -> Option<usize> {
+    buf.windows(2).position(|w| w == b"\n\n").map(|p| p + 2)
+}
+
+/// Parse an SSE frame into a transfer status, if it carries a data line.
+fn parse_sse_status(frame: &[u8]) -> Option<SftpTransferStatus> {
+    let text = std::str::from_utf8(frame).ok()?;
+    for line in text.lines() {
+        if let Some(data) = line.strip_prefix("data: ") {
+            if data.starts_with('{') {
+                return serde_json::from_str::<SftpTransferStatus>(data).ok();
+            }
+        }
+    }
+    None
+}
+
 /// Standard RFC 4648 Base64 encoding for PEM payloads.
 pub fn encode_base64(bytes: &[u8]) -> String {
     const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1028,6 +1046,9 @@ pub struct AppState {
     /// Quick-connect sessions offer "Save this connection?" after a final
     /// disconnect, matching the web client's SaveConnectionBanner.
     pub save_connection_prompt: Option<(String, u16, String)>,
+    pub sftp_split_drag_start_x: f32,
+    pub sftp_split_drag_start_ratio: f32,
+    pub backend_transfer_counter: u64,
     pub terminal_context_menu: Option<(f32, f32)>,
     pub terminal_font_size: f32,
     pub terminal_font_family: String,
@@ -1115,6 +1136,9 @@ impl AppState {
             delete_key_target: None,
             key_delete_warning: None,
             save_connection_prompt: None,
+            sftp_split_drag_start_x: 0.0,
+            sftp_split_drag_start_ratio: 0.5,
+            backend_transfer_counter: 0,
             terminal_context_menu: None,
             terminal_font_size,
             terminal_font_family: terminal_font_family.clone(),
@@ -1648,7 +1672,7 @@ impl AppState {
     }
 
     /// Save Edit SSH Key form (rename and optionally replace key material).
-    pub fn save_edit_key_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn save_edit_key_form(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let name_value = AppState::input_value(&self.inputs().edit_key_name, cx);
         let pem_value = AppState::input_value_textarea(&self.inputs().edit_key_pem, cx);
         if let Some(f) = &mut self.edit_key_modal {
@@ -1741,7 +1765,7 @@ impl AppState {
     }
 
     /// Upload and save new SSH Key to backend pool.
-    pub fn create_ssh_key(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn create_ssh_key(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let name_value = AppState::input_value(&self.inputs().new_key_name, cx);
         let pem_value = AppState::input_value_textarea(&self.inputs().new_key_pem, cx);
         self.new_key_name = name_value.clone();
@@ -2181,7 +2205,7 @@ impl AppState {
     }
 
     /// Save connection form (Create or Update).
-    pub fn save_connection_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn save_connection_form(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let (label, host, port, username, password, tags) = {
             let inputs = self.inputs();
             (
@@ -4199,7 +4223,8 @@ impl AppState {
         let conn_id = self.sftp_pane(target_pane).source_id.clone();
         let target_path = self.sftp_pane(target_pane).current_path.clone();
         let total_bytes = data.len() as i64;
-        let transfer_id = next_transfer_id();
+        let backend_transfer_id = self.next_backend_transfer_id();
+        let transfer_id = backend_transfer_id.clone();
 
         let transfer_item = SftpTransferItem {
             id: transfer_id.clone(),
@@ -4215,6 +4240,7 @@ impl AppState {
 
         self.sftp_manager.transfers.push(transfer_item);
         self.sftp_manager.transfers_drawer_open = true;
+        self.sftp_watch_progress(backend_transfer_id.clone(), cx);
         cx.notify();
 
         let tx_id = transfer_id.clone();
@@ -4223,7 +4249,7 @@ impl AppState {
 
         TOKIO_RT.spawn(async move {
             match client
-                .sftp_upload(&conn_id, &target_path, &filename, data)
+                .sftp_upload(&conn_id, &target_path, &filename, data, &backend_transfer_id)
                 .await
             {
                 Ok(remote_tx_id) => {
@@ -4405,7 +4431,8 @@ impl AppState {
         self.sftp_manager.transfers_drawer_open = true;
 
         for (filename, dst_name) in pairs {
-            let tx_id = next_transfer_id();
+            let backend_transfer_id = self.next_backend_transfer_id();
+            let tx_id = backend_transfer_id.clone();
             let delete_after = if delete_source {
                 Some((src_conn.clone(), join_path(&src_base, &filename)))
             } else {
@@ -4430,6 +4457,8 @@ impl AppState {
             let src_file_path = join_path(&src_base, &filename);
             let dst_target_dir = dst_base.clone();
             let fname = dst_name.clone();
+            let backend_transfer_id = backend_transfer_id.clone();
+            self.sftp_watch_progress(backend_transfer_id.clone(), cx);
             let view_weak = cx.entity().downgrade();
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<usize, String>>();
 
@@ -4438,7 +4467,7 @@ impl AppState {
                     Ok(data) => {
                         let len = data.len();
                         match client
-                            .sftp_upload(&dst_conn, &dst_target_dir, &fname, data)
+                            .sftp_upload(&dst_conn, &dst_target_dir, &fname, data, &backend_transfer_id)
                             .await
                         {
                             Ok(_) => {
@@ -4636,11 +4665,11 @@ impl AppState {
 
         self.sftp_pane_mut(pane).show_actions_menu = false;
 
-        enum Progress {
-            Started(String),
-            Finished(String),
-            Failed(String),
-        }
+    enum Progress {
+        Started(String, String),
+        Finished(String),
+        Failed(String, String),
+    }
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Progress>();
         TOKIO_RT.spawn(async move {
             let picked = rfd::AsyncFileDialog::new().pick_files().await;
@@ -4649,14 +4678,25 @@ impl AppState {
             };
             for handle in handles {
                 let name = handle.file_name();
-                let _ = tx.send(Progress::Started(name.clone())).ok();
+                static COUNTER: std::sync::atomic::AtomicU64 =
+                    std::sync::atomic::AtomicU64::new(1);
+                let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let nanos = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0);
+                let backend_id = format!("wt-{}-{}", nanos, n);
+                let _ = tx.send(Progress::Started(name.clone(), backend_id.clone())).ok();
                 let bytes = handle.read().await;
-                match client.sftp_upload(&conn_id, &dir, &name, bytes).await {
+                match client
+                    .sftp_upload(&conn_id, &dir, &name, bytes, &backend_id)
+                    .await
+                {
                     Ok(_) => {
-                        let _ = tx.send(Progress::Finished(name)).ok();
+                        let _ = tx.send(Progress::Finished(backend_id)).ok();
                     }
                     Err(e) => {
-                        let _ = tx.send(Progress::Failed(format!("Upload error: {e}"))).ok();
+                        let _ = tx.send(Progress::Failed(backend_id, format!("Upload error: {e}"))).ok();
                     }
                 }
             }
@@ -4672,9 +4712,9 @@ impl AppState {
                         if let Some(app) = view_weak.upgrade() {
                             app.update(cx, |this, cx| {
                                 match res {
-                                    Progress::Started(name) => {
+                                    Progress::Started(name, backend_id) => {
                                         this.sftp_manager.transfers.push(SftpTransferItem {
-                                            id: next_transfer_id(),
+                                            id: backend_id.clone(),
                                             name,
                                             from_source: "Local file".to_string(),
                                             to_source: label.clone(),
@@ -4684,26 +4724,25 @@ impl AppState {
                                             error: None,
                                             delete_source_after: None,
                                         });
+                                        this.sftp_watch_progress(backend_id, cx);
                                     }
-                                    Progress::Finished(name) => {
+                                    Progress::Finished(id) => {
                                         if let Some(item) = this
                                             .sftp_manager
                                             .transfers
                                             .iter_mut()
-                                            .rev()
-                                            .find(|t| t.name == name && t.status == "in_progress")
+                                            .find(|t| t.id == id)
                                         {
                                             item.status = "completed".to_string();
                                         }
                                         this.sftp_load_pane(pane, cx);
                                     }
-                                    Progress::Failed(err) => {
+                                    Progress::Failed(id, err) => {
                                         if let Some(item) = this
                                             .sftp_manager
                                             .transfers
                                             .iter_mut()
-                                            .rev()
-                                            .find(|t| t.status == "in_progress")
+                                            .find(|t| t.id == id)
                                         {
                                             item.status = "failed".to_string();
                                             item.error = Some(err.clone());
@@ -4738,7 +4777,8 @@ impl AppState {
 
         let conn_id = self.sftp_pane(source_pane).source_id.clone();
         let full_path = join_path(&self.sftp_pane(source_pane).current_path, &file_path);
-        let transfer_id = next_transfer_id();
+        let backend_transfer_id = self.next_backend_transfer_id();
+        let transfer_id = backend_transfer_id.clone();
 
         let transfer_item = SftpTransferItem {
             id: transfer_id.clone(),
@@ -4822,6 +4862,148 @@ impl AppState {
         })
         .detach();
 
+    }
+
+    // ==================== SFTP splitter drag + progress ====================
+
+    /// Begin dragging the dual-pane splitter at the given window x.
+    pub fn sftp_split_drag_start(&mut self, x: f32, cx: &mut Context<Self>) {
+        self.sftp_manager.split_dragging = true;
+        self.sftp_split_drag_start_x = x;
+        self.sftp_split_drag_start_ratio = self.sftp_manager.split_ratio;
+        cx.notify();
+    }
+
+    /// Update the split ratio while dragging; the row width is estimated
+    /// from the viewport minus sidebar/sheet so a delta-based update keeps
+    /// the divider under the cursor.
+    pub fn sftp_split_drag_move(&mut self, x: f32, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.sftp_manager.split_dragging {
+            return;
+        }
+        let mut total = f32::from(window.viewport_size().width);
+        if self.sidebar_open {
+            total -= 200.0;
+        }
+        if self.connection_modal.is_some()
+            || self.connection_sheet_closing
+            || self.edit_key_modal.is_some()
+            || self.edit_key_sheet_closing
+            || self.show_add_key_modal
+            || self.add_key_sheet_closing
+            || self.forward_modal.is_some()
+            || self.forward_sheet_closing
+        {
+            total -= 540.0;
+        }
+        let delta = x - self.sftp_split_drag_start_x;
+        self.sftp_manager.split_ratio = (self.sftp_split_drag_start_ratio + delta / total.max(200.0))
+            .clamp(0.2, 0.8);
+        cx.notify();
+    }
+
+    /// Finish dragging the splitter.
+    pub fn sftp_split_drag_end(&mut self, cx: &mut Context<Self>) {
+        if self.sftp_manager.split_dragging {
+            self.sftp_manager.split_dragging = false;
+            cx.notify();
+        }
+    }
+
+    /// Generate a backend transfer id so the client can watch the SSE
+    /// progress stream while the upload is still in flight.
+    pub fn next_backend_transfer_id(&mut self) -> String {
+        self.backend_transfer_counter += 1;
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        format!("wt-{}-{}", nanos, self.backend_transfer_counter)
+    }
+
+    /// Watch the backend SSE progress stream for a transfer id and update
+    /// the matching transfer item live (bytes, total, status).
+    pub fn sftp_watch_progress(&mut self, transfer_id: String, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<SftpTransferStatus>();
+
+        let transfer_id_for_stream = transfer_id.clone();
+        TOKIO_RT.spawn(async move {
+            let Ok(mut resp) = client.sftp_open_progress_stream(&transfer_id_for_stream).await else {
+                return;
+            };
+            let mut buf: Vec<u8> = Vec::new();
+            loop {
+                match resp.chunk().await {
+                    Ok(Some(chunk)) => {
+                        buf.extend_from_slice(&chunk);
+                        while let Some(pos) = find_sse_frame(&buf) {
+                            let frame: Vec<u8> = buf.drain(..pos).collect();
+                            if let Some(status) = parse_sse_status(&frame) {
+                                if tx.send(status).is_err() {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(_) => break,
+                }
+            }
+        });
+
+        let transfer_id_for_loop = transfer_id.clone();
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            let transfer_id = transfer_id_for_loop;
+            async move {
+                while let Some(remote) = rx.recv().await {
+                    let mut done = false;
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                if let Some(item) = this
+                                    .sftp_manager
+                                    .transfers
+                                    .iter_mut()
+                                    .find(|t| t.id == transfer_id)
+                                {
+                                    item.bytes_transferred = remote.bytes_transferred;
+                                    item.total_bytes = remote.total_bytes;
+                                    item.status = match remote.status.as_str() {
+                                        "completed" => {
+                                            done = true;
+                                            "completed".to_string()
+                                        }
+                                        "error" => {
+                                            done = true;
+                                            "failed".to_string()
+                                        }
+                                        "transferring" => "in_progress".to_string(),
+                                        other => other.to_string(),
+                                    };
+                                    if let Some(err_text) = remote.error.clone() {
+                                        if !err_text.is_empty() {
+                                            item.error = Some(err_text);
+                                        }
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                    if done {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
     }
 
     /// Toggle visibility of the transfers drawer.
@@ -5004,7 +5186,7 @@ impl AppState {
     }
 
     /// Save port forward modal form (Create or Update).
-    pub fn save_forward_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn save_forward_form(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let (name, local_port, remote_port) = {
             let inputs = self.inputs();
             (
