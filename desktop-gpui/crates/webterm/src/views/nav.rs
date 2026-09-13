@@ -119,8 +119,8 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .bg(bg_color)
         .text_color(text_color)
         // Tab shortcuts
-        .on_action(cx.listener(|this, _: &NewTab, _window, cx| {
-            this.open_new_tab_page(cx);
+        .on_action(cx.listener(|this, _: &NewTab, window, cx| {
+            this.open_new_tab_page(window, cx);
         }))
         .on_action(cx.listener(|this, _: &CloseTab, _window, cx| {
             let idx = this.session_manager.active_index();
@@ -606,8 +606,8 @@ pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> 
             ),
         };
         return Some(
-            confirm_dialog_shell(app, cx, move |this, _, cx| {
-                this.confirm_delete_key(cx);
+            confirm_dialog_shell(app, cx, |this, _, cx| {
+                this.cancel_delete_key_modal(cx);
             })
             .child(
                 div()

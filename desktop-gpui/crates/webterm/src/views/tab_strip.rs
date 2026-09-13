@@ -153,14 +153,14 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .child(svg().data(PLUS_SVG).size(px(14.0)).text_color(muted_text))
                         .on_mouse_down(
                             MouseButton::Left,
-                            cx.listener(|this, _, _window, cx| {
+                            cx.listener(|this, _, window, cx| {
                                 let has_active_session = this.session_manager.tab_count() > 0
                                     && this.active_view == View::Hosts
                                     && !this.show_hosts_catalog;
                                 if has_active_session {
                                     this.toggle_new_tab_popover(cx);
                                 } else {
-                                    this.open_new_tab_page(cx);
+                                    this.open_new_tab_page(window, cx);
                                 }
                             }),
                         ),
@@ -258,8 +258,8 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                     )
                                     .on_mouse_down(
                                         MouseButton::Left,
-                                        cx.listener(|this, _, _window, cx| {
-                                            this.open_new_tab_page(cx);
+                                        cx.listener(|this, _, window, cx| {
+                                            this.open_new_tab_page(window, cx);
                                         }),
                                     ),
                             ),

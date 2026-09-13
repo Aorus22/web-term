@@ -1527,8 +1527,8 @@ fn render_actions_dropdown(
                         .child("Upload File")
                         .on_mouse_down(
                             MouseButton::Left,
-                            cx.listener(move |this, _, _window, _cx| {
-                                this.sftp_pane_mut(pane).show_actions_menu = false;
+                            cx.listener(move |this, _, _window, cx| {
+                                this.sftp_upload_from_picker(pane, cx);
                             }),
                         ),
                 )
@@ -2924,6 +2924,132 @@ pub fn render_sftp_context_menu(
                     )
                     // Divider
                     .child(div().h_px().w_full().bg(border_color).my_0p5())
+                    // Cut
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(hover_bg))
+                            .text_xs()
+                            .text_color(text_color)
+                            .child(
+                                svg()
+                                    .data(crate::icons::TRASH_SVG)
+                                    .size(px(12.0))
+                                    .text_color(muted_text),
+                            )
+                            .child("Cut")
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _window, cx| {
+                                    this.sftp_close_context_menu(cx);
+                                    this.sftp_clipboard_copy(true, pane, cx);
+                                }),
+                            ),
+                    )
+                    // Copy
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(hover_bg))
+                            .text_xs()
+                            .text_color(text_color)
+                            .child(
+                                svg()
+                                    .data(crate::icons::COPY_SVG)
+                                    .size(px(12.0))
+                                    .text_color(muted_text),
+                            )
+                            .child("Copy")
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _window, cx| {
+                                    this.sftp_close_context_menu(cx);
+                                    this.sftp_clipboard_copy(false, pane, cx);
+                                }),
+                            ),
+                    )
+                    // Paste Here (dimmed without clipboard)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(hover_bg))
+                            .text_xs()
+                            .text_color(if app.sftp_manager.clipboard.is_some() {
+                                text_color
+                            } else {
+                                muted_text
+                            })
+                            .child(
+                                svg()
+                                    .data(crate::icons::FILES_SVG)
+                                    .size(px(12.0))
+                                    .text_color(muted_text),
+                            )
+                            .child("Paste Here")
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _window, cx| {
+                                    if this.sftp_manager.clipboard.is_some() {
+                                        this.sftp_close_context_menu(cx);
+                                        this.sftp_paste(pane, cx);
+                                    }
+                                }),
+                            ),
+                    )
+                    // Download (files only)
+                    .children(if !menu.is_dir {
+                        Some(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_2()
+                                .px_3()
+                                .py_1p5()
+                                .rounded_md()
+                                .cursor_pointer()
+                                .hover(|s| s.bg(hover_bg))
+                                .text_xs()
+                                .text_color(text_color)
+                                .child(
+                                    svg()
+                                        .data(crate::icons::ARROW_DOWN_SVG)
+                                        .size(px(12.0))
+                                        .text_color(muted_text),
+                                )
+                                .child("Download")
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _window, cx| {
+                                        this.sftp_close_context_menu(cx);
+                                        this.sftp_download_file(pane, filename.clone(), cx);
+                                    }),
+                                ),
+                        )
+                    } else {
+                        None
+                    })
                     // 4. Copy Path
                     .child(
                         div()

@@ -321,6 +321,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                     let conn_id_click = conn.id.clone();
                                     let conn_id_del = conn.id.clone();
                                     let conn_id_edit = conn.id.clone();
+                                    let conn_id_dup = conn.id.clone();
 
                                     // Active session count for this connection
                                     let conn_sessions = app.session_manager.tabs()
@@ -469,6 +470,25 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                 } else {
                                                     None
                                                 })
+                                                // Duplicate icon button
+                                                .child(
+                                                    div()
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .size(px(24.0))
+                                                        .rounded_md()
+                                                        .hover(move |s| s.bg(muted_bg))
+                                                        .child(
+                                                            svg()
+                                                                .data(crate::icons::COPY_SVG)
+                                                                .size(px(13.0))
+                                                                .text_color(muted_text),
+                                                        )
+                                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                            this.duplicate_connection(&conn_id_dup, cx);
+                                                        })),
+                                                )
                                                 // Edit icon button
                                                 .child(
                                                     div()

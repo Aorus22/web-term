@@ -305,6 +305,9 @@ impl ConnectionFormState {
         if self.username.trim().is_empty() {
             return Err("Username is required".to_string());
         }
+        if self.port.trim().parse::<u16>().is_err() {
+            return Err("Port must be a valid number (1-65535)".to_string());
+        }
         if self.auth_method == "key" && self.ssh_key_id.is_none() {
             return Err("Please select an SSH key for key authentication".to_string());
         }
@@ -659,6 +662,9 @@ pub enum SftpModalState {
         dst_pane: SftpActivePane,
         conflict_name: String,
         remaining_transfers: Vec<String>,
+        /// Whether resolving this conflict should delete the source entries
+        /// (cut/paste) instead of copying them.
+        cut: bool,
     },
 }
 
@@ -1216,6 +1222,11 @@ impl AppState {
     /// Escape closes the topmost overlay (popover > menus > dialogs >
     /// sheets), matching the web client's dismissal behavior.
     pub fn handle_escape(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.terminal_context_menu.is_some() {
+            self.terminal_context_menu = None;
+            cx.notify();
+            return;
+        }
         if self.show_new_tab_popover {
             self.show_new_tab_popover = false;
             cx.notify();
@@ -1277,6 +1288,18 @@ impl AppState {
         if self.show_font_dialog {
             self.show_font_dialog = false;
             cx.notify();
+            return;
+        }
+        if self.show_theme_mode_picker
+            || self.show_cursor_style_picker
+            || self.show_scrollback_picker
+            || self.show_font_dialog_picker
+        {
+            self.show_theme_mode_picker = false;
+            self.show_cursor_style_picker = false;
+            self.show_scrollback_picker = false;
+            self.show_font_dialog_picker = false;
+            cx.notify();
         }
     }
 
@@ -1287,11 +1310,12 @@ impl AppState {
     }
 
     /// Open the onboarding / New Tab page (Welcome to WebTerm).
-    pub fn open_new_tab_page(&mut self, cx: &mut Context<Self>) {
+    pub fn open_new_tab_page(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.show_new_tab_popover = false;
         self.show_hosts_catalog = false;
         self.active_view = View::NewTab;
         self.quick_connect_query.clear();
+        AppState::set_input_value(&self.inputs().quick_connect, "", window, cx);
         cx.notify();
     }
 
@@ -1812,8 +1836,13 @@ impl AppState {
     }
 
     /// Confirm key deletion. When the backend reports the key is still
-    /// referenced, show the affected-connections warning and re-confirm.
+    /// referenced, the dialog stays open showing the warning; a second
+    /// confirm simply dismisses it (the key was already deleted).
     pub fn confirm_delete_key(&mut self, cx: &mut Context<Self>) {
+        if self.key_delete_warning.is_some() {
+            self.cancel_delete_key_modal(cx);
+            return;
+        }
         let Some(key) = self.delete_key_target.clone() else {
             return;
         };
@@ -1858,16 +1887,9 @@ impl AppState {
                                 match res {
                                     Ok(Some(warning)) => {
                                         // 200 + body: key deleted, warn that
-                                        // connections lost key-based auth.
-                                        this.push_notification(
-                                            format!(
-                                                "{} ({} connection(s) affected)",
-                                                warning.warning, warning.affected_connections
-                                            ),
-                                            true,
-                                            cx,
-                                        );
-                                        this.delete_key_target = None;
+                                        // connections lost key-based auth. Keep
+                                        // the dialog open in its warning state
+                                        // like the web client.
                                         this.key_delete_warning =
                                             Some((warning.warning, warning.affected_connections));
                                         this.fetch_ssh_keys(cx);
@@ -4263,110 +4285,6 @@ impl AppState {
         self.sftp_transfer_with_conflict_check(src_pane, dst_pane, targets, false, cx);
     }
 
-    /// Poll backend transfer progress every 600ms until nothing is active.
-    pub fn sftp_poll_transfers(&mut self, cx: &mut Context<Self>) {
-        let client = match self.client.clone() {
-            Some(c) => c,
-            None => return,
-        };
-
-        let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<Result<Vec<SftpTransferStatus>, String>>();
-
-        TOKIO_RT.spawn(async move {
-            match client.sftp_list_transfers().await {
-                Ok(list) => {
-                    let _ = tx.send(Ok(list));
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(e.to_string()));
-                }
-            }
-        });
-
-        cx.spawn(move |_view, cx: &mut AsyncApp| {
-            let view_weak = view_weak.clone();
-            let cx_handle = cx.clone();
-            async move {
-                if let Some(res) = rx.recv().await {
-                    cx_handle.update(|cx: &mut App| {
-                        if let Some(app) = view_weak.upgrade() {
-                            app.update(cx, |this, cx| {
-                                if let Ok(remote_list) = res {
-                                    for remote in remote_list {
-                                        if let Some(existing) = this
-                                            .sftp_manager
-                                            .transfers
-                                            .iter_mut()
-                                            .find(|t| t.id == remote.id)
-                                        {
-                                            existing.bytes_transferred = remote.bytes_transferred;
-                                            existing.total_bytes = remote.total_bytes;
-                                            existing.status = remote.status;
-                                            existing.error = remote.error;
-                                        } else {
-                                            this.sftp_manager
-                                                .transfers
-                                                .push(SftpTransferItem::from(remote));
-                                        }
-                                    }
-                                }
-                                cx.notify();
-                            });
-                        }
-                    });
-                }
-            }
-        })
-        .detach();
-    }
-
-    pub fn sftp_start_transfer_polling(&mut self, cx: &mut Context<Self>) {
-        if self.sftp_manager.transfer_poll_active {
-            return;
-        }
-        self.sftp_manager.transfer_poll_active = true;
-        let view_weak = cx.entity().downgrade();
-        cx.spawn(move |_view, cx: &mut AsyncApp| {
-            let view_weak = view_weak.clone();
-            let cx_handle = cx.clone();
-            async move {
-                loop {
-                    cx_handle
-                        .background_executor()
-                        .timer(std::time::Duration::from_millis(600))
-                        .await;
-                    let still_active = cx_handle.update(|cx: &mut App| {
-                        let mut active = false;
-                        if let Some(app) = view_weak.upgrade() {
-                            app.update(cx, |this, cx| {
-                                this.sftp_poll_transfers(cx);
-                                active = this.sftp_manager.transfers.iter().any(|t| {
-                                    matches!(
-                                        t.status.as_str(),
-                                        "in_progress"
-                                            | "uploading"
-                                            | "downloading"
-                                            | "transferring"
-                                            | "pending"
-                                    )
-                                });
-                                this.sftp_manager.transfer_poll_active = active;
-                                cx.notify();
-                            });
-                        }
-                        active
-                    });
-                    if !still_active {
-                        break;
-                    }
-                }
-            }
-        })
-        .detach();
-    }
-
     /// Remove completed/failed transfers from the drawer (web Clear History).
     pub fn sftp_clear_transfer_history(&mut self, cx: &mut Context<Self>) {
         self.sftp_manager.transfers.retain(|t| {
@@ -4415,8 +4333,15 @@ impl AppState {
             return; // pasting into the same directory is a no-op
         }
         let items = clip.items.clone();
+        let dst_files: Vec<String> = self
+            .sftp_pane(dst_pane)
+            .files
+            .iter()
+            .map(|f| f.name.clone())
+            .collect();
+        let has_conflict = items.iter().any(|t| dst_files.contains(t));
         self.sftp_transfer_with_conflict_check(clip.source_pane, dst_pane, items, clip.cut, cx);
-        if clip.cut {
+        if clip.cut && !has_conflict {
             self.sftp_manager.clipboard = None;
         }
     }
@@ -4444,6 +4369,7 @@ impl AppState {
                 dst_pane,
                 conflict_name,
                 remaining_transfers: targets,
+                cut,
             });
             cx.notify();
             return;
@@ -4599,7 +4525,6 @@ impl AppState {
             .detach();
         }
 
-        self.sftp_start_transfer_polling(cx);
         cx.notify();
     }
 
@@ -4711,8 +4636,12 @@ impl AppState {
 
         self.sftp_pane_mut(pane).show_actions_menu = false;
 
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<Result<(String, usize), String>>();
+        enum Progress {
+            Started(String),
+            Finished(String),
+            Failed(String),
+        }
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Progress>();
         TOKIO_RT.spawn(async move {
             let picked = rfd::AsyncFileDialog::new().pick_files().await;
             let Some(handles) = picked else {
@@ -4720,11 +4649,15 @@ impl AppState {
             };
             for handle in handles {
                 let name = handle.file_name();
+                let _ = tx.send(Progress::Started(name.clone())).ok();
                 let bytes = handle.read().await;
-                let len = bytes.len();
-                let _ = tx.send(Ok((name.clone(), len))).ok();
-                if let Err(e) = client.sftp_upload(&conn_id, &dir, &name, bytes).await {
-                    let _ = tx.send(Err(format!("Upload error: {e}"))).ok();
+                match client.sftp_upload(&conn_id, &dir, &name, bytes).await {
+                    Ok(_) => {
+                        let _ = tx.send(Progress::Finished(name)).ok();
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Progress::Failed(format!("Upload error: {e}"))).ok();
+                    }
                 }
             }
         });
@@ -4739,21 +4672,42 @@ impl AppState {
                         if let Some(app) = view_weak.upgrade() {
                             app.update(cx, |this, cx| {
                                 match res {
-                                    Ok((name, len)) => {
+                                    Progress::Started(name) => {
                                         this.sftp_manager.transfers.push(SftpTransferItem {
                                             id: next_transfer_id(),
                                             name,
                                             from_source: "Local file".to_string(),
                                             to_source: label.clone(),
-                                            bytes_transferred: len as i64,
-                                            total_bytes: len as i64,
-                                            status: "completed".to_string(),
+                                            bytes_transferred: 0,
+                                            total_bytes: 0,
+                                            status: "in_progress".to_string(),
                                             error: None,
                                             delete_source_after: None,
                                         });
+                                    }
+                                    Progress::Finished(name) => {
+                                        if let Some(item) = this
+                                            .sftp_manager
+                                            .transfers
+                                            .iter_mut()
+                                            .rev()
+                                            .find(|t| t.name == name && t.status == "in_progress")
+                                        {
+                                            item.status = "completed".to_string();
+                                        }
                                         this.sftp_load_pane(pane, cx);
                                     }
-                                    Err(err) => {
+                                    Progress::Failed(err) => {
+                                        if let Some(item) = this
+                                            .sftp_manager
+                                            .transfers
+                                            .iter_mut()
+                                            .rev()
+                                            .find(|t| t.status == "in_progress")
+                                        {
+                                            item.status = "failed".to_string();
+                                            item.error = Some(err.clone());
+                                        }
                                         this.push_notification(err, true, cx);
                                     }
                                 }
@@ -4766,7 +4720,6 @@ impl AppState {
         })
         .detach();
         self.sftp_manager.transfers_drawer_open = true;
-        self.sftp_start_transfer_polling(cx);
         cx.notify();
     }
 
@@ -4869,7 +4822,6 @@ impl AppState {
         })
         .detach();
 
-        self.sftp_start_transfer_polling(cx);
     }
 
     /// Toggle visibility of the transfers drawer.

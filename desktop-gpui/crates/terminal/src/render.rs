@@ -453,7 +453,9 @@ impl TerminalRenderer {
             let cursor_x = origin.x + self.cell_width * (cursor_point.column.0 as f32);
             let cursor_y = origin.y + self.cell_height * (cursor_point.line.0 as f32);
             let cursor_color = self.palette.cursor;
-            let shape = term.cursor_style().shape;
+            let shape = self
+                .cursor_shape_override
+                .unwrap_or_else(|| term.cursor_style().shape);
 
             if focused {
                 match shape {
