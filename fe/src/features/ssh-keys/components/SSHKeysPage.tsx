@@ -13,16 +13,17 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useSSHKeys, useDeleteSSHKey } from '../hooks/useSSHKeys'
 import { SSHKeyCard } from './SSHKeyCard'
-import { SSHKeyUploadSheet } from './SSHKeyUploadSheet'
-import { SSHKeyEditSheet } from './SSHKeyEditSheet'
+import { useAppStore } from '@/stores/app-store'
 import type { SSHKey } from '@/lib/api'
 
 export const SSHKeysPage = () => {
   const { data: sshKeys = [], isLoading } = useSSHKeys()
   const deleteMutation = useDeleteSSHKey()
 
-  const [uploadOpen, setUploadOpen] = React.useState(false)
-  const [editKey, setEditKey] = React.useState<SSHKey | null>(null)
+  // Side panel (push-aside sheet) state lives in the store so the panels can
+  // render in the App layout slot next to the page content.
+  const setUploadOpen = useAppStore((s) => s.setKeyUploadOpen)
+  const setEditKey = useAppStore((s) => s.setKeyEdit)
   const [deleteKey, setDeleteKey] = React.useState<SSHKey | null>(null)
   const [deleteWarning, setDeleteWarning] = React.useState<string | null>(null)
   const [affectedCount, setAffectedCount] = React.useState<number>(0)
@@ -110,14 +111,6 @@ export const SSHKeysPage = () => {
           )}
         </div>
       </div>
-
-      <SSHKeyUploadSheet open={uploadOpen} onOpenChange={setUploadOpen} />
-
-      <SSHKeyEditSheet
-        open={!!editKey}
-        onOpenChange={(open) => !open && setEditKey(null)}
-        sshKey={editKey}
-      />
 
       <AlertDialog open={!!deleteKey} onOpenChange={(open) => !open && setDeleteKey(null)}>
         <AlertDialogContent>

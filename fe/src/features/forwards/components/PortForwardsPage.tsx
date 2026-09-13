@@ -27,7 +27,7 @@ import {
   useStopForward,
 } from '../hooks/useForwards'
 import { useConnections } from '@/features/connections/hooks/useConnections'
-import { ForwardFormSheet } from './ForwardFormSheet'
+import { useAppStore } from '@/stores/app-store'
 import type { PortForward } from '@/lib/api'
 
 export const PortForwardsPage = () => {
@@ -37,8 +37,10 @@ export const PortForwardsPage = () => {
   const startMutation = useStartForward()
   const stopMutation = useStopForward()
 
-  const [formOpen, setFormOpen] = React.useState(false)
-  const [editForward, setEditForward] = React.useState<PortForward | null>(null)
+  // Side panel (push-aside sheet) state lives in the store so the panel can
+  // render in the App layout slot next to the page content.
+  const setFormOpen = useAppStore((s) => s.setForwardSheetOpen)
+  const setEditForward = useAppStore((s) => s.setForwardSheetEdit)
   const [deleteTarget, setDeleteTarget] = React.useState<PortForward | null>(null)
 
   // Build connection lookup map
@@ -200,15 +202,6 @@ export const PortForwardsPage = () => {
           )}
         </div>
       </div>
-
-      <ForwardFormSheet
-        open={formOpen}
-        onOpenChange={(open) => {
-          setFormOpen(open)
-          if (!open) setEditForward(null)
-        }}
-        editForward={editForward}
-      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

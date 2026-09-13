@@ -2,13 +2,13 @@ import * as React from 'react'
 import { ArrowLeftRight, ArrowRightLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from '@/components/ui/sheet'
+  SidePanel,
+  SidePanelContent,
+  SidePanelHeader,
+  SidePanelTitle,
+  SidePanelDescription,
+  SidePanelFooter,
+} from '@/components/ui/side-panel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -151,16 +151,16 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
   const isReverse = type === 'reverse'
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col">
-        <SheetHeader>
-          <SheetTitle>{isEditMode ? 'Edit Port Forward' : 'Create Port Forward'}</SheetTitle>
-          <SheetDescription>
+    <SidePanel open={open} onOpenChange={onOpenChange}>
+      <SidePanelContent>
+        <SidePanelHeader>
+          <SidePanelTitle>{isEditMode ? 'Edit Port Forward' : 'Create Port Forward'}</SidePanelTitle>
+          <SidePanelDescription>
             {isEditMode
               ? 'Modify the port forwarding rule.'
               : 'Set up an SSH port forwarding tunnel.'}
-          </SheetDescription>
-        </SheetHeader>
+          </SidePanelDescription>
+        </SidePanelHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Type selector (Local / Reverse) */}
@@ -272,7 +272,7 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
           </div>
         </form>
 
-        <SheetFooter className="pt-6 border-t">
+        <SidePanelFooter className="pt-6 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -283,8 +283,8 @@ export const ForwardFormSheet = ({ open, onOpenChange, editForward }: ForwardFor
                 ? 'Save Changes'
                 : 'Create Forward'}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </SidePanelFooter>
+      </SidePanelContent>
+    </SidePanel>
   )
 }

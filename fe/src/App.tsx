@@ -10,6 +10,9 @@ import { generateId } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 import { ConnectionForm } from '@/features/connections/components/ConnectionForm'
+import { ForwardFormSheet } from '@/features/forwards/components/ForwardFormSheet'
+import { SSHKeyUploadSheet } from '@/features/ssh-keys/components/SSHKeyUploadSheet'
+import { SSHKeyEditSheet } from '@/features/ssh-keys/components/SSHKeyEditSheet'
 import { TabBar } from '@/components/TabBar'
 import { Toaster } from '@/components/ui/sonner'
 import { TerminalPane } from '@/features/terminal/TerminalPane'
@@ -66,6 +69,43 @@ function ResizeHandles({ windowState }: { windowState: 'maximized' | 'restored' 
 }
 
 const queryClient = new QueryClient()
+
+// Side panel slots: read push-aside sheet state from the store so the panels
+// render as flex siblings of the page content (push-aside, no overlay).
+const ForwardFormSlot = () => {
+  const open = useAppStore((s) => s.forwardSheetOpen)
+  const setOpen = useAppStore((s) => s.setForwardSheetOpen)
+  const editForward = useAppStore((s) => s.forwardSheetEdit)
+  const setEditForward = useAppStore((s) => s.setForwardSheetEdit)
+  return (
+    <ForwardFormSheet
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (!o) setEditForward(null)
+      }}
+      editForward={editForward}
+    />
+  )
+}
+
+const SSHKeyUploadSlot = () => {
+  const open = useAppStore((s) => s.keyUploadOpen)
+  const setOpen = useAppStore((s) => s.setKeyUploadOpen)
+  return <SSHKeyUploadSheet open={open} onOpenChange={setOpen} />
+}
+
+const SSHKeyEditSlot = () => {
+  const editKey = useAppStore((s) => s.keyEdit)
+  const setEditKey = useAppStore((s) => s.setKeyEdit)
+  return (
+    <SSHKeyEditSheet
+      open={!!editKey}
+      onOpenChange={(o) => !o && setEditKey(null)}
+      sshKey={editKey}
+    />
+  )
+}
 
 function AppContent() {
   const { 
@@ -318,44 +358,53 @@ function AppContent() {
           </div>
         </header>
 
-        {/* Content Area — all sessions rendered, only active one visible */}
-        <div className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              className={cn("absolute inset-0", session.id !== activeSessionId && "invisible pointer-events-none")}
-            >
-              <TerminalPane
-                sessionId={session.id}
-                isActive={session.id === activeSessionId}
-                initialConnect={session.connectionId && session.status !== 'detached' ? { type: session.type, connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
-              />
-            </div>
-          ))}
-          {!activeSessionId && sidebarPage === 'new-tab' && (
-            <NewTabView />
-          )}
-          {!activeSessionId && sidebarPage === 'hosts' && (
-            <HostsPage />
-          )}
-          {!activeSessionId && sidebarPage === 'keys' && (
-            <SSHKeysPage />
-          )}
-          {!activeSessionId && sidebarPage === 'forwards' && (
-            <PortForwardsPage />
-          )}
-          {!activeSessionId && sidebarPage === 'settings' && (
-            <SettingsPage />
-          )}
-          {!activeSessionId && sidebarPage === 'sftp' && (
-            <SFTPView />
-          )}
+        {/* Content Area — all sessions rendered, only active one visible.
+            Flex row so the side panel (push-aside sheet) squeezes the page
+            content instead of overlaying it. */}
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          <div className="flex-1 relative flex flex-col min-h-0 min-w-0 overflow-hidden">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className={cn("absolute inset-0", session.id !== activeSessionId && "invisible pointer-events-none")}
+              >
+                <TerminalPane
+                  sessionId={session.id}
+                  isActive={session.id === activeSessionId}
+                  initialConnect={session.connectionId && session.status !== 'detached' ? { type: session.type, connectionId: session.connectionId, host: session.host, port: session.port, username: session.username } : undefined}
+                />
+              </div>
+            ))}
+            {!activeSessionId && sidebarPage === 'new-tab' && (
+              <NewTabView />
+            )}
+            {!activeSessionId && sidebarPage === 'hosts' && (
+              <HostsPage />
+            )}
+            {!activeSessionId && sidebarPage === 'keys' && (
+              <SSHKeysPage />
+            )}
+            {!activeSessionId && sidebarPage === 'forwards' && (
+              <PortForwardsPage />
+            )}
+            {!activeSessionId && sidebarPage === 'settings' && (
+              <SettingsPage />
+            )}
+            {!activeSessionId && sidebarPage === 'sftp' && (
+              <SFTPView />
+            )}
+          </div>
+
+          {/* Side panel slot — push-aside sheets (connection / forward / keys) */}
+          <ConnectionForm />
+          <ForwardFormSlot />
+          <SSHKeyUploadSlot />
+          <SSHKeyEditSlot />
         </div>
       </main>
 
 
       {/* Overlays */}
-      <ConnectionForm />
       <Toaster />
     </div>
   )

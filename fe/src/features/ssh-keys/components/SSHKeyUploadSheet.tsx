@@ -1,12 +1,12 @@
 import * as React from 'react'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from '@/components/ui/sheet'
+  SidePanel,
+  SidePanelContent,
+  SidePanelHeader,
+  SidePanelTitle,
+  SidePanelDescription,
+  SidePanelFooter,
+} from '@/components/ui/side-panel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -102,14 +102,14 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Upload SSH Key</SheetTitle>
-          <SheetDescription>
+    <SidePanel open={open} onOpenChange={onOpenChange}>
+      <SidePanelContent>
+        <SidePanelHeader>
+          <SidePanelTitle>Upload SSH Key</SidePanelTitle>
+          <SidePanelDescription>
             Add a private key to your secure pool. Key material is encrypted on the server.
-          </SheetDescription>
-        </SheetHeader>
+          </SidePanelDescription>
+        </SidePanelHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="space-y-2">
@@ -203,7 +203,7 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
           {error && <p className="text-sm text-destructive font-medium">{error}</p>}
         </form>
 
-        <SheetFooter className="pt-6 border-t">
+        <SidePanelFooter className="pt-6 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button 
             onClick={handleSubmit} 
@@ -211,8 +211,8 @@ export const SSHKeyUploadSheet = ({ open, onOpenChange }: SSHKeyUploadSheetProps
           >
             {createMutation.isPending ? 'Uploading...' : 'Upload Key'}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </SidePanelFooter>
+      </SidePanelContent>
+    </SidePanel>
   )
 }

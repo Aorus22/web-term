@@ -1,13 +1,13 @@
 import * as React from 'react'
 import { toast } from 'sonner'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from '@/components/ui/sheet'
+  SidePanel,
+  SidePanelContent,
+  SidePanelHeader,
+  SidePanelTitle,
+  SidePanelDescription,
+  SidePanelFooter,
+} from '@/components/ui/side-panel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -111,14 +111,14 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
   const isSubmitDisabled = updateMutation.isPending || !name.trim() || (hasNewKey && !keyContent.trim())
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Edit SSH Key</SheetTitle>
-          <SheetDescription>
+    <SidePanel open={open} onOpenChange={onOpenChange}>
+      <SidePanelContent>
+        <SidePanelHeader>
+          <SidePanelTitle>Edit SSH Key</SidePanelTitle>
+          <SidePanelDescription>
             Update the name for your SSH key. You can also upload a new key file to replace the existing one.
-          </SheetDescription>
-        </SheetHeader>
+          </SidePanelDescription>
+        </SidePanelHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="space-y-2">
@@ -212,13 +212,13 @@ export const SSHKeyEditSheet = ({ open, onOpenChange, sshKey }: SSHKeyEditSheetP
           </div>
         </form>
 
-        <SheetFooter className="pt-6 border-t">
+        <SidePanelFooter className="pt-6 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={isSubmitDisabled}>
             {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </SidePanelFooter>
+      </SidePanelContent>
+    </SidePanel>
   )
 }

@@ -1,12 +1,12 @@
 import * as React from 'react'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from '@/components/ui/sheet'
+  SidePanel,
+  SidePanelContent,
+  SidePanelHeader,
+  SidePanelTitle,
+  SidePanelDescription,
+  SidePanelFooter,
+} from '@/components/ui/side-panel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -122,16 +122,16 @@ export const ConnectionForm = () => {
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col">
-        <SheetHeader>
-          <SheetTitle>{editingConnection ? 'Edit Connection' : 'New Connection'}</SheetTitle>
-          <SheetDescription>
+    <SidePanel open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <SidePanelContent>
+        <SidePanelHeader>
+          <SidePanelTitle>{editingConnection ? 'Edit Connection' : 'New Connection'}</SidePanelTitle>
+          <SidePanelDescription>
             {editingConnection 
               ? 'Update your saved connection details.' 
               : 'Add a new SSH connection to your library.'}
-          </SheetDescription>
-        </SheetHeader>
+          </SidePanelDescription>
+        </SidePanelHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="space-y-2">
@@ -254,16 +254,16 @@ export const ConnectionForm = () => {
           </div>
         </form>
 
-        <SheetFooter className="pt-6 border-t">
+        <SidePanelFooter className="pt-6 border-t">
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button 
-            onClick={handleSubmit} 
+          <Button
+            onClick={handleSubmit}
             disabled={createMutation.isPending || updateMutation.isPending}
           >
             {editingConnection ? 'Save Changes' : 'Create Connection'}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </SidePanelFooter>
+      </SidePanelContent>
+    </SidePanel>
   )
 }

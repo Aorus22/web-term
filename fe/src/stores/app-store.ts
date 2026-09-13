@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Connection } from '@/lib/api'
+import type { Connection, PortForward, SSHKey } from '@/lib/api'
 import type { SSHSession } from '@/features/terminal/types'
 import { generateId } from '@/lib/utils'
 
@@ -66,6 +66,15 @@ interface AppState {
   setEditingConnection: (c: Connection | null) => void
   creatingConnection: boolean
   setCreatingConnection: (v: boolean) => void
+  // Side panel (push-aside sheet) state — rendered in the App layout slot
+  forwardSheetOpen: boolean
+  setForwardSheetOpen: (v: boolean) => void
+  forwardSheetEdit: PortForward | null
+  setForwardSheetEdit: (f: PortForward | null) => void
+  keyUploadOpen: boolean
+  setKeyUploadOpen: (v: boolean) => void
+  keyEdit: SSHKey | null
+  setKeyEdit: (k: SSHKey | null) => void
   selectedTags: string[]
   toggleTag: (tag: string) => void
   clearTags: () => void
@@ -100,6 +109,14 @@ export const useAppStore = create<AppState>((set) => ({
   setEditingConnection: (c) => set({ editingConnection: c }),
   creatingConnection: false,
   setCreatingConnection: (v) => set({ creatingConnection: v }),
+  forwardSheetOpen: false,
+  setForwardSheetOpen: (v) => set({ forwardSheetOpen: v }),
+  forwardSheetEdit: null,
+  setForwardSheetEdit: (f) => set({ forwardSheetEdit: f }),
+  keyUploadOpen: false,
+  setKeyUploadOpen: (v) => set({ keyUploadOpen: v }),
+  keyEdit: null,
+  setKeyEdit: (k) => set({ keyEdit: k }),
   selectedTags: [],
   toggleTag: (tag) => set((state) => ({
     selectedTags: state.selectedTags.includes(tag)
