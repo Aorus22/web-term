@@ -308,12 +308,13 @@ impl TerminalWsClient {
         request: WsConnectRequest,
     ) -> Result<TerminalWsHandle, TerminalWsError> {
         let ws_url = normalize_ws_url(url);
-        let (ws_stream, _) = connect_async(&ws_url).await.map_err(|source| {
-            TerminalWsError::Connect {
-                url: ws_url.clone(),
-                source: Box::new(source),
-            }
-        })?;
+        let (ws_stream, _) =
+            connect_async(&ws_url)
+                .await
+                .map_err(|source| TerminalWsError::Connect {
+                    url: ws_url.clone(),
+                    source: Box::new(source),
+                })?;
 
         let (mut ws_write, mut ws_read) = ws_stream.split();
 
@@ -322,7 +323,9 @@ impl TerminalWsClient {
         ws_write
             .send(Message::Text(handshake_json.into()))
             .await
-            .map_err(|e| TerminalWsError::Protocol(format!("Failed to send connect handshake: {e}")))?;
+            .map_err(|e| {
+                TerminalWsError::Protocol(format!("Failed to send connect handshake: {e}"))
+            })?;
 
         // 2. Await connected response
         let session_id = Self::await_connected(&mut ws_read).await?;
@@ -339,17 +342,15 @@ impl TerminalWsClient {
     }
 
     /// Attach / reconnect to an existing session by its session ID.
-    pub async fn attach(
-        url: &str,
-        session_id: &str,
-    ) -> Result<TerminalWsHandle, TerminalWsError> {
+    pub async fn attach(url: &str, session_id: &str) -> Result<TerminalWsHandle, TerminalWsError> {
         let ws_url = normalize_ws_url(url);
-        let (ws_stream, _) = connect_async(&ws_url).await.map_err(|source| {
-            TerminalWsError::Connect {
-                url: ws_url.clone(),
-                source: Box::new(source),
-            }
-        })?;
+        let (ws_stream, _) =
+            connect_async(&ws_url)
+                .await
+                .map_err(|source| TerminalWsError::Connect {
+                    url: ws_url.clone(),
+                    source: Box::new(source),
+                })?;
 
         let (mut ws_write, mut ws_read) = ws_stream.split();
 
@@ -359,7 +360,9 @@ impl TerminalWsClient {
         ws_write
             .send(Message::Text(handshake_json.into()))
             .await
-            .map_err(|e| TerminalWsError::Protocol(format!("Failed to send attach handshake: {e}")))?;
+            .map_err(|e| {
+                TerminalWsError::Protocol(format!("Failed to send attach handshake: {e}"))
+            })?;
 
         // 2. Await connected response
         let verified_session_id = Self::await_connected(&mut ws_read).await?;
@@ -383,7 +386,9 @@ impl TerminalWsClient {
             .next()
             .await
             .ok_or_else(|| {
-                TerminalWsError::Protocol("Connection closed before receiving handshake response".into())
+                TerminalWsError::Protocol(
+                    "Connection closed before receiving handshake response".into(),
+                )
             })?
             .map_err(|e| TerminalWsError::Protocol(format!("Handshake read error: {e}")))?;
 
@@ -416,9 +421,9 @@ impl TerminalWsClient {
             )));
         }
 
-        response.session_id.ok_or_else(|| {
-            TerminalWsError::Protocol("Connected message missing session_id".into())
-        })
+        response
+            .session_id
+            .ok_or_else(|| TerminalWsError::Protocol("Connected message missing session_id".into()))
     }
 
     fn spawn_pumps<W, R>(session_id: String, mut ws_write: W, mut ws_read: R) -> TerminalWsHandle

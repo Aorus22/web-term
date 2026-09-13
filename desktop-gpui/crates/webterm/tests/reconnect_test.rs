@@ -115,6 +115,12 @@ fn test_session_restoration_selection_logic() {
         .collect();
 
     assert_eq!(all_restored.len(), 2);
-    assert_eq!(all_restored[0], ("s1".to_string(), "Local Shell".to_string()));
-    assert_eq!(all_restored[1], ("s2".to_string(), "admin:10.0.0.1".to_string()));
+    assert_eq!(
+        all_restored[0],
+        ("s1".to_string(), "Local Shell".to_string())
+    );
+    assert_eq!(
+        all_restored[1],
+        ("s2".to_string(), "admin:10.0.0.1".to_string())
+    );
 }

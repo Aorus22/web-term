@@ -153,11 +153,17 @@ fn test_status_and_title_updates() {
     let id = manager.alloc_tab_id();
     manager.add_tab(TerminalTab::new_headless(id, "Initial Title", "ssh", None));
 
-    assert_eq!(manager.active_tab().unwrap().status, SessionStatus::Connecting);
+    assert_eq!(
+        manager.active_tab().unwrap().status,
+        SessionStatus::Connecting
+    );
 
     // Update status to Connected
     manager.set_tab_status(id, SessionStatus::Connected);
-    assert_eq!(manager.active_tab().unwrap().status, SessionStatus::Connected);
+    assert_eq!(
+        manager.active_tab().unwrap().status,
+        SessionStatus::Connected
+    );
     assert!(manager.active_tab().unwrap().is_connected());
 
     // Update status to Disconnected with reason

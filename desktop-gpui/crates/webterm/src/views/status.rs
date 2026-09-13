@@ -72,16 +72,15 @@ pub fn render_status_page<V: 'static>(
                         .font_weight(FontWeight::SEMIBOLD)
                         .child("Starting backend…"),
                 )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(rgb(0xa1a1aa))
-                        .mt_2()
-                        .child("Initializing Go server, capturing handshake port and verifying readiness"),
-                )
+                .child(div().text_sm().text_color(rgb(0xa1a1aa)).mt_2().child(
+                    "Initializing Go server, capturing handshake port and verifying readiness",
+                ))
                 .into_any_element()
         }
-        BackendStatus::Failed { reason, stderr_tail } => {
+        BackendStatus::Failed {
+            reason,
+            stderr_tail,
+        } => {
             let redacted_lines = redact_key_material(stderr_tail, key_secret);
             let retry_handler = on_retry.clone();
 
@@ -130,9 +129,7 @@ pub fn render_status_page<V: 'static>(
                                 .text_xs()
                                 .font_family("JetBrains Mono")
                                 .text_color(rgb(0xd4d4d8))
-                                .children(redacted_lines.into_iter().map(|line| {
-                                    div().child(line)
-                                })),
+                                .children(redacted_lines.into_iter().map(|line| div().child(line))),
                         )
                         .child(
                             div()
@@ -165,16 +162,21 @@ pub fn render_status_page<V: 'static>(
                                         .text_sm()
                                         .font_weight(FontWeight::MEDIUM)
                                         .child("Retry")
-                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev, window, cx| {
-                                            retry_handler(this, ev, window, cx);
-                                        })),
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(move |this, ev, window, cx| {
+                                                retry_handler(this, ev, window, cx);
+                                            }),
+                                        ),
                                 ),
                         ),
                 )
                 .into_any_element()
         }
         BackendStatus::Crashed { exit_code } => {
-            let code_str = exit_code.map(|c| c.to_string()).unwrap_or_else(|| "unknown".into());
+            let code_str = exit_code
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "unknown".into());
             div()
                 .flex()
                 .flex_col()
@@ -191,8 +193,6 @@ pub fn render_status_page<V: 'static>(
                 )
                 .into_any_element()
         }
-        BackendStatus::Ready => {
-            div().into_any_element()
-        }
+        BackendStatus::Ready => div().into_any_element(),
     }
 }

@@ -346,7 +346,11 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
         .child(
             sheet_body()
                 // Key Name
-                .child(sheet_input_row(app, "Key Name *", &app.inputs().new_key_name))
+                .child(sheet_input_row(
+                    app,
+                    "Key Name *",
+                    &app.inputs().new_key_name,
+                ))
                 // SSH Private Key PEM
                 .child(
                     div()

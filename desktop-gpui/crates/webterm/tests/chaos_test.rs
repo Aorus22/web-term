@@ -67,7 +67,9 @@ async fn test_chaos_backend_process_kill_resilience() {
     let backend_path = match resolve_backend_path() {
         Some(p) => p,
         None => {
-            eprintln!("Fixture missing at desktop-gpui/test-support/backend; skipping live kill test");
+            eprintln!(
+                "Fixture missing at desktop-gpui/test-support/backend; skipping live kill test"
+            );
             return;
         }
     };
@@ -79,7 +81,10 @@ async fn test_chaos_backend_process_kill_resilience() {
 
     let mut supervisor = Supervisor::new();
 
-    let info = supervisor.spawn(opts).await.expect("supervisor should reach ready");
+    let info = supervisor
+        .spawn(opts)
+        .await
+        .expect("supervisor should reach ready");
     assert_eq!(supervisor.status(), BackendStatus::Ready);
     assert!(info.port > 0);
 
@@ -110,7 +115,10 @@ async fn test_chaos_backend_process_kill_resilience() {
         }
     }
 
-    assert!(crashed, "Supervisor must detect child termination and transition to Crashed status");
+    assert!(
+        crashed,
+        "Supervisor must detect child termination and transition to Crashed status"
+    );
 }
 
 #[test]

@@ -6,9 +6,18 @@ use webterm_terminal::ColorPalette;
 
 #[test]
 fn test_theme_toggling_logic() {
-    assert_eq!(webterm::theme::toggle_theme(SettingsTheme::Dark), SettingsTheme::Light);
-    assert_eq!(webterm::theme::toggle_theme(SettingsTheme::Light), SettingsTheme::Dark);
-    assert_eq!(webterm::theme::toggle_theme(SettingsTheme::System), SettingsTheme::Light);
+    assert_eq!(
+        webterm::theme::toggle_theme(SettingsTheme::Dark),
+        SettingsTheme::Light
+    );
+    assert_eq!(
+        webterm::theme::toggle_theme(SettingsTheme::Light),
+        SettingsTheme::Dark
+    );
+    assert_eq!(
+        webterm::theme::toggle_theme(SettingsTheme::System),
+        SettingsTheme::Light
+    );
 }
 
 #[test]
@@ -40,7 +49,9 @@ fn test_settings_theme_and_backend_path_override_roundtrip() {
     // Clear backend override
     let mut cleared = reloaded;
     cleared.backend_path = None;
-    cleared.save_to(&temp_dir).expect("should save cleared override");
+    cleared
+        .save_to(&temp_dir)
+        .expect("should save cleared override");
 
     let final_check = DesktopSettings::load_from(&temp_dir).expect("should load final settings");
     assert!(final_check.backend_path.is_none());

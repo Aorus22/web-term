@@ -1,11 +1,11 @@
 //! Hosts Catalog view: connection cards grid, tag filtering, and quick-connect matching web client.
 
+use crate::app_state::AppState;
+use crate::icons::{ARROW_DOWN_SVG, ARROW_UP_SVG, PLUS_SVG};
 use gpui::*;
 use gpui_component::input::Input;
 use gpui_component::Sizable;
 use webterm_backend_client::Connection;
-use crate::icons::{ARROW_DOWN_SVG, ARROW_UP_SVG, PLUS_SVG};
-use crate::app_state::AppState;
 
 /// Renders the host connection catalog view matching fe/src/features/hosts/components/HostsPage.tsx.
 pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
@@ -553,7 +553,10 @@ pub fn filter_connections(
                 let matches_label = c.label.to_lowercase().contains(&query_lower);
                 let matches_host = c.host.to_lowercase().contains(&query_lower);
                 let matches_user = c.username.to_lowercase().contains(&query_lower);
-                let matches_tags = c.tags.iter().any(|t| t.to_lowercase().contains(&query_lower));
+                let matches_tags = c
+                    .tags
+                    .iter()
+                    .any(|t| t.to_lowercase().contains(&query_lower));
                 matches_label || matches_host || matches_user || matches_tags
             } else {
                 true

@@ -50,7 +50,10 @@ async fn test_local_terminal_e2e_smoke() {
     let opts = SpawnOptions::new(backend_path, db_path, key).unwrap();
 
     let mut supervisor = Supervisor::new();
-    let info = supervisor.spawn(opts).await.expect("supervisor should reach ready");
+    let info = supervisor
+        .spawn(opts)
+        .await
+        .expect("supervisor should reach ready");
     assert_eq!(supervisor.status(), BackendStatus::Ready);
 
     let ws_url = normalize_ws_url(&info.base_url);
@@ -73,7 +76,9 @@ async fn test_local_terminal_e2e_smoke() {
     } else {
         b"echo CONPTY_SMOKE_OK\n"
     };
-    handle.send_input(cmd.to_vec()).expect("send_input should succeed");
+    handle
+        .send_input(cmd.to_vec())
+        .expect("send_input should succeed");
 
     // 3. Read output until token is found or timeout expires
     let mut collected = Vec::new();
@@ -88,7 +93,8 @@ async fn test_local_terminal_e2e_smoke() {
                 break;
             }
         }
-    }).await;
+    })
+    .await;
 
     assert!(
         read_result.is_ok() && found_marker,
@@ -103,7 +109,10 @@ async fn test_local_terminal_e2e_smoke() {
     let _ = handle.disconnect();
 
     // 6. Stop backend supervisor
-    supervisor.stop(Duration::from_secs(5)).await.expect("supervisor should stop");
+    supervisor
+        .stop(Duration::from_secs(5))
+        .await
+        .expect("supervisor should stop");
 }
 
 #[tokio::test]
@@ -122,7 +131,10 @@ async fn test_local_terminal_e2e_with_custom_cwd() {
     let opts = SpawnOptions::new(backend_path, db_path, key).unwrap();
 
     let mut supervisor = Supervisor::new();
-    let info = supervisor.spawn(opts).await.expect("supervisor should reach ready");
+    let info = supervisor
+        .spawn(opts)
+        .await
+        .expect("supervisor should reach ready");
     assert_eq!(supervisor.status(), BackendStatus::Ready);
 
     let ws_url = normalize_ws_url(&info.base_url);
@@ -140,5 +152,8 @@ async fn test_local_terminal_e2e_with_custom_cwd() {
 
     // Disconnect and stop
     let _ = handle.disconnect();
-    supervisor.stop(Duration::from_secs(5)).await.expect("supervisor should stop");
+    supervisor
+        .stop(Duration::from_secs(5))
+        .await
+        .expect("supervisor should stop");
 }

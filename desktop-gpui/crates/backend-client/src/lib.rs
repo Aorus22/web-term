@@ -15,8 +15,9 @@ pub use terminal_ws::{
 };
 pub use types::{
     Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
-    ForwardActionResponse, ImportResult, KeyDeleteWarning, PortForward, SessionInfo, Settings, SftpFileInfo,
-    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest, UpdateKeyRequest,
+    ForwardActionResponse, ImportResult, KeyDeleteWarning, PortForward, SessionInfo, Settings,
+    SftpFileInfo, SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest,
+    UpdateKeyRequest,
 };
 
 #[cfg(test)]

@@ -1,9 +1,9 @@
 //! WebTerm desktop client (GPUI).
 
-use std::borrow::Cow;
-use std::sync::Arc;
 use gpui::*;
 use parking_lot::Mutex;
+use std::borrow::Cow;
+use std::sync::Arc;
 use webterm::actions;
 use webterm::app_state::AppState;
 use webterm::bundle::resolve_backend_path;

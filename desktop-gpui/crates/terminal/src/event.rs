@@ -65,7 +65,10 @@ mod tests {
         assert_eq!(rx.recv().unwrap(), TerminalEvent::Wakeup);
 
         proxy.send_event(Event::Title("my-shell".to_string()));
-        assert_eq!(rx.recv().unwrap(), TerminalEvent::Title("my-shell".to_string()));
+        assert_eq!(
+            rx.recv().unwrap(),
+            TerminalEvent::Title("my-shell".to_string())
+        );
 
         proxy.send_event(Event::Bell);
         assert_eq!(rx.recv().unwrap(), TerminalEvent::Bell);

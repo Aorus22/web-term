@@ -11,8 +11,8 @@ use alacritty_terminal::term::cell::{Cell, Flags};
 use alacritty_terminal::term::{Term, TermMode};
 use alacritty_terminal::vte::ansi::CursorShape;
 use gpui::{
-    quad, transparent_black, App, Bounds, Edges, Font, FontFeatures, FontStyle, FontWeight, Hsla,
-    Pixels, Point, SharedString, Size, TextAlign, TextRun, UnderlineStyle, Window, px,
+    px, quad, transparent_black, App, Bounds, Edges, Font, FontFeatures, FontStyle, FontWeight,
+    Hsla, Pixels, Point, SharedString, Size, TextAlign, TextRun, UnderlineStyle, Window,
 };
 
 /// Dimensions of a single character cell in pixels.
@@ -428,9 +428,10 @@ impl TerminalRenderer {
                 };
 
                 let text: SharedString = run.text.into();
-                let shaped = window
-                    .text_system()
-                    .shape_line(text, self.font_size, &[text_run], None);
+                let shaped =
+                    window
+                        .text_system()
+                        .shape_line(text, self.font_size, &[text_run], None);
 
                 let _ = shaped.paint(
                     Point { x, y },

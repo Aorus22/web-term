@@ -13,14 +13,14 @@ use crate::mouse::{
 use crate::render::TerminalRenderer;
 use crate::terminal::Terminal;
 use alacritty_terminal::index::{Column, Line, Point as AlacPoint};
-use gpui::*;
 use alacritty_terminal::vte::ansi::CursorShape;
+use gpui::*;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
 pub type InputCallback = Arc<dyn Fn(&[u8]) + Send + Sync>;
 pub type ResizeCallback = Arc<dyn Fn(usize, usize) + Send + Sync>;
-pub type TitleCallback = Arc<dyn Fn(&str) + Send + Sync>;
+pub type TitleCallback = Arc<dyn Fn(&str, &mut App) + Send + Sync>;
 pub type BellCallback = Arc<dyn Fn() + Send + Sync>;
 
 /// Core GPUI view wrapping the terminal emulator.
@@ -59,30 +59,30 @@ impl TerminalView {
             async move {
                 while let Ok(event) = event_rx.recv_async().await {
                     let view_weak = view_weak.clone();
-                    let cont = cx_handle
-                        .update(|cx: &mut App| {
-                            if let Some(entity) = view_weak.upgrade() {
-                                entity.update(cx, |this, cx| {
-                                    match &event {
-                                        TerminalEvent::Title(title) => {
-                                            if let Some(ref cb) = this.title_callback {
-                                                cb(title);
-                                            }
+                    let cont = cx_handle.update(|cx: &mut App| {
+                        if let Some(entity) = view_weak.upgrade() {
+                            entity.update(cx, |this, cx| {
+                                match &event {
+                                    TerminalEvent::Title(title) => {
+                                        if let Some(ref cb) = this.title_callback {
+                                            let title = title.clone();
+                                            cb(&title, cx);
                                         }
-                                        TerminalEvent::Bell => {
-                                            if let Some(ref cb) = this.bell_callback {
-                                                cb();
-                                            }
-                                        }
-                                        _ => {}
                                     }
-                                    cx.notify();
-                                });
-                                true
-                            } else {
-                                false
-                            }
-                        });
+                                    TerminalEvent::Bell => {
+                                        if let Some(ref cb) = this.bell_callback {
+                                            cb();
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                                cx.notify();
+                            });
+                            true
+                        } else {
+                            false
+                        }
+                    });
                     if !cont {
                         break;
                     }
@@ -124,13 +124,19 @@ impl TerminalView {
     }
 
     /// Set callback invoked when terminal grid dimensions change.
-    pub fn with_resize_callback<F: Fn(usize, usize) + Send + Sync + 'static>(mut self, f: F) -> Self {
+    pub fn with_resize_callback<F: Fn(usize, usize) + Send + Sync + 'static>(
+        mut self,
+        f: F,
+    ) -> Self {
         self.resize_callback = Some(Arc::new(f));
         self
     }
 
     /// Set callback invoked when terminal title changes.
-    pub fn with_title_callback<F: Fn(&str) + Send + Sync + 'static>(mut self, f: F) -> Self {
+    pub fn with_title_callback<F: Fn(&str, &mut App) + Send + Sync + 'static>(
+        mut self,
+        f: F,
+    ) -> Self {
         self.title_callback = Some(Arc::new(f));
         self
     }
@@ -152,7 +158,7 @@ impl TerminalView {
     }
 
     /// Update callback invoked when terminal title changes.
-    pub fn set_title_callback<F: Fn(&str) + Send + Sync + 'static>(&mut self, f: F) {
+    pub fn set_title_callback<F: Fn(&str, &mut App) + Send + Sync + 'static>(&mut self, f: F) {
         self.title_callback = Some(Arc::new(f));
     }
 

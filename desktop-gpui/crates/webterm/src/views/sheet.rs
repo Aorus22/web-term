@@ -251,7 +251,12 @@ pub fn sheet_input_row(
         .flex()
         .flex_col()
         .gap_1()
-        .child(div().text_xs().text_color(app.muted_text()).child(label.into()))
+        .child(
+            div()
+                .text_xs()
+                .text_color(app.muted_text())
+                .child(label.into()),
+        )
         .child(
             Input::new(input)
                 .with_size(gpui_component::Size::Small)
@@ -271,7 +276,12 @@ pub fn sheet_textarea_row(
         .flex()
         .flex_col()
         .gap_1()
-        .child(div().text_xs().text_color(app.muted_text()).child(label.into()))
+        .child(
+            div()
+                .text_xs()
+                .text_color(app.muted_text())
+                .child(label.into()),
+        )
         .child(
             Textarea::new(input)
                 .w_full()

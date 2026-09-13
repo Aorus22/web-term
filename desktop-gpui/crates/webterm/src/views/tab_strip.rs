@@ -1,9 +1,11 @@
 //! Terminal Tab Strip UI component: frameless titlebar with sidebar toggle, active session tabs, new tab button, draggable region, and custom window controls.
 
-use gpui::*;
 use crate::app_state::{AppState, View};
-use crate::icons::{COPY_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, RESTORE_SVG, PANEL_LEFT_SVG, PLUS_SVG, X_SVG};
+use crate::icons::{
+    COPY_SVG, MAXIMIZE_SVG, MINIMIZE_SVG, PANEL_LEFT_SVG, PLUS_SVG, RESTORE_SVG, X_SVG,
+};
 use crate::session::SessionStatus;
+use gpui::*;
 
 /// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, draggable titlebar area, and custom window controls.
 pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl IntoElement {
@@ -43,13 +45,17 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .size(px(16.0))
                         .text_color(muted_text),
                 )
-                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                    this.toggle_sidebar(cx);
-                })),
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _window, cx| {
+                        this.toggle_sidebar(cx);
+                    }),
+                ),
         )
         // Tabs container
         .children((0..tabs_len).map(|idx| {
-            let is_active = !app.show_hosts_catalog && app.active_view == View::Hosts && idx == active_index;
+            let is_active =
+                !app.show_hosts_catalog && app.active_view == View::Hosts && idx == active_index;
             let tab = &app.session_manager.tabs()[idx];
             let title = tab.title.clone();
             let status = tab.status.clone();
@@ -90,28 +96,26 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .border_1()
                 .border_color(tab_border)
                 .cursor_pointer()
-                .hover(|s| s.bg(if is_active {
-                    tab_bg
-                } else {
-                    hover_bg
-                }))
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                    this.show_hosts_catalog = false;
-                    this.active_view = View::Hosts;
-                    this.switch_tab(idx, cx);
-                }))
-                // Status dot
-                .child(
-                    div()
-                        .size(px(6.0))
-                        .rounded_full()
-                        .bg(dot_color),
+                .hover(|s| s.bg(if is_active { tab_bg } else { hover_bg }))
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, _, _window, cx| {
+                        this.show_hosts_catalog = false;
+                        this.active_view = View::Hosts;
+                        this.switch_tab(idx, cx);
+                    }),
                 )
+                // Status dot
+                .child(div().size(px(6.0)).rounded_full().bg(dot_color))
                 // Tab title
                 .child(
                     div()
                         .text_xs()
-                        .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
+                        .font_weight(if is_active {
+                            FontWeight::SEMIBOLD
+                        } else {
+                            FontWeight::NORMAL
+                        })
                         .text_color(text_color)
                         .child(title),
                 )
@@ -124,15 +128,13 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .size(px(16.0))
                         .rounded_sm()
                         .hover(|s| s.bg(border_color))
-                        .child(
-                            svg()
-                                .data(X_SVG)
-                                .size(px(10.0))
-                                .text_color(muted_text),
-                        )
-                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                            this.close_tab(idx, cx);
-                        })),
+                        .child(svg().data(X_SVG).size(px(10.0)).text_color(muted_text))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _window, cx| {
+                                this.close_tab(idx, cx);
+                            }),
+                        ),
                 )
         }))
         // '+' New Tab button with Popover
@@ -148,22 +150,20 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .rounded_md()
                         .cursor_pointer()
                         .hover(|s| s.bg(hover_bg))
-                        .child(
-                            svg()
-                                .data(PLUS_SVG)
-                                .size(px(14.0))
-                                .text_color(muted_text),
-                        )
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                            let has_active_session = this.session_manager.tab_count() > 0
-                                && this.active_view == View::Hosts
-                                && !this.show_hosts_catalog;
-                            if has_active_session {
-                                this.toggle_new_tab_popover(cx);
-                            } else {
-                                this.open_new_tab_page(cx);
-                            }
-                        })),
+                        .child(svg().data(PLUS_SVG).size(px(14.0)).text_color(muted_text))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _window, cx| {
+                                let has_active_session = this.session_manager.tab_count() > 0
+                                    && this.active_view == View::Hosts
+                                    && !this.show_hosts_catalog;
+                                if has_active_session {
+                                    this.toggle_new_tab_popover(cx);
+                                } else {
+                                    this.open_new_tab_page(cx);
+                                }
+                            }),
+                        ),
                 )
                 // Popover dropdown menu
                 .children(if app.show_new_tab_popover {
@@ -196,10 +196,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                     .cursor_pointer()
                                     .hover(|s| s.bg(hover_bg))
                                     .child(
-                                        svg()
-                                            .data(COPY_SVG)
-                                            .size(px(16.0))
-                                            .text_color(muted_text),
+                                        svg().data(COPY_SVG).size(px(16.0)).text_color(muted_text),
                                     )
                                     .child(
                                         div()
@@ -219,9 +216,12 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                                     .child("Same connection & directory"),
                                             ),
                                     )
-                                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                        this.duplicate_active_tab(cx);
-                                    })),
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(|this, _, _window, cx| {
+                                            this.duplicate_active_tab(cx);
+                                        }),
+                                    ),
                             )
                             // Option 2: New Connection
                             .child(
@@ -236,10 +236,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                     .cursor_pointer()
                                     .hover(|s| s.bg(hover_bg))
                                     .child(
-                                        svg()
-                                            .data(PLUS_SVG)
-                                            .size(px(16.0))
-                                            .text_color(muted_text),
+                                        svg().data(PLUS_SVG).size(px(16.0)).text_color(muted_text),
                                     )
                                     .child(
                                         div()
@@ -259,9 +256,12 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                                     .child("Connect to a server"),
                                             ),
                                     )
-                                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                        this.open_new_tab_page(cx);
-                                    })),
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(|this, _, _window, cx| {
+                                            this.open_new_tab_page(cx);
+                                        }),
+                                    ),
                             ),
                     )
                 } else {
@@ -322,11 +322,14 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                 .size(px(12.0))
                                 .text_color(muted_text),
                         )
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                            let new_max = crate::window_state::toggle_maximize(window);
-                            this.is_maximized = new_max;
-                            cx.notify();
-                        })),
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, window, cx| {
+                                let new_max = crate::window_state::toggle_maximize(window);
+                                this.is_maximized = new_max;
+                                cx.notify();
+                            }),
+                        ),
                 )
                 // Close Button (Red on hover)
                 .child(
@@ -338,12 +341,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .h_full()
                         .cursor_pointer()
                         .hover(|s| s.bg(rgb(0xe81123)).text_color(rgb(0xffffff)))
-                        .child(
-                            svg()
-                                .data(X_SVG)
-                                .size(px(13.0))
-                                .text_color(muted_text),
-                        )
+                        .child(svg().data(X_SVG).size(px(13.0)).text_color(muted_text))
                         .on_mouse_down(MouseButton::Left, |_, window, _| {
                             window.remove_window();
                         }),

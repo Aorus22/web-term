@@ -10,7 +10,10 @@ use webterm_terminal::{ColorPalette, Terminal, TerminalRenderer, TerminalView};
 pub enum SessionStatus {
     Connecting,
     Connected,
-    Reconnecting { attempt: usize, next_retry_secs: usize },
+    Reconnecting {
+        attempt: usize,
+        next_retry_secs: usize,
+    },
     Disconnected(Option<String>),
 }
 
@@ -42,18 +45,12 @@ impl TerminalTab {
         cx: &mut App,
     ) -> Self {
         let cursor_shape = webterm_terminal::cursor_shape_from_style(cursor_style);
-        let config = webterm_terminal::terminal::TerminalConfig {
-            scrollback_limit,
-        };
+        let config = webterm_terminal::terminal::TerminalConfig { scrollback_limit };
 
         let view = cx.new(|cx| {
             let terminal = webterm_terminal::terminal::Terminal::with_config(80, 24, config);
-            let mut renderer = TerminalRenderer::new(
-                "JetBrains Mono".to_string(),
-                px(14.0),
-                1.2,
-                palette,
-            );
+            let mut renderer =
+                TerminalRenderer::new("JetBrains Mono".to_string(), px(14.0), 1.2, palette);
             renderer.cursor_shape_override = cursor_shape;
             TerminalView::new(terminal, cx).with_renderer(renderer)
         });

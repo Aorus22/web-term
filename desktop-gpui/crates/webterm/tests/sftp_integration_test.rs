@@ -112,7 +112,10 @@ async fn test_sftp_supervisor_e2e_filesystem_lifecycle() {
         .sftp_upload("local", &test_dir_str, "sample.txt", file_payload.clone())
         .await
         .expect("sftp_upload should succeed");
-    assert!(!tx_id.is_empty(), "Upload should return non-empty transfer ID");
+    assert!(
+        !tx_id.is_empty(),
+        "Upload should return non-empty transfer ID"
+    );
 
     // Wait for background staging-to-destination goroutine to complete
     let mut uploaded_found = false;
@@ -125,7 +128,10 @@ async fn test_sftp_supervisor_e2e_filesystem_lifecycle() {
             }
         }
     }
-    assert!(uploaded_found, "Uploaded file sample.txt should appear in listing");
+    assert!(
+        uploaded_found,
+        "Uploaded file sample.txt should appear in listing"
+    );
 
     // Verify uploaded file appears in sftp_list with correct attributes
     let list_after_upload = client
@@ -147,7 +153,6 @@ async fn test_sftp_supervisor_e2e_filesystem_lifecycle() {
         .await
         .expect("sftp_download should succeed");
     assert_eq!(downloaded_data, file_payload);
-
 
     // 8. Delete uploaded file and subdirectory via sftp_remove
     client

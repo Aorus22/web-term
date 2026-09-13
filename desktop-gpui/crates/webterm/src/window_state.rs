@@ -1,9 +1,9 @@
 //! Window state geometry restoration, toggle maximize/restore, and debounced persistence.
 
-use std::sync::Arc;
 use gpui::*;
 use parking_lot::Mutex;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use std::sync::Arc;
 use webterm_settings::{DesktopSettings, WindowState};
 
 /// Default window dimensions for balanced layout (comfortable for dual-pane SFTP and terminal, not oversized).
@@ -106,7 +106,8 @@ pub fn toggle_maximize(window: &mut Window) -> bool {
 pub fn restore(settings: &DesktopSettings) -> Option<WindowBounds> {
     if let Some(ref state) = settings.window_state {
         // If the saved state has legacy oversized 1200x800 or tiny 940x560, reset to default 1160x660
-        let is_legacy = (state.width == Some(1200) && (state.height == Some(800) || state.height == Some(662)))
+        let is_legacy = (state.width == Some(1200)
+            && (state.height == Some(800) || state.height == Some(662)))
             || (state.width == Some(940) && state.height == Some(560))
             || state.x.map(|x| x <= -1000).unwrap_or(false)
             || state.y.map(|y| y <= -1000).unwrap_or(false);
@@ -128,10 +129,12 @@ pub fn restore(settings: &DesktopSettings) -> Option<WindowBounds> {
         }
 
         let origin = match (state.x, state.y) {
-            (Some(x), Some(y)) if x > 10 && y > 10 && x < 10000 && y < 10000 && !is_legacy => Point {
-                x: px(x as f32),
-                y: px(y as f32),
-            },
+            (Some(x), Some(y)) if x > 10 && y > 10 && x < 10000 && y < 10000 && !is_legacy => {
+                Point {
+                    x: px(x as f32),
+                    y: px(y as f32),
+                }
+            }
             _ => Point {
                 x: px(DEFAULT_ORIGIN_X),
                 y: px(DEFAULT_ORIGIN_Y),
@@ -154,7 +157,10 @@ pub fn restore(settings: &DesktopSettings) -> Option<WindowBounds> {
 }
 
 /// Helper to extract WindowState from current Window state.
-pub fn extract_window_state(window: &Window, prev_state: Option<&WindowState>) -> Option<WindowState> {
+pub fn extract_window_state(
+    window: &Window,
+    prev_state: Option<&WindowState>,
+) -> Option<WindowState> {
     let bounds = window.bounds();
     let current_width = (bounds.size.width / px(1.0)) as u32;
     let current_height = (bounds.size.height / px(1.0)) as u32;
@@ -210,11 +216,7 @@ pub fn extract_window_state(window: &Window, prev_state: Option<&WindowState>) -
 }
 
 /// Observe window geometry changes and debounced-save to settings.
-pub fn observe(
-    window: &mut Window,
-    settings: Arc<Mutex<DesktopSettings>>,
-    cx: &mut App,
-) {
+pub fn observe(window: &mut Window, settings: Arc<Mutex<DesktopSettings>>, cx: &mut App) {
     let last_saved = Arc::new(Mutex::new(settings.lock().window_state));
     let last_saved_close = last_saved.clone();
     let settings_close = settings.clone();

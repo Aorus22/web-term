@@ -1,10 +1,10 @@
 //! Onboarding / New Tab Page ("Welcome to WebTerm") matching fe/src/components/NewTabView.tsx 1:1.
 
+use crate::app_state::AppState;
+use crate::icons::{KEY_SVG, PLUS_SVG, SEARCH_SVG, TAG_SVG, TERMINAL_SVG};
 use gpui::*;
 use gpui_component::input::Input;
 use gpui_component::Sizable;
-use crate::app_state::AppState;
-use crate::icons::{KEY_SVG, PLUS_SVG, SEARCH_SVG, TAG_SVG, TERMINAL_SVG};
 
 /// Renders the Onboarding / New Tab Page.
 pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
@@ -100,12 +100,7 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                 .border_b_1()
                                 .border_color(border_color)
                                 .gap_2p5()
-                                .child(
-                                    svg()
-                                        .data(SEARCH_SVG)
-                                        .size(px(16.0))
-                                        .text_color(muted_text),
-                                )
+                                .child(svg().data(SEARCH_SVG).size(px(16.0)).text_color(muted_text))
                                 .child(
                                     div().flex_1().child(
                                         Input::new(&app.inputs().quick_connect)
@@ -139,12 +134,7 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                 .rounded_lg()
                                 .cursor_pointer()
                                 .hover(|s| s.bg(muted_bg))
-                                .child(
-                                    svg()
-                                        .data(PLUS_SVG)
-                                        .size(px(14.0))
-                                        .text_color(muted_text),
-                                )
+                                .child(svg().data(PLUS_SVG).size(px(14.0)).text_color(muted_text))
                                 .child(
                                     div()
                                         .text_sm()
@@ -152,9 +142,12 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                         .text_color(text_color)
                                         .child("Create New..."),
                                 )
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                                    this.open_create_connection_modal(window, cx);
-                                })),
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(|this, _, window, cx| {
+                                        this.open_create_connection_modal(window, cx);
+                                    }),
+                                ),
                         )
                         // Group: Saved Connections (if any)
                         .children(if !filtered_connections.is_empty() {
@@ -219,9 +212,12 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                                     .truncate()
                                                     .child(format!("{} ({})", label, host)),
                                             )
-                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                this.connect_to_host(&conn_id, cx);
-                                            }))
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(move |this, _, _window, cx| {
+                                                    this.connect_to_host(&conn_id, cx);
+                                                }),
+                                            )
                                     })),
                             )
                         } else {
@@ -242,48 +238,47 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                 .child("Direct Access"),
                         )
                         .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .w_full()
-                                .child(
-                                    div()
-                                        .w(px(280.0))
-                                        .p_4()
-                                        .rounded_xl()
-                                        .border_1()
-                                        .border_color(primary_color)
-                                        .bg(muted_bg)
-                                        .cursor_pointer()
-                                        .hover(|s| s.border_color(primary_color).bg(border_color))
-                                        .child(
-                                            div()
-                                                .flex()
-                                                .flex_row()
-                                                .items_center()
-                                                .gap_2()
-                                                .text_base()
-                                                .font_weight(FontWeight::BOLD)
-                                                .text_color(primary_color)
-                                                .child(
-                                                    svg()
-                                                        .data(TERMINAL_SVG)
-                                                        .size(px(16.0))
-                                                        .text_color(primary_color),
-                                                )
-                                                .child("Local Terminal"),
-                                        )
-                                        .child(
-                                            div()
-                                                .mt_1p5()
-                                                .text_xs()
-                                                .text_color(muted_text)
-                                                .child("Spawn a shell on the backend host"),
-                                        )
-                                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                            div().flex().flex_row().w_full().child(
+                                div()
+                                    .w(px(280.0))
+                                    .p_4()
+                                    .rounded_xl()
+                                    .border_1()
+                                    .border_color(primary_color)
+                                    .bg(muted_bg)
+                                    .cursor_pointer()
+                                    .hover(|s| s.border_color(primary_color).bg(border_color))
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .gap_2()
+                                            .text_base()
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(primary_color)
+                                            .child(
+                                                svg()
+                                                    .data(TERMINAL_SVG)
+                                                    .size(px(16.0))
+                                                    .text_color(primary_color),
+                                            )
+                                            .child("Local Terminal"),
+                                    )
+                                    .child(
+                                        div()
+                                            .mt_1p5()
+                                            .text_xs()
+                                            .text_color(muted_text)
+                                            .child("Spawn a shell on the backend host"),
+                                    )
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(|this, _, _window, cx| {
                                             this.open_local_tab(cx);
-                                        })),
-                                ),
+                                        }),
+                                    ),
+                            ),
                         ),
                 )
                 // 4. Saved Connections Section
@@ -345,49 +340,45 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                                 .text_color(muted_text),
                                         )
                                         .child("New Connection")
-                                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                                            this.open_create_connection_modal(window, cx);
-                                        })),
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(|this, _, window, cx| {
+                                                this.open_create_connection_modal(window, cx);
+                                            }),
+                                        ),
                                 ),
                         )
                         // Saved Connections Cards Grid (3-column)
                         .children(if connections.is_empty() {
-                            vec![
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .items_center()
-                                    .justify_center()
-                                    .py_12()
-                                    .rounded_xl()
-                                    .border_1()
-                                    .border_color(border_color)
-                                    .bg(card_bg)
-                                    .gap_3()
-                                    .child(
-                                        svg()
-                                            .data(TERMINAL_SVG)
-                                            .size(px(32.0))
-                                            .text_color(muted_text),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .text_color(muted_text)
-                                            .child("No saved connections yet. Create one to get started."),
-                                    )
-                                    .into_any_element(),
-                            ]
+                            vec![div()
+                                .flex()
+                                .flex_col()
+                                .items_center()
+                                .justify_center()
+                                .py_12()
+                                .rounded_xl()
+                                .border_1()
+                                .border_color(border_color)
+                                .bg(card_bg)
+                                .gap_3()
+                                .child(
+                                    svg()
+                                        .data(TERMINAL_SVG)
+                                        .size(px(32.0))
+                                        .text_color(muted_text),
+                                )
+                                .child(
+                                    div().text_sm().text_color(muted_text).child(
+                                        "No saved connections yet. Create one to get started.",
+                                    ),
+                                )
+                                .into_any_element()]
                         } else {
                             // Render 3-column rows
                             connections
                                 .chunks(3)
                                 .map(|row| {
-                                    let mut row_div = div()
-                                        .flex()
-                                        .flex_row()
-                                        .w_full()
-                                        .gap_4();
+                                    let mut row_div = div().flex().flex_row().w_full().gap_4();
 
                                     for conn in row {
                                         let conn_id = conn.id.clone();
@@ -397,9 +388,10 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                             conn.label.clone()
                                         };
                                         let subtitle = format!("{}@{}", conn.username, conn.host);
-                                        let is_session_active = app.session_manager.tabs().iter().any(|t| {
-                                            t.connection_id.as_deref() == Some(&conn.id)
-                                        });
+                                        let is_session_active =
+                                            app.session_manager.tabs().iter().any(|t| {
+                                                t.connection_id.as_deref() == Some(&conn.id)
+                                            });
 
                                         row_div = row_div.child(
                                             div()
@@ -416,7 +408,9 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                                 })
                                                 .bg(card_bg)
                                                 .cursor_pointer()
-                                                .hover(|s| s.border_color(primary_color).bg(muted_bg))
+                                                .hover(|s| {
+                                                    s.border_color(primary_color).bg(muted_bg)
+                                                })
                                                 // Header: Title & Terminal icon
                                                 .child(
                                                     div()
@@ -489,27 +483,28 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                                                 })
                                                                 .collect::<Vec<_>>()
                                                         } else {
-                                                            vec![
-                                                                div()
-                                                                    .flex()
-                                                                    .flex_row()
-                                                                    .items_center()
-                                                                    .gap_1()
-                                                                    .text_xs()
-                                                                    .text_color(muted_text)
-                                                                    .child(
-                                                                        svg()
-                                                                            .data(TAG_SVG)
-                                                                            .size(px(11.0))
-                                                                            .text_color(muted_text),
-                                                                    )
-                                                                    .child("No tags"),
-                                                            ]
+                                                            vec![div()
+                                                                .flex()
+                                                                .flex_row()
+                                                                .items_center()
+                                                                .gap_1()
+                                                                .text_xs()
+                                                                .text_color(muted_text)
+                                                                .child(
+                                                                    svg()
+                                                                        .data(TAG_SVG)
+                                                                        .size(px(11.0))
+                                                                        .text_color(muted_text),
+                                                                )
+                                                                .child("No tags")]
                                                         }),
                                                 )
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    this.connect_to_host(&conn_id, cx);
-                                                })),
+                                                .on_mouse_down(
+                                                    MouseButton::Left,
+                                                    cx.listener(move |this, _, _window, cx| {
+                                                        this.connect_to_host(&conn_id, cx);
+                                                    }),
+                                                ),
                                         );
                                     }
 

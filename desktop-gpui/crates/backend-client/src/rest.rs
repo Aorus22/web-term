@@ -3,9 +3,9 @@ use crate::terminal_ws::{
 };
 use crate::types::{
     Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
-    ForwardActionResponse, ImportResult, PortForward, SessionInfo, Settings, SftpFileInfo,
-    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest, UpdateKeyRequest,
-    KeyDeleteWarning,
+    ForwardActionResponse, ImportResult, KeyDeleteWarning, PortForward, SessionInfo, Settings,
+    SftpFileInfo, SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest,
+    UpdateKeyRequest,
 };
 use std::time::Duration;
 use thiserror::Error;

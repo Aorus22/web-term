@@ -159,7 +159,11 @@ impl Terminal {
     /// Start a mouse text selection.
     pub fn start_selection(&mut self, point: AlacPoint, selection_type: SelectionType) {
         let mut term = self.term.lock();
-        term.selection = Some(Selection::new(selection_type, point, alacritty_terminal::index::Side::Left));
+        term.selection = Some(Selection::new(
+            selection_type,
+            point,
+            alacritty_terminal::index::Side::Left,
+        ));
     }
 
     /// Update an ongoing mouse text selection.

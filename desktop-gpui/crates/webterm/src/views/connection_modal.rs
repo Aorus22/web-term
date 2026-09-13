@@ -74,20 +74,16 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                             .flex()
                             .flex_row()
                             .gap_3()
-                            .child(
-                                div().flex_1().child(sheet_input_row(
-                                    app,
-                                    "Host / IP *",
-                                    &app.inputs().conn_host,
-                                )),
-                            )
-                            .child(
-                                div().w(px(90.0)).child(sheet_input_row(
-                                    app,
-                                    "Port *",
-                                    &app.inputs().conn_port,
-                                )),
-                            ),
+                            .child(div().flex_1().child(sheet_input_row(
+                                app,
+                                "Host / IP *",
+                                &app.inputs().conn_host,
+                            )))
+                            .child(div().w(px(90.0)).child(sheet_input_row(
+                                app,
+                                "Port *",
+                                &app.inputs().conn_port,
+                            ))),
                     )
                     // Username Row
                     .child(sheet_input_row(
@@ -132,11 +128,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             .px_3()
                                             .py_1p5()
                                             .rounded_md()
-                                            .bg(if !is_key_auth {
-                                                primary_color
-                                            } else {
-                                                tag_bg
-                                            })
+                                            .bg(if !is_key_auth { primary_color } else { tag_bg })
                                             .text_color(if !is_key_auth {
                                                 primary_fg
                                             } else {
@@ -176,11 +168,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             .px_3()
                                             .py_1p5()
                                             .rounded_md()
-                                            .bg(if is_key_auth {
-                                                primary_color
-                                            } else {
-                                                tag_bg
-                                            })
+                                            .bg(if is_key_auth { primary_color } else { tag_bg })
                                             .text_color(if is_key_auth {
                                                 primary_fg
                                             } else {
@@ -263,11 +251,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             } else {
                                                 border_color
                                             })
-                                            .bg(if is_selected {
-                                                tag_bg
-                                            } else {
-                                                app.bg_color()
-                                            })
+                                            .bg(if is_selected { tag_bg } else { app.bg_color() })
                                             .hover(|s| s.bg(tag_bg))
                                             .flex()
                                             .flex_row()

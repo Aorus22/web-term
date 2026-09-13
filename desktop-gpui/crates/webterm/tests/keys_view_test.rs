@@ -22,7 +22,9 @@ fn test_encode_base64_pem_format() {
     let encoded = encode_base64(pem.as_bytes());
     assert!(!encoded.is_empty());
     // Ensure standard characters only
-    assert!(encoded.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
+    assert!(encoded
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
 }
 
 #[test]
@@ -34,11 +36,17 @@ fn test_session_passphrase_cache_lifecycle() {
 
     // Cache passphrase on unlock
     cache.insert("key-prod".to_string(), "supersecret123".to_string());
-    assert_eq!(cache.get("key-prod").map(|s| s.as_str()), Some("supersecret123"));
+    assert_eq!(
+        cache.get("key-prod").map(|s| s.as_str()),
+        Some("supersecret123")
+    );
 
     // Cache multiple keys
     cache.insert("key-staging".to_string(), "stagingpass".to_string());
-    assert_eq!(cache.get("key-staging").map(|s| s.as_str()), Some("stagingpass"));
+    assert_eq!(
+        cache.get("key-staging").map(|s| s.as_str()),
+        Some("stagingpass")
+    );
     assert_eq!(cache.len(), 2);
 
     // Key deletion purges passphrase from memory

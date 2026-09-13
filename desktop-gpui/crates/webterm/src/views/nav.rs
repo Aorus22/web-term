@@ -1,8 +1,8 @@
 //! Navigation shell view: left sidebar and main content views.
 
 use crate::actions::{
-    CloseTab, EscapeOverlays, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7, JumpTab8,
-    JumpTab9, NewTab, NextTab, PrevTab,
+    CloseTab, EscapeOverlays, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7,
+    JumpTab8, JumpTab9, NewTab, NextTab, PrevTab,
 };
 use crate::app_state::{AppState, View};
 use crate::views::hosts::render_hosts_view;
@@ -46,6 +46,12 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     };
 
     let confirm_modals_overlay = render_confirm_modals(app, cx);
+    let terminal_menu_overlay = if app.terminal_context_menu.is_some() {
+        render_terminal_context_menu(app, cx)
+    } else {
+        None
+    };
+    let save_banner_overlay = render_save_connection_banner(app, cx);
 
     let delete_forward_modal_overlay = if app.delete_forward_target.is_some() {
         Some(crate::views::forwards::render_delete_forward_modal(app, cx))
@@ -371,6 +377,8 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         )
         .children(passphrase_modal_overlay)
         .children(confirm_modals_overlay)
+        .children(save_banner_overlay)
+        .children(terminal_menu_overlay)
         .children(delete_forward_modal_overlay)
         .children(sftp_context_menu_overlay)
         .children(sftp_modal_overlay)
@@ -444,7 +452,19 @@ fn render_content_pane(
             let host_or_term = if app.show_hosts_catalog || active_tab_view.is_none() {
                 render_hosts_view(app, cx)
             } else if let Some(term_view) = active_tab_view {
-                div().size_full().bg(bg).child(term_view).into_any_element()
+                div()
+                    .size_full()
+                    .bg(bg)
+                    .on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(|this, ev: &MouseDownEvent, _window, cx| {
+                            this.terminal_context_menu =
+                                Some((f32::from(ev.position.x), f32::from(ev.position.y)));
+                            cx.notify();
+                        }),
+                    )
+                    .child(term_view)
+                    .into_any_element()
             } else {
                 render_hosts_view(app, cx)
             };
@@ -491,7 +511,6 @@ fn render_content_pane(
     }
 }
 
-
 /// Confirmation dialogs: close connected tab, delete connection, delete key
 /// (with the affected-connections warning step from the web client).
 pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> Option<AnyElement> {
@@ -522,25 +541,21 @@ pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> 
                     .text_color(text_color)
                     .child("Disconnect from host"),
             )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(muted_text)
-                    .child(format!("Disconnect from {}? The tab will be closed.", title)),
-            )
-            .child(
-                confirm_dialog_buttons(
-                    app,
-                    cx,
-                    "Cancel",
-                    "Disconnect",
-                    |this, cx| this.cancel_close_tab(cx),
-                    move |this, _, cx| {
-                        // Backdrop dismiss must not close the tab; use idx.
-                        this.confirm_close_tab(idx, cx);
-                    },
-                ),
-            )
+            .child(div().text_sm().text_color(muted_text).child(format!(
+                "Disconnect from {}? The tab will be closed.",
+                title
+            )))
+            .child(confirm_dialog_buttons(
+                app,
+                cx,
+                "Cancel",
+                "Disconnect",
+                |this, cx| this.cancel_close_tab(cx),
+                move |this, _, cx| {
+                    // Backdrop dismiss must not close the tab; use idx.
+                    this.confirm_close_tab(idx, cx);
+                },
+            ))
             .into_any_element(),
         );
     }
@@ -557,15 +572,10 @@ pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> 
                     .text_color(text_color)
                     .child("Delete Connection"),
             )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(muted_text)
-                    .child(format!(
-                        "Delete \"{}\"? This action cannot be undone.",
-                        conn.label
-                    )),
-            )
+            .child(div().text_sm().text_color(muted_text).child(format!(
+                "Delete \"{}\"? This action cannot be undone.",
+                conn.label
+            )))
             .child(confirm_dialog_buttons(
                 app,
                 cx,
@@ -706,4 +716,328 @@ fn confirm_dialog_buttons(
                     cx.listener(move |this, _, window, cx| on_action(this, window, cx)),
                 ),
         )
+}
+
+/// Right-click context menu for the terminal pane: clipboard, clear, and
+/// control-key sender, matching the web TerminalContextMenu.
+pub fn render_terminal_context_menu(
+    app: &mut AppState,
+    cx: &mut Context<AppState>,
+) -> Option<AnyElement> {
+    let (x, y) = app.terminal_context_menu?;
+    let is_dark = app.is_dark();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let hover_bg = app.muted_bg();
+
+    if app
+        .session_manager
+        .active_tab()
+        .and_then(|t| t.view.clone())
+        .is_none()
+    {
+        app.terminal_context_menu = None;
+        return None;
+    }
+
+    let border_color = app.border_color();
+    let card_bg = app.card_bg();
+
+    let menu = div()
+        .w(px(190.0))
+        .rounded_md()
+        .border_1()
+        .border_color(border_color)
+        .bg(card_bg)
+        .shadow_lg()
+        .py_1()
+        .on_mouse_down(MouseButton::Left, |_, _, _| {})
+        .child(context_menu_row(
+            "Copy",
+            crate::icons::COPY_SVG,
+            is_dark,
+            text_color,
+            muted_text,
+            hover_bg,
+            cx.listener(|this, _, _window, cx| {
+                this.terminal_context_menu = None;
+                if let Some(view) = this
+                    .session_manager
+                    .active_tab()
+                    .and_then(|t| t.view.clone())
+                {
+                    view.update(cx, |v, cx| {
+                        v.copy_selection(cx);
+                    });
+                }
+            }),
+        ))
+        .child(context_menu_row(
+            "Paste",
+            crate::icons::FILES_SVG,
+            is_dark,
+            text_color,
+            muted_text,
+            hover_bg,
+            cx.listener(|this, _, _window, cx| {
+                this.terminal_context_menu = None;
+                if let Some(view) = this
+                    .session_manager
+                    .active_tab()
+                    .and_then(|t| t.view.clone())
+                {
+                    view.update(cx, |v, cx| {
+                        v.paste_clipboard(cx);
+                    });
+                }
+            }),
+        ))
+        .child(div().h_px().w_full().bg(border_color).my_0p5())
+        .child(context_menu_row(
+            "Clear",
+            crate::icons::TRASH_SVG,
+            is_dark,
+            text_color,
+            muted_text,
+            hover_bg,
+            cx.listener(|this, _, _window, cx| {
+                this.terminal_context_menu = None;
+                if let Some(view) = this
+                    .session_manager
+                    .active_tab()
+                    .and_then(|t| t.view.clone())
+                {
+                    view.update(cx, |v, _cx| {
+                        // Clear screen + scrollback (CSI 3J / CSI H / CSI 2J).
+                        v.write_to_pty(b"\x1b[3J\x1b[H\x1b[2J");
+                    });
+                }
+            }),
+        ))
+        .child(div().h_px().w_full().bg(border_color).my_0p5())
+        .child(context_menu_row(
+            "Send Ctrl+C (Interrupt)",
+            crate::icons::TERMINAL_SVG,
+            is_dark,
+            text_color,
+            muted_text,
+            hover_bg,
+            cx.listener(|this, _, _window, cx| {
+                this.terminal_context_menu = None;
+                if let Some(view) = this
+                    .session_manager
+                    .active_tab()
+                    .and_then(|t| t.view.clone())
+                {
+                    view.update(cx, |v, _cx| {
+                        v.write_to_pty(b"\x03");
+                    });
+                }
+            }),
+        ))
+        .child(context_menu_row(
+            "Send Ctrl+Z (Suspend)",
+            crate::icons::TERMINAL_SVG,
+            is_dark,
+            text_color,
+            muted_text,
+            hover_bg,
+            cx.listener(|this, _, _window, cx| {
+                this.terminal_context_menu = None;
+                if let Some(view) = this
+                    .session_manager
+                    .active_tab()
+                    .and_then(|t| t.view.clone())
+                {
+                    view.update(cx, |v, _cx| {
+                        v.write_to_pty(b"\x1a");
+                    });
+                }
+            }),
+        ))
+        .child(context_menu_row(
+            "Send Ctrl+D (EOF)",
+            crate::icons::TERMINAL_SVG,
+            is_dark,
+            text_color,
+            muted_text,
+            hover_bg,
+            cx.listener(|this, _, _window, cx| {
+                this.terminal_context_menu = None;
+                if let Some(view) = this
+                    .session_manager
+                    .active_tab()
+                    .and_then(|t| t.view.clone())
+                {
+                    view.update(cx, |v, _cx| {
+                        v.write_to_pty(b"\x04");
+                    });
+                }
+            }),
+        ))
+        .child(context_menu_row(
+            "Send Ctrl+L (Clear line)",
+            crate::icons::TERMINAL_SVG,
+            is_dark,
+            text_color,
+            muted_text,
+            hover_bg,
+            cx.listener(|this, _, _window, cx| {
+                this.terminal_context_menu = None;
+                if let Some(view) = this
+                    .session_manager
+                    .active_tab()
+                    .and_then(|t| t.view.clone())
+                {
+                    view.update(cx, |v, _cx| {
+                        v.write_to_pty(b"\x0c");
+                    });
+                }
+            }),
+        ));
+
+    let dismiss = cx.listener(|this, _, _window, cx| {
+        this.terminal_context_menu = None;
+        cx.notify();
+    });
+    Some(
+        div()
+            .absolute()
+            .inset_0()
+            .on_mouse_down(MouseButton::Left, dismiss)
+            .child(div().absolute().left(px(x)).top(px(y)).child(menu))
+            .into_any_element(),
+    )
+}
+
+fn context_menu_row(
+    label: &'static str,
+    icon: &'static [u8],
+    is_dark: bool,
+    text_color: Rgba,
+    muted_text: Rgba,
+    hover_bg: Rgba,
+    on_click: impl Fn(&MouseDownEvent, &mut Window, &mut App) + 'static,
+) -> Div {
+    let _ = is_dark;
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_2()
+        .px_3()
+        .py_1p5()
+        .rounded_md()
+        .cursor_pointer()
+        .hover(move |s| s.bg(hover_bg))
+        .text_xs()
+        .text_color(text_color)
+        .child(svg().data(icon).size(px(12.0)).text_color(muted_text))
+        .child(label)
+        .on_mouse_down(MouseButton::Left, on_click)
+}
+
+/// "Save this connection?" banner shown for disconnected quick-connect tabs.
+pub fn render_save_connection_banner(
+    app: &mut AppState,
+    cx: &mut Context<AppState>,
+) -> Option<AnyElement> {
+    if app.save_connection_prompt.is_none() {
+        return None;
+    }
+    let disconnected = app
+        .session_manager
+        .active_tab()
+        .map(|t| matches!(t.status, crate::session::SessionStatus::Disconnected(_)))
+        .unwrap_or(false);
+    if !disconnected {
+        return None;
+    }
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let primary_color = app.primary_color();
+    let primary_fg = app.primary_fg();
+
+    Some(
+        div()
+            .absolute()
+            .top(px(48.0))
+            .left(px(16.0))
+            .right(px(16.0))
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_between()
+            .px_4()
+            .py_2()
+            .rounded_lg()
+            .bg(app.card_bg())
+            .border_1()
+            .border_color(app.primary_color())
+            .shadow_lg()
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(text_color)
+                            .child("Save this connection?"),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(muted_text)
+                            .child("Save the host so you can reconnect quickly later."),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        div()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .bg(primary_color)
+                            .hover(|s| s.opacity(0.9))
+                            .cursor_pointer()
+                            .text_xs()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(primary_fg)
+                            .child("Save")
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _window, cx| {
+                                    this.save_quick_connection(cx);
+                                }),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .px_3()
+                            .py_1p5()
+                            .rounded_md()
+                            .text_xs()
+                            .text_color(muted_text)
+                            .cursor_pointer()
+                            .hover(move |s| s.text_color(text_color))
+                            .child("Dismiss")
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _window, cx| {
+                                    this.dismiss_save_connection_prompt(cx);
+                                }),
+                            ),
+                    ),
+            )
+            .into_any_element(),
+    )
 }

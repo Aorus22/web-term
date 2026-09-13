@@ -58,7 +58,10 @@ fn test_rename_modal_validation() {
     };
 
     // 1. Empty new name -> error
-    if let SftpModalState::Rename { new_name, error, .. } = &mut modal {
+    if let SftpModalState::Rename {
+        new_name, error, ..
+    } = &mut modal
+    {
         if new_name.trim().is_empty() {
             *error = Some("New name cannot be empty".to_string());
         }

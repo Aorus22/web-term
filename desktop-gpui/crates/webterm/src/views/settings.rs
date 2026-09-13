@@ -12,10 +12,10 @@
 //!   - Scrollback Buffer dropdown ("1,000 lines", "5,000 lines", etc.).
 //! - Terminal Font modal with family selector, size stepper/presets, and terminal preview.
 
+use crate::app_state::AppState;
 use gpui::*;
 use gpui_component::input::Input;
 use gpui_component::Sizable;
-use crate::app_state::AppState;
 
 const MONO_FONTS: &[&str] = &[
     "Geist Mono",
@@ -84,7 +84,10 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     };
 
     let cursor_blink_active = app.cursor_blink;
-    let font_display = format!("{} {:.0}px", app.terminal_font_family, app.terminal_font_size);
+    let font_display = format!(
+        "{} {:.0}px",
+        app.terminal_font_family, app.terminal_font_size
+    );
 
     div()
         .id("settings-scroll-area")

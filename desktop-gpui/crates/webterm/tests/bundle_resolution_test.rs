@@ -35,7 +35,9 @@ fn test_bundle_resolution_settings_override_takes_precedence() {
     let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
     let app_exe = bundle_dir.join(format!("webterm{}", exe_suffix));
     let bundled_backend = bundle_dir.join(format!("backend{}", exe_suffix));
-    let custom_backend = temp_dir.path().join(format!("custom-backend{}", exe_suffix));
+    let custom_backend = temp_dir
+        .path()
+        .join(format!("custom-backend{}", exe_suffix));
 
     std::fs::write(&app_exe, b"mock-app").unwrap();
     std::fs::write(&bundled_backend, b"mock-bundled").unwrap();

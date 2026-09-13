@@ -5,9 +5,7 @@ use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
 use webterm::session::{SessionStatus, TerminalSessionManager, TerminalTab};
-use webterm_backend_client::{
-    normalize_ws_url, TerminalWsClient, WsConnectRequest,
-};
+use webterm_backend_client::{normalize_ws_url, TerminalWsClient, WsConnectRequest};
 
 #[test]
 fn test_local_connect_request_structure_and_serialization() {
@@ -58,7 +56,8 @@ fn test_local_connect_request_with_cwd_serialization() {
 
 #[test]
 fn test_quick_ssh_connect_request_structure() {
-    let req = WsConnectRequest::for_quick_connect("192.168.1.100", 2222, "alice", "secret123", 100, 30);
+    let req =
+        WsConnectRequest::for_quick_connect("192.168.1.100", 2222, "alice", "secret123", 100, 30);
 
     assert_eq!(req.msg_type, "connect");
     assert_eq!(req.session_type.as_deref(), Some("ssh"));
@@ -83,12 +82,7 @@ fn test_quick_ssh_connect_request_structure() {
 fn test_local_session_tab_lifecycle() {
     let mut manager = TerminalSessionManager::new();
     let tab_id = manager.alloc_tab_id();
-    let tab = TerminalTab::new_headless(
-        tab_id,
-        "Local Shell",
-        "local",
-        Some("local".to_string()),
-    );
+    let tab = TerminalTab::new_headless(tab_id, "Local Shell", "local", Some("local".to_string()));
     manager.add_tab(tab);
 
     assert_eq!(manager.tab_count(), 1);
@@ -103,7 +97,10 @@ fn test_local_session_tab_lifecycle() {
 
     // Transition to Connected
     manager.set_tab_status(tab_id, SessionStatus::Connected);
-    assert_eq!(manager.active_tab().unwrap().status, SessionStatus::Connected);
+    assert_eq!(
+        manager.active_tab().unwrap().status,
+        SessionStatus::Connected
+    );
 }
 
 #[tokio::test]
@@ -134,7 +131,9 @@ async fn test_local_shell_mock_ws_stream_and_resize() {
             "type": "connected",
             "session_id": "session-local-xyz-100"
         });
-        ws.send(Message::Text(resp.to_string().into())).await.unwrap();
+        ws.send(Message::Text(resp.to_string().into()))
+            .await
+            .unwrap();
 
         // 3. Receive ready frame
         let ready_msg = ws.next().await.unwrap().unwrap();
@@ -147,7 +146,9 @@ async fn test_local_shell_mock_ws_stream_and_resize() {
 
         // 4. Stream local shell prompt
         let prompt = b"user@localhost:~$ ";
-        ws.send(Message::Binary(prompt.to_vec().into())).await.unwrap();
+        ws.send(Message::Binary(prompt.to_vec().into()))
+            .await
+            .unwrap();
 
         // 5. Receive client binary input
         let input_msg = ws.next().await.unwrap().unwrap();
@@ -203,12 +204,8 @@ async fn test_local_shell_mock_ws_stream_and_resize() {
 
 #[test]
 fn test_local_tab_is_local_flag_and_restartability() {
-    let mut local_tab = TerminalTab::new_headless(
-        1,
-        "Local Shell",
-        "local",
-        Some("local".to_string()),
-    );
+    let mut local_tab =
+        TerminalTab::new_headless(1, "Local Shell", "local", Some("local".to_string()));
     assert!(local_tab.is_local());
     assert!(!local_tab.is_restartable());
 
@@ -218,12 +215,7 @@ fn test_local_tab_is_local_flag_and_restartability() {
     local_tab.status = SessionStatus::Disconnected(Some("Process exited with code 0".to_string()));
     assert!(local_tab.is_restartable());
 
-    let ssh_tab = TerminalTab::new_headless(
-        2,
-        "prod-server",
-        "ssh",
-        Some("conn-123".to_string()),
-    );
+    let ssh_tab = TerminalTab::new_headless(2, "prod-server", "ssh", Some("conn-123".to_string()));
     assert!(!ssh_tab.is_local());
 }
 
@@ -234,13 +226,11 @@ fn test_local_tab_with_custom_cwd() {
     assert_eq!(req.cols, 100);
     assert_eq!(req.rows, 30);
 
-    let mut tab = TerminalTab::new_headless(
-        10,
-        "Local Shell",
-        "local",
-        Some("local".to_string()),
-    );
+    let mut tab = TerminalTab::new_headless(10, "Local Shell", "local", Some("local".to_string()));
     tab.last_connect_req = Some(req.clone());
 
-    assert_eq!(tab.last_connect_req.as_ref().unwrap().cwd.as_deref(), Some("/workspace/project"));
+    assert_eq!(
+        tab.last_connect_req.as_ref().unwrap().cwd.as_deref(),
+        Some("/workspace/project")
+    );
 }

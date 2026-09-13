@@ -58,7 +58,9 @@ pub fn mouse_button_report(
     modifiers: u8,
     mode: TermMode,
 ) -> Option<Vec<u8>> {
-    if !mode.intersects(TermMode::MOUSE_REPORT_CLICK | TermMode::MOUSE_MOTION | TermMode::MOUSE_DRAG) {
+    if !mode
+        .intersects(TermMode::MOUSE_REPORT_CLICK | TermMode::MOUSE_MOTION | TermMode::MOUSE_DRAG)
+    {
         return None;
     }
 
@@ -85,7 +87,8 @@ pub fn scroll_report(
     modifiers: u8,
     mode: TermMode,
 ) -> Option<Vec<u8>> {
-    if mode.intersects(TermMode::MOUSE_REPORT_CLICK | TermMode::MOUSE_MOTION | TermMode::MOUSE_DRAG) {
+    if mode.intersects(TermMode::MOUSE_REPORT_CLICK | TermMode::MOUSE_MOTION | TermMode::MOUSE_DRAG)
+    {
         // 64 = wheel up, 65 = wheel down
         let button_code = if delta > 0 { 64 } else { 65 };
         let button_value = button_code | modifiers;

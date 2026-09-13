@@ -10,9 +10,8 @@ pub fn keystroke_to_bytes(keystroke: &Keystroke, mode: TermMode) -> Option<Vec<u
     let key = keystroke.key.as_str();
 
     // Handle modified arrow keys (Shift, Alt, Ctrl)
-    let has_modifiers = keystroke.modifiers.shift
-        || keystroke.modifiers.alt
-        || keystroke.modifiers.control;
+    let has_modifiers =
+        keystroke.modifiers.shift || keystroke.modifiers.alt || keystroke.modifiers.control;
 
     if has_modifiers && matches!(key, "up" | "down" | "right" | "left") {
         let mut mod_code = 1;
@@ -166,14 +165,20 @@ mod tests {
             key: "enter".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&enter, TermMode::empty()), Some(b"\r".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&enter, TermMode::empty()),
+            Some(b"\r".to_vec())
+        );
 
         let backspace = Keystroke {
             modifiers: Modifiers::default(),
             key: "backspace".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&backspace, TermMode::empty()), Some(b"\x7f".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&backspace, TermMode::empty()),
+            Some(b"\x7f".to_vec())
+        );
     }
 
     #[test]
@@ -183,7 +188,10 @@ mod tests {
             key: "tab".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&tab, TermMode::empty()), Some(b"\t".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&tab, TermMode::empty()),
+            Some(b"\t".to_vec())
+        );
 
         let shift_tab = Keystroke {
             modifiers: Modifiers {
@@ -193,7 +201,10 @@ mod tests {
             key: "tab".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&shift_tab, TermMode::empty()), Some(b"\x1b[Z".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&shift_tab, TermMode::empty()),
+            Some(b"\x1b[Z".to_vec())
+        );
     }
 
     #[test]
@@ -203,16 +214,28 @@ mod tests {
             key: "up".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&up, TermMode::empty()), Some(b"\x1b[A".to_vec()));
-        assert_eq!(keystroke_to_bytes(&up, TermMode::APP_CURSOR), Some(b"\x1bOA".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&up, TermMode::empty()),
+            Some(b"\x1b[A".to_vec())
+        );
+        assert_eq!(
+            keystroke_to_bytes(&up, TermMode::APP_CURSOR),
+            Some(b"\x1bOA".to_vec())
+        );
 
         let down = Keystroke {
             modifiers: Modifiers::default(),
             key: "down".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&down, TermMode::empty()), Some(b"\x1b[B".to_vec()));
-        assert_eq!(keystroke_to_bytes(&down, TermMode::APP_CURSOR), Some(b"\x1bOB".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&down, TermMode::empty()),
+            Some(b"\x1b[B".to_vec())
+        );
+        assert_eq!(
+            keystroke_to_bytes(&down, TermMode::APP_CURSOR),
+            Some(b"\x1bOB".to_vec())
+        );
     }
 
     #[test]
@@ -226,7 +249,10 @@ mod tests {
             key_char: None,
         };
         // mod_code = 1 + 4 = 5
-        assert_eq!(keystroke_to_bytes(&ctrl_up, TermMode::empty()), Some(b"\x1b[1;5A".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&ctrl_up, TermMode::empty()),
+            Some(b"\x1b[1;5A".to_vec())
+        );
     }
 
     #[test]
@@ -239,7 +265,10 @@ mod tests {
             key: "c".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&ctrl_c, TermMode::empty()), Some(vec![0x03]));
+        assert_eq!(
+            keystroke_to_bytes(&ctrl_c, TermMode::empty()),
+            Some(vec![0x03])
+        );
 
         let ctrl_d = Keystroke {
             modifiers: Modifiers {
@@ -249,7 +278,10 @@ mod tests {
             key: "d".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&ctrl_d, TermMode::empty()), Some(vec![0x04]));
+        assert_eq!(
+            keystroke_to_bytes(&ctrl_d, TermMode::empty()),
+            Some(vec![0x04])
+        );
     }
 
     #[test]
@@ -259,13 +291,19 @@ mod tests {
             key: "f1".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&f1, TermMode::empty()), Some(b"\x1bOP".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&f1, TermMode::empty()),
+            Some(b"\x1bOP".to_vec())
+        );
 
         let pageup = Keystroke {
             modifiers: Modifiers::default(),
             key: "pageup".into(),
             key_char: None,
         };
-        assert_eq!(keystroke_to_bytes(&pageup, TermMode::empty()), Some(b"\x1b[5~".to_vec()));
+        assert_eq!(
+            keystroke_to_bytes(&pageup, TermMode::empty()),
+            Some(b"\x1b[5~".to_vec())
+        );
     }
 }

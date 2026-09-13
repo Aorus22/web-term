@@ -9,11 +9,20 @@ use webterm::backend_client::SftpFileInfo;
 #[test]
 fn test_split_breadcrumbs_unix_and_windows() {
     // Empty or dot
-    assert_eq!(split_breadcrumbs(""), vec![(".".to_string(), ".".to_string())]);
-    assert_eq!(split_breadcrumbs("."), vec![(".".to_string(), ".".to_string())]);
+    assert_eq!(
+        split_breadcrumbs(""),
+        vec![(".".to_string(), ".".to_string())]
+    );
+    assert_eq!(
+        split_breadcrumbs("."),
+        vec![(".".to_string(), ".".to_string())]
+    );
 
     // Unix root
-    assert_eq!(split_breadcrumbs("/"), vec![("/".to_string(), "/".to_string())]);
+    assert_eq!(
+        split_breadcrumbs("/"),
+        vec![("/".to_string(), "/".to_string())]
+    );
 
     // Unix absolute path
     let unix_crumbs = split_breadcrumbs("/home/user/documents");

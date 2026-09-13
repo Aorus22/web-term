@@ -37,8 +37,8 @@ impl ColorPalette {
     pub fn dark_default() -> Self {
         let foreground = hex_to_hsla(0xe4e4e7ff); // zinc-200
         let background = hex_to_hsla(0x18181bff); // zinc-900
-        let cursor = hex_to_hsla(0x60a5faff);     // blue-400
-        let selection = hex_to_hsla(0x3b82f666);  // blue-500 with alpha
+        let cursor = hex_to_hsla(0x60a5faff); // blue-400
+        let selection = hex_to_hsla(0x3b82f666); // blue-500 with alpha
 
         let ansi = [
             hex_to_hsla(0x27272aff), // Black
@@ -75,8 +75,8 @@ impl ColorPalette {
     pub fn light_default() -> Self {
         let foreground = hex_to_hsla(0x27272aff); // zinc-800
         let background = hex_to_hsla(0xfafafaff); // zinc-50
-        let cursor = hex_to_hsla(0x2563ebff);     // blue-600
-        let selection = hex_to_hsla(0xbfdbfe88);  // blue-200 with alpha
+        let cursor = hex_to_hsla(0x2563ebff); // blue-600
+        let selection = hex_to_hsla(0xbfdbfe88); // blue-200 with alpha
 
         let ansi = [
             hex_to_hsla(0x18181bff), // Black

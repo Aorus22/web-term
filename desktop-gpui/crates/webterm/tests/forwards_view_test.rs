@@ -91,14 +91,18 @@ fn test_forward_form_validation_and_request_conversion() {
     form.local_port = "3000".to_string();
     assert!(form.validate().is_ok());
 
-    let create_req = form.to_create_request().expect("should build create request");
+    let create_req = form
+        .to_create_request()
+        .expect("should build create request");
     assert_eq!(create_req.name, "Web Dev");
     assert_eq!(create_req.connection_id, "c-1");
     assert_eq!(create_req.local_port, 3000);
     assert_eq!(create_req.remote_port, 3000);
     assert_eq!(create_req.forward_type, "local");
 
-    let update_req = form.to_update_request().expect("should build update request");
+    let update_req = form
+        .to_update_request()
+        .expect("should build update request");
     assert_eq!(update_req.name, "Web Dev");
     assert_eq!(update_req.forward_type, "local");
 
@@ -123,7 +127,10 @@ fn test_port_forward_mapping_display() {
         updated_at: None,
     };
     assert!(!local_forward.is_reverse());
-    assert_eq!(local_forward.mapping_display(), "localhost:8080 \u{2192} :80");
+    assert_eq!(
+        local_forward.mapping_display(),
+        "localhost:8080 \u{2192} :80"
+    );
 
     let reverse_forward = PortForward {
         id: "f-2".to_string(),
@@ -139,5 +146,8 @@ fn test_port_forward_mapping_display() {
         updated_at: None,
     };
     assert!(reverse_forward.is_reverse());
-    assert_eq!(reverse_forward.mapping_display(), ":15000 \u{2190} localhost:5000");
+    assert_eq!(
+        reverse_forward.mapping_display(),
+        ":15000 \u{2190} localhost:5000"
+    );
 }
