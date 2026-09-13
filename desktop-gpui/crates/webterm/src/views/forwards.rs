@@ -1,7 +1,10 @@
-//! Port Forwarding rules management view: rule cards, toggle, create/edit, and deletion modals.
+//! Port Forwarding rules management view: rule cards, toggle, create/edit sheet, and deletion modal.
 
-use gpui::*;
 use crate::app_state::{AppState, ForwardModalMode};
+use crate::views::sheet::{
+    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_panel,
+};
+use gpui::*;
 
 /// Render the Port Forwarding rules management view.
 pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
@@ -388,17 +391,14 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
         .into_any_element()
 }
 
-/// Render Create / Edit Port Forward modal dialog overlay.
-pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
+/// Render Create / Edit Port Forward sheet (right-side push-aside panel).
+pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let is_dark = app.is_dark();
-    let card_bg = app.card_bg();
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let input_bg = app.bg_color();
     let tag_bg = app.muted_bg();
-    let primary_color = app.primary_color();
-    let primary_fg = app.primary_fg();
 
     let form = match &app.forward_modal {
         Some(f) => f.clone(),
@@ -406,85 +406,33 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
     };
 
     let is_edit = matches!(form.mode, ForwardModalMode::Edit(_));
-    let title = if is_edit { "Edit Port Forward" } else { "Create Port Forward" };
+    let title = if is_edit {
+        "Edit Port Forward"
+    } else {
+        "Create Port Forward"
+    };
     let is_reverse = form.forward_type == "reverse";
 
     let connections = app.connections.clone();
     let port_presets = ["3000", "5432", "6379", "8000", "8080", "9000", "27017"];
 
-    div()
-        .absolute()
-        .inset_0()
-        .flex()
-        .items_center()
-        .justify_center()
-        .bg(rgba(0x00000088))
-        // Dismiss on background click
-        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-            this.close_forward_modal(cx);
-        }))
-        // Modal Card
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .w(px(520.0))
-                .rounded_xl()
-                .bg(card_bg)
-                .border_1()
-                .border_color(border_color)
-                .shadow_lg()
-                .p_6()
-                .gap_4()
-                .on_mouse_down(MouseButton::Left, |_, _, _| {}) // stop propagation
-                // Modal Header
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            div()
-                                .text_lg()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(text_color)
-                                .child(title),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .size(px(24.0))
-                                .rounded_md()
-                                .hover(|s| s.bg(tag_bg))
-                                .cursor_pointer()
-                                .text_color(muted_text)
-                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.close_forward_modal(cx);
-                                })),
-                        ),
-                )
-                // Error banner (if validation failed)
-                .children(form.error_message.map(|err| {
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_1p5()
-                        .px_3()
-                        .py_2()
-                        .rounded_md()
-                        .bg(if is_dark { rgb(0x451a1a) } else { rgb(0xfee2e2) })
-                        .border_1()
-                        .border_color(rgb(0xef4444))
-                        .text_xs()
-                        .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
-                        .child(svg().data(crate::icons::ALERT_TRIANGLE_SVG).size(px(13.0)).text_color(rgb(0xef4444)))
-                        .child(err)
-                }))
+    sheet_panel(app)
+        .child(sheet_header(
+            app,
+            cx,
+            title,
+            if is_edit {
+                "Modify the port forwarding rule."
+            } else {
+                "Set up an SSH port forwarding tunnel."
+            },
+            AppState::close_forward_modal,
+        ))
+        .children(form
+            .error_message
+            .map(|err| sheet_error_banner(app, err.into()).into_any_element()))
+        // Scrollable form body
+        .child(sheet_body()
                 // Forward Type Selector (Local vs Reverse)
                 .child(
                     div()
@@ -779,58 +727,27 @@ pub fn render_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 ),
                         ),
                 )
-                // Footer Action Buttons
-                .child(
-                    div()
-                        .mt_2()
-                        .flex()
-                        .flex_row()
-                        .justify_end()
-                        .gap_2()
-                        .child(
-                            div()
-                                .px_4()
-                                .py_2()
-                                .rounded_md()
-                                .bg(tag_bg)
-                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
-                                .cursor_pointer()
-                                .text_sm()
-                                .text_color(text_color)
-                                .child("Cancel")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.close_forward_modal(cx);
-                                })),
-                        )
-                                .child(
-                                    div()
-                                        .px_4()
-                                        .py_2()
-                                        .rounded_md()
-                                        .bg(primary_color)
-                                        .hover(|s| s.opacity(0.9))
-                                        .cursor_pointer()
-                                        .text_sm()
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(primary_fg)
-                                        .child(if is_edit { "Save Changes" } else { "Create Forward" })
-                                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                            this.save_forward_form(cx);
-                                        })),
-                                ),
-                        ),
-                )
-                .into_any_element()
-        }
+        )
+        // Footer
+        .child(sheet_footer(
+            app,
+            cx,
+            "Cancel",
+            if is_edit { "Save Changes" } else { "Create Forward" },
+            AppState::close_forward_modal,
+            AppState::save_forward_form,
+        ))
+        .into_any_element()
+}
 
-        /// Render Delete Confirmation modal dialog overlay.
-        pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-            let is_dark = app.is_dark();
-            let card_bg = app.card_bg();
-            let border_color = app.border_color();
-            let text_color = app.text_color();
-            let muted_text = app.muted_text();
-            let tag_bg = app.muted_bg();
+/// Render Delete Confirmation modal dialog overlay.
+pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
+    let is_dark = app.is_dark();
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let tag_bg = app.muted_bg();
 
     let target = match &app.delete_forward_target {
         Some(t) => t.clone(),

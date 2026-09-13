@@ -16,7 +16,7 @@ pub use terminal_ws::{
 pub use types::{
     Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
     ForwardActionResponse, ImportResult, PortForward, SessionInfo, Settings, SftpFileInfo,
-    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest,
+    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest, UpdateKeyRequest,
 };
 
 #[cfg(test)]
@@ -53,8 +53,14 @@ mod tests {
 
         let client = BackendClient::new(format!("http://127.0.0.1:{}", port));
         let settings = client.get_settings().await.expect("should fetch settings");
-        assert_eq!(settings.settings.get("theme_mode").map(|s| s.as_str()), Some("system"));
-        assert_eq!(settings.settings.get("font_size").map(|s| s.as_str()), Some("14"));
+        assert_eq!(
+            settings.settings.get("theme_mode").map(|s| s.as_str()),
+            Some("system")
+        );
+        assert_eq!(
+            settings.settings.get("font_size").map(|s| s.as_str()),
+            Some("14")
+        );
     }
 
     #[tokio::test]
@@ -80,7 +86,10 @@ mod tests {
         });
 
         let client = BackendClient::new(format!("http://127.0.0.1:{}", port));
-        let list = client.list_connections().await.expect("should list connections");
+        let list = client
+            .list_connections()
+            .await
+            .expect("should list connections");
         assert_eq!(list.len(), 2);
         assert_eq!(list[0].id, "c1");
         assert_eq!(list[0].label, "Prod Server");

@@ -1,12 +1,13 @@
 //! Root application state, session orchestration, and view routing.
 
+use gpui::*;
 use std::collections::HashSet;
 use std::sync::LazyLock;
-use gpui::*;
 use webterm_backend_client::{
     BackendClient, Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
     ImportResult, PortForward, SessionInfo, SftpFileInfo, SftpTransferStatus, SshKey,
-    TerminalWsHandle, UpdateConnectionRequest, UpdateForwardRequest, WsConnectRequest,
+    TerminalWsHandle, UpdateConnectionRequest, UpdateForwardRequest, UpdateKeyRequest,
+    WsConnectRequest,
 };
 use webterm_settings::{DesktopSettings, SavedSessionTab, Theme as SettingsTheme};
 use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
@@ -161,6 +162,39 @@ impl ConnectionFormState {
                 None
             },
         }
+    }
+}
+
+/// Form state for Editing an existing SSH Key (rename / replace key material).
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditKeyFormState {
+    pub key_id: String,
+    pub original_name: String,
+    pub name: String,
+    /// New PEM content; empty means keep the current key material.
+    pub new_pem: String,
+    pub error_message: Option<String>,
+}
+
+impl EditKeyFormState {
+    pub fn new(key: &SshKey) -> Self {
+        Self {
+            key_id: key.id.clone(),
+            original_name: key.name.clone(),
+            name: key.name.clone(),
+            new_pem: String::new(),
+            error_message: None,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() {
+            return Err("Key name is required".to_string());
+        }
+        if !self.new_pem.is_empty() && self.new_pem.trim().is_empty() {
+            return Err("New key content cannot be empty".to_string());
+        }
+        Ok(())
     }
 }
 
@@ -326,7 +360,11 @@ pub struct SftpPaneState {
 }
 
 impl SftpPaneState {
-    pub fn new(source_id: impl Into<String>, source_label: impl Into<String>, initial_path: impl Into<String>) -> Self {
+    pub fn new(
+        source_id: impl Into<String>,
+        source_label: impl Into<String>,
+        initial_path: impl Into<String>,
+    ) -> Self {
         let p = initial_path.into();
         Self {
             source_id: source_id.into(),
@@ -367,7 +405,10 @@ impl SftpPaneState {
                     return false;
                 }
                 if !self.search_query.is_empty()
-                    && !f.name.to_lowercase().contains(&self.search_query.to_lowercase())
+                    && !f
+                        .name
+                        .to_lowercase()
+                        .contains(&self.search_query.to_lowercase())
                 {
                     return false;
                 }
@@ -399,7 +440,10 @@ static SFTP_TX_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomic
 
 /// Generate unique transfer ID.
 pub fn next_transfer_id() -> String {
-    format!("tx-{}", SFTP_TX_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+    format!(
+        "tx-{}",
+        SFTP_TX_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    )
 }
 
 /// Modal state for SFTP file operations.
@@ -429,7 +473,6 @@ pub enum SftpModalState {
     },
 }
 
-
 /// Transfer item tracking an active or past transfer.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SftpTransferItem {
@@ -457,7 +500,6 @@ impl From<SftpTransferStatus> for SftpTransferItem {
         }
     }
 }
-
 
 /// Context menu state for a file/folder row.
 #[derive(Debug, Clone, PartialEq)]
@@ -669,7 +711,13 @@ pub fn format_date_modified(iso: &str) -> String {
         let day = clean[8..10].trim_start_matches('0');
         if let (Ok(h), Ok(m)) = (clean[11..13].parse::<u32>(), clean[14..16].parse::<u32>()) {
             let ampm = if h >= 12 { "PM" } else { "AM" };
-            let h12 = if h == 0 { 12 } else if h > 12 { h - 12 } else { h };
+            let h12 = if h == 0 {
+                12
+            } else if h > 12 {
+                h - 12
+            } else {
+                h
+            };
             return format!("{month}/{day}/{year}, {h12}:{m:02} {ampm}");
         }
     }
@@ -705,7 +753,6 @@ pub fn get_available_drives() -> Vec<String> {
         vec!["/".to_string()]
     }
 }
-
 
 pub static TOKIO_RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
@@ -744,10 +791,14 @@ pub struct AppState {
     pub ssh_keys: Vec<SshKey>,
     pub is_loading_keys: bool,
     pub connection_modal: Option<ConnectionFormState>,
+    pub connection_sheet_closing: bool,
     pub show_import_modal: bool,
     pub import_payload: String,
     pub notification: Option<String>,
     pub show_add_key_modal: bool,
+    pub add_key_sheet_closing: bool,
+    pub edit_key_modal: Option<EditKeyFormState>,
+    pub edit_key_sheet_closing: bool,
     pub new_key_name: String,
     pub new_key_pem: String,
     pub add_key_error: Option<String>,
@@ -759,6 +810,7 @@ pub struct AppState {
     pub forwards: Vec<PortForward>,
     pub is_loading_forwards: bool,
     pub forward_modal: Option<ForwardFormState>,
+    pub forward_sheet_closing: bool,
     pub delete_forward_target: Option<PortForward>,
     pub terminal_font_size: f32,
     pub terminal_font_family: String,
@@ -793,7 +845,11 @@ impl AppState {
         let cursor_blink = settings.cursor_blink;
         let scrollback = settings.scrollback;
         let theme_mode_filter = settings.theme_mode_filter.clone();
-        let is_maximized = settings.window_state.as_ref().map(|s| s.maximized).unwrap_or(false);
+        let is_maximized = settings
+            .window_state
+            .as_ref()
+            .map(|s| s.maximized)
+            .unwrap_or(false);
 
         Self {
             backend_status: BackendStatus::Starting,
@@ -818,10 +874,14 @@ impl AppState {
             ssh_keys: Vec::new(),
             is_loading_keys: false,
             connection_modal: None,
+            connection_sheet_closing: false,
             show_import_modal: false,
             import_payload: String::new(),
             notification: None,
             show_add_key_modal: false,
+            add_key_sheet_closing: false,
+            edit_key_modal: None,
+            edit_key_sheet_closing: false,
             new_key_name: String::new(),
             new_key_pem: String::new(),
             add_key_error: None,
@@ -833,6 +893,7 @@ impl AppState {
             forwards: Vec::new(),
             is_loading_forwards: false,
             forward_modal: None,
+            forward_sheet_closing: false,
             delete_forward_target: None,
             terminal_font_size,
             terminal_font_family: terminal_font_family.clone(),
@@ -867,7 +928,11 @@ impl AppState {
     pub fn set_theme_preset(&mut self, preset_id: &str, cx: &mut Context<Self>) {
         self.settings.theme_preset = preset_id.to_string();
         let preset = crate::theme::find_theme_preset(preset_id);
-        self.theme = if preset.is_dark { SettingsTheme::Dark } else { SettingsTheme::Light };
+        self.theme = if preset.is_dark {
+            SettingsTheme::Dark
+        } else {
+            SettingsTheme::Light
+        };
         self.settings.theme = self.theme;
         let _ = self.settings.save();
 
@@ -886,21 +951,51 @@ impl AppState {
         cx.notify();
     }
 
-    pub fn bg_color(&self) -> Rgba { self.current_theme().bg() }
-    pub fn card_bg(&self) -> Rgba { self.current_theme().card_bg() }
-    pub fn card_fg(&self) -> Rgba { self.current_theme().card_fg() }
-    pub fn border_color(&self) -> Rgba { self.current_theme().border() }
-    pub fn text_color(&self) -> Rgba { self.current_theme().fg() }
-    pub fn muted_text(&self) -> Rgba { self.current_theme().muted_fg() }
-    pub fn muted_bg(&self) -> Rgba { self.current_theme().muted() }
-    pub fn primary_color(&self) -> Rgba { self.current_theme().primary() }
-    pub fn primary_fg(&self) -> Rgba { self.current_theme().primary_fg() }
-    pub fn accent_color(&self) -> Rgba { self.current_theme().accent() }
-    pub fn accent_fg(&self) -> Rgba { self.current_theme().accent_fg() }
-    pub fn secondary_bg(&self) -> Rgba { self.current_theme().secondary() }
-    pub fn secondary_fg(&self) -> Rgba { self.current_theme().secondary_fg() }
-    pub fn destructive_color(&self) -> Rgba { self.current_theme().destructive() }
-    pub fn is_dark(&self) -> bool { self.current_theme().is_dark }
+    pub fn bg_color(&self) -> Rgba {
+        self.current_theme().bg()
+    }
+    pub fn card_bg(&self) -> Rgba {
+        self.current_theme().card_bg()
+    }
+    pub fn card_fg(&self) -> Rgba {
+        self.current_theme().card_fg()
+    }
+    pub fn border_color(&self) -> Rgba {
+        self.current_theme().border()
+    }
+    pub fn text_color(&self) -> Rgba {
+        self.current_theme().fg()
+    }
+    pub fn muted_text(&self) -> Rgba {
+        self.current_theme().muted_fg()
+    }
+    pub fn muted_bg(&self) -> Rgba {
+        self.current_theme().muted()
+    }
+    pub fn primary_color(&self) -> Rgba {
+        self.current_theme().primary()
+    }
+    pub fn primary_fg(&self) -> Rgba {
+        self.current_theme().primary_fg()
+    }
+    pub fn accent_color(&self) -> Rgba {
+        self.current_theme().accent()
+    }
+    pub fn accent_fg(&self) -> Rgba {
+        self.current_theme().accent_fg()
+    }
+    pub fn secondary_bg(&self) -> Rgba {
+        self.current_theme().secondary()
+    }
+    pub fn secondary_fg(&self) -> Rgba {
+        self.current_theme().secondary_fg()
+    }
+    pub fn destructive_color(&self) -> Rgba {
+        self.current_theme().destructive()
+    }
+    pub fn is_dark(&self) -> bool {
+        self.current_theme().is_dark
+    }
 
     /// Toggle new tab launcher popover on the plus button.
     pub fn toggle_new_tab_popover(&mut self, cx: &mut Context<Self>) {
@@ -953,12 +1048,17 @@ impl AppState {
         }
 
         // Check if matching a saved connection
-        if let Some(saved) = self.connections.iter().find(|c| {
-            c.label.eq_ignore_ascii_case(input)
-                || format!("{}@{}:{}", c.username, c.host, c.port).eq_ignore_ascii_case(input)
-                || format!("{}@{}", c.username, c.host).eq_ignore_ascii_case(input)
-                || c.host.eq_ignore_ascii_case(input)
-        }).cloned() {
+        if let Some(saved) = self
+            .connections
+            .iter()
+            .find(|c| {
+                c.label.eq_ignore_ascii_case(input)
+                    || format!("{}@{}:{}", c.username, c.host, c.port).eq_ignore_ascii_case(input)
+                    || format!("{}@{}", c.username, c.host).eq_ignore_ascii_case(input)
+                    || c.host.eq_ignore_ascii_case(input)
+            })
+            .cloned()
+        {
             self.connect_to_host(&saved.id, cx);
             self.quick_connect_query.clear();
             return;
@@ -1168,22 +1268,181 @@ impl AppState {
         cx.notify();
     }
 
-    /// Open Add SSH Key modal dialog.
+    /// Run `done` once a sheet's exit animation has finished playing.
+    fn after_sheet_exit(cx: &mut Context<Self>, done: impl FnOnce(&mut Self) + 'static) {
+        let view_weak = cx.entity().downgrade();
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                cx_handle
+                    .background_executor()
+                    .timer(std::time::Duration::from_millis(
+                        crate::views::sheet::SHEET_ANIM_MS + 40,
+                    ))
+                    .await;
+                cx_handle.update(|cx: &mut App| {
+                    if let Some(app) = view_weak.upgrade() {
+                        app.update(cx, |this, cx| {
+                            done(this);
+                            cx.notify();
+                        });
+                    }
+                });
+            }
+        })
+        .detach();
+    }
+
+    /// Open Add SSH Key sheet (right-side push-aside panel).
     pub fn open_add_key_modal(&mut self, cx: &mut Context<Self>) {
         self.show_add_key_modal = true;
+        self.add_key_sheet_closing = false;
+        // Only one sheet open at a time; force-close the others instantly.
+        self.connection_modal = None;
+        self.connection_sheet_closing = false;
+        self.edit_key_modal = None;
+        self.edit_key_sheet_closing = false;
+        self.forward_modal = None;
+        self.forward_sheet_closing = false;
         self.new_key_name.clear();
         self.new_key_pem.clear();
         self.add_key_error = None;
         cx.notify();
     }
 
-    /// Close Add SSH Key modal dialog.
+    /// Play the Add SSH Key sheet's exit animation, then unmount it.
     pub fn close_add_key_modal(&mut self, cx: &mut Context<Self>) {
-        self.show_add_key_modal = false;
-        self.new_key_name.clear();
-        self.new_key_pem.clear();
-        self.add_key_error = None;
+        if !self.show_add_key_modal || self.add_key_sheet_closing {
+            return;
+        }
+        self.add_key_sheet_closing = true;
+        Self::after_sheet_exit(cx, |this| {
+            // Re-opening during the exit cancels the pending unmount.
+            if this.add_key_sheet_closing {
+                this.show_add_key_modal = false;
+                this.add_key_sheet_closing = false;
+            }
+        });
         cx.notify();
+    }
+
+    /// Open Edit SSH Key sheet (rename / replace key material).
+    pub fn open_edit_key_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+        let Some(key) = self.ssh_keys.iter().find(|k| k.id == id) else {
+            return;
+        };
+        self.edit_key_modal = Some(EditKeyFormState::new(key));
+        self.edit_key_sheet_closing = false;
+        self.connection_modal = None;
+        self.connection_sheet_closing = false;
+        self.show_add_key_modal = false;
+        self.add_key_sheet_closing = false;
+        self.forward_modal = None;
+        self.forward_sheet_closing = false;
+        cx.notify();
+    }
+
+    /// Play the Edit SSH Key sheet's exit animation, then unmount it.
+    pub fn close_edit_key_modal(&mut self, cx: &mut Context<Self>) {
+        if !self.edit_key_modal.is_some() || self.edit_key_sheet_closing {
+            return;
+        }
+        self.edit_key_sheet_closing = true;
+        Self::after_sheet_exit(cx, |this| {
+            if this.edit_key_sheet_closing {
+                this.edit_key_modal = None;
+                this.edit_key_sheet_closing = false;
+            }
+        });
+        cx.notify();
+    }
+
+    /// Save Edit SSH Key form (rename and optionally replace key material).
+    pub fn save_edit_key_form(&mut self, cx: &mut Context<Self>) {
+        let form = match &mut self.edit_key_modal {
+            Some(f) => f,
+            None => return,
+        };
+
+        if let Err(err) = form.validate() {
+            form.error_message = Some(err);
+            cx.notify();
+            return;
+        }
+
+        form.error_message = None;
+
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => {
+                if let Some(f) = &mut self.edit_key_modal {
+                    f.error_message = Some("Backend client is not connected".to_string());
+                    cx.notify();
+                }
+                return;
+            }
+        };
+
+        let key_id = form.key_id.clone();
+        let has_new_key = !form.new_pem.trim().is_empty();
+        let req = UpdateKeyRequest {
+            name: form.name.trim().to_string(),
+            key_base64: if has_new_key {
+                Some(encode_base64(form.new_pem.trim().as_bytes()))
+            } else {
+                None
+            },
+        };
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<SshKey, String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.update_key(&key_id, &req).await {
+                Ok(k) => {
+                    let _ = tx.send(Ok(k));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(key) => {
+                                        let msg = if has_new_key {
+                                            "SSH key updated with new key material".to_string()
+                                        } else {
+                                            format!("SSH key '{}' updated", key.name)
+                                        };
+                                        this.close_edit_key_modal(cx);
+                                        this.notification = Some(msg);
+                                        this.fetch_ssh_keys(cx);
+                                    }
+                                    Err(e) => {
+                                        if let Some(f) = &mut this.edit_key_modal {
+                                            f.error_message =
+                                                Some(format!("Failed to update key: {e}"));
+                                        }
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
     }
 
     /// Upload and save new SSH Key to backend pool.
@@ -1239,14 +1498,14 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(key) => {
-                                        this.show_add_key_modal = false;
-                                        this.new_key_name.clear();
-                                        this.new_key_pem.clear();
-                                        this.notification = Some(format!("SSH Key '{}' added", key.name));
+                                        this.close_add_key_modal(cx);
+                                        this.notification =
+                                            Some(format!("SSH Key '{}' added", key.name));
                                         this.fetch_ssh_keys(cx);
                                     }
                                     Err(e) => {
-                                        this.add_key_error = Some(format!("Failed to add key: {e}"));
+                                        this.add_key_error =
+                                            Some(format!("Failed to add key: {e}"));
                                     }
                                 }
                                 cx.notify();
@@ -1341,8 +1600,7 @@ impl AppState {
         cx.notify();
 
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<Result<Vec<SshKey>, String>>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<Vec<SshKey>, String>>();
 
         TOKIO_RT.spawn(async move {
             match client.list_keys().await {
@@ -1385,14 +1643,18 @@ impl AppState {
     /// Open create connection modal.
     pub fn open_create_connection_modal(&mut self, cx: &mut Context<Self>) {
         self.connection_modal = Some(ConnectionFormState::new_create());
+        self.connection_sheet_closing = false;
+        self.close_other_sheets_for("connection");
         self.fetch_ssh_keys(cx);
         cx.notify();
     }
 
-    /// Open edit connection modal.
+    /// Open edit connection sheet.
     pub fn open_edit_connection_modal(&mut self, id: &str, cx: &mut Context<Self>) {
         if let Some(conn) = self.connections.iter().find(|c| c.id == id).cloned() {
             self.connection_modal = Some(ConnectionFormState::new_edit(&conn));
+            self.connection_sheet_closing = false;
+            self.close_other_sheets_for("connection");
             self.fetch_ssh_keys(cx);
 
             if let Some(client) = self.client.clone() {
@@ -1421,7 +1683,9 @@ impl AppState {
                                 if let Some(app) = view_weak.upgrade() {
                                     app.update(cx, |this, cx| {
                                         if let Some(form) = &mut this.connection_modal {
-                                            if form.mode == ConnectionModalMode::Edit(full_conn.id.clone()) {
+                                            if form.mode
+                                                == ConnectionModalMode::Edit(full_conn.id.clone())
+                                            {
                                                 if let Some(key_id) = full_conn.ssh_key_id {
                                                     form.ssh_key_id = Some(key_id);
                                                 }
@@ -1440,10 +1704,42 @@ impl AppState {
         cx.notify();
     }
 
-    /// Close connection modal.
+    /// Play the connection sheet's exit animation, then unmount it.
     pub fn close_connection_modal(&mut self, cx: &mut Context<Self>) {
-        self.connection_modal = None;
+        if !self.connection_modal.is_some() || self.connection_sheet_closing {
+            return;
+        }
+        self.connection_sheet_closing = true;
+        Self::after_sheet_exit(cx, |this| {
+            // Re-opening during the exit cancels the pending unmount.
+            if this.connection_sheet_closing {
+                this.connection_modal = None;
+                this.connection_sheet_closing = false;
+            }
+        });
         cx.notify();
+    }
+
+    /// Force-close every sheet except `keep` ("connection" | "edit_key" |
+    /// "add_key" | "forward"); mirrors wa-bot's drawers being mutually
+    /// exclusive.
+    pub fn close_other_sheets_for(&mut self, keep: &str) {
+        if keep != "connection" {
+            self.connection_modal = None;
+            self.connection_sheet_closing = false;
+        }
+        if keep != "edit_key" {
+            self.edit_key_modal = None;
+            self.edit_key_sheet_closing = false;
+        }
+        if keep != "add_key" {
+            self.show_add_key_modal = false;
+            self.add_key_sheet_closing = false;
+        }
+        if keep != "forward" {
+            self.forward_modal = None;
+            self.forward_sheet_closing = false;
+        }
     }
 
     /// Save connection form (Create or Update).
@@ -1515,13 +1811,14 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(msg) => {
-                                        this.connection_modal = None;
+                                        this.close_connection_modal(cx);
                                         this.notification = Some(msg);
                                         this.fetch_connections(cx);
                                     }
                                     Err(e) => {
                                         if let Some(f) = &mut this.connection_modal {
-                                            f.error_message = Some(format!("Error saving host: {e}"));
+                                            f.error_message =
+                                                Some(format!("Error saving host: {e}"));
                                         }
                                     }
                                 }
@@ -1682,7 +1979,8 @@ impl AppState {
                     Ok(content) => match serde_json::from_str::<Vec<Connection>>(&content) {
                         Ok(c) => c,
                         Err(e) => {
-                            self.notification = Some(format!("JSON parsing error from export file: {e}"));
+                            self.notification =
+                                Some(format!("JSON parsing error from export file: {e}"));
                             cx.notify();
                             return;
                         }
@@ -1694,7 +1992,9 @@ impl AppState {
                     }
                 }
             } else {
-                self.notification = Some("Please paste JSON array or create webterm-connections-export.json".to_string());
+                self.notification = Some(
+                    "Please paste JSON array or create webterm-connections-export.json".to_string(),
+                );
                 cx.notify();
                 return;
             }
@@ -1710,8 +2010,7 @@ impl AppState {
         };
 
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<Result<ImportResult, String>>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<ImportResult, String>>();
 
         TOKIO_RT.spawn(async move {
             match client.import_connections(&conns).await {
@@ -1769,7 +2068,8 @@ impl AppState {
             None => {
                 self.backend_status = BackendStatus::Failed {
                     reason: "No backend spawn options configured".to_string(),
-                    stderr_tail: "Please build the backend binary: scripts/build-test-backend".to_string(),
+                    stderr_tail: "Please build the backend binary: scripts/build-test-backend"
+                        .to_string(),
                 };
                 cx.notify();
                 return;
@@ -1803,12 +2103,16 @@ impl AppState {
                 }
                 Err(e) => {
                     let (reason, stderr_tail) = match e {
-                        webterm_supervisor::SupervisorError::Failed { reason, stderr_tail } => {
-                            (reason, stderr_tail)
-                        }
+                        webterm_supervisor::SupervisorError::Failed {
+                            reason,
+                            stderr_tail,
+                        } => (reason, stderr_tail),
                         other => (other.to_string(), String::new()),
                     };
-                    let _ = tx.send(SupervisorEvent::Failed { reason, stderr_tail });
+                    let _ = tx.send(SupervisorEvent::Failed {
+                        reason,
+                        stderr_tail,
+                    });
                 }
             }
         });
@@ -1835,7 +2139,10 @@ impl AppState {
                                         this.fetch_ssh_keys(cx);
                                         this.fetch_forwards(cx);
                                     }
-                                    SupervisorEvent::Failed { reason, stderr_tail } => {
+                                    SupervisorEvent::Failed {
+                                        reason,
+                                        stderr_tail,
+                                    } => {
                                         this.backend_status = BackendStatus::Failed {
                                             reason,
                                             stderr_tail,
@@ -1848,7 +2155,8 @@ impl AppState {
                     });
                 }
             }
-        }).detach();
+        })
+        .detach();
     }
 
     /// Restore detached sessions from backend or open a default local tab.
@@ -1861,8 +2169,7 @@ impl AppState {
         let saved_sessions = self.settings.open_sessions.clone();
         let view_weak = cx.entity().downgrade();
 
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<Vec<SessionInfo>>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<SessionInfo>>();
 
         TOKIO_RT.spawn(async move {
             let backend_sessions = client.list_sessions().await.unwrap_or_default();
@@ -1879,7 +2186,9 @@ impl AppState {
 
                 if !saved_sessions.is_empty() {
                     for saved in &saved_sessions {
-                        if let Some(matched) = backend_sessions.iter().find(|s| s.id == saved.session_id) {
+                        if let Some(matched) =
+                            backend_sessions.iter().find(|s| s.id == saved.session_id)
+                        {
                             to_attach.push((
                                 matched.id.clone(),
                                 saved.title.clone(),
@@ -1916,12 +2225,7 @@ impl AppState {
                                     let tab_id = this.session_manager.alloc_tab_id();
                                     let palette = this.current_terminal_palette();
                                     let mut tab = TerminalTab::new(
-                                        tab_id,
-                                        title,
-                                        stype,
-                                        conn_id,
-                                        palette,
-                                        cx,
+                                        tab_id, title, stype, conn_id, palette, cx,
                                     );
                                     tab.session_id = Some(session_id.clone());
                                     this.session_manager.add_tab(tab);
@@ -1934,7 +2238,8 @@ impl AppState {
                     }
                 });
             }
-        }).detach();
+        })
+        .detach();
     }
 
     /// Persist current open session IDs to settings store.
@@ -1987,7 +2292,8 @@ impl AppState {
         cx.notify();
 
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<TerminalWsHandle, String>>();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<TerminalWsHandle, String>>();
 
         TOKIO_RT.spawn(async move {
             match client.connect_terminal(connect_req).await {
@@ -2034,7 +2340,8 @@ impl AppState {
                     });
                 }
             }
-        }).detach();
+        })
+        .detach();
     }
 
     /// Open a new SSH terminal tab with given connection request.
@@ -2047,14 +2354,8 @@ impl AppState {
 
         let tab_id = self.session_manager.alloc_tab_id();
         let palette = self.current_terminal_palette();
-        let mut tab = TerminalTab::new(
-            tab_id,
-            title,
-            "ssh",
-            req.connection_id.clone(),
-            palette,
-            cx,
-        );
+        let mut tab =
+            TerminalTab::new(tab_id, title, "ssh", req.connection_id.clone(), palette, cx);
         tab.last_connect_req = Some(req.clone());
         self.show_hosts_catalog = false;
         self.active_view = View::Hosts;
@@ -2062,7 +2363,8 @@ impl AppState {
         cx.notify();
 
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<TerminalWsHandle, String>>();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<TerminalWsHandle, String>>();
 
         TOKIO_RT.spawn(async move {
             match client.connect_terminal(req).await {
@@ -2109,12 +2411,18 @@ impl AppState {
                     });
                 }
             }
-        }).detach();
+        })
+        .detach();
     }
 
     /// Invoked when a tab's WebSocket transport connection terminates unexpectedly.
     pub fn on_tab_dropped(&mut self, tab_id: u64, cx: &mut Context<Self>) {
-        let tab = match self.session_manager.tabs_mut().iter_mut().find(|t| t.id == tab_id) {
+        let tab = match self
+            .session_manager
+            .tabs_mut()
+            .iter_mut()
+            .find(|t| t.id == tab_id)
+        {
             Some(t) => t,
             None => return,
         };
@@ -2171,7 +2479,8 @@ impl AppState {
                     });
                 }
             }
-        }).detach();
+        })
+        .detach();
     }
 
     /// Attempt to reconnect/re-attach a tab.
@@ -2202,7 +2511,8 @@ impl AppState {
         cx.notify();
 
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<TerminalWsHandle, String>>();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<TerminalWsHandle, String>>();
 
         TOKIO_RT.spawn(async move {
             if let Some(ref sid) = session_id {
@@ -2268,7 +2578,12 @@ impl AppState {
                                                     next_retry_secs: next_secs,
                                                 },
                                             );
-                                            this.schedule_reconnect(tab_id, next_attempt, next_secs, cx);
+                                            this.schedule_reconnect(
+                                                tab_id,
+                                                next_attempt,
+                                                next_secs,
+                                                cx,
+                                            );
                                         } else {
                                             this.session_manager.set_tab_status(
                                                 tab_id,
@@ -2283,7 +2598,8 @@ impl AppState {
                     });
                 }
             }
-        }).detach();
+        })
+        .detach();
     }
 
     /// Close tab at given index and persist open sessions.
@@ -2409,15 +2725,23 @@ impl AppState {
             let target_dark = mode == "dark";
             if current_preset.is_dark != target_dark {
                 let current_id = current_preset.id;
-                let base = current_id.trim_end_matches("-dark").trim_end_matches("-light");
+                let base = current_id
+                    .trim_end_matches("-dark")
+                    .trim_end_matches("-light");
                 let counterpart = if target_dark {
                     format!("{base}-dark")
                 } else {
                     format!("{base}-light")
                 };
-                if crate::theme::THEME_PRESETS.iter().any(|p| p.id == counterpart) {
+                if crate::theme::THEME_PRESETS
+                    .iter()
+                    .any(|p| p.id == counterpart)
+                {
                     self.set_theme_preset(&counterpart, cx);
-                } else if let Some(first_match) = crate::theme::THEME_PRESETS.iter().find(|p| p.is_dark == target_dark) {
+                } else if let Some(first_match) = crate::theme::THEME_PRESETS
+                    .iter()
+                    .find(|p| p.is_dark == target_dark)
+                {
                     self.set_theme_preset(first_match.id, cx);
                 }
             }
@@ -2552,7 +2876,12 @@ impl AppState {
     }
 
     /// Change source connection for a pane ("local" or connection ID).
-    pub fn sftp_set_source(&mut self, pane: SftpActivePane, conn_id: String, cx: &mut Context<Self>) {
+    pub fn sftp_set_source(
+        &mut self,
+        pane: SftpActivePane,
+        conn_id: String,
+        cx: &mut Context<Self>,
+    ) {
         let label = if conn_id == "local" || conn_id.is_empty() {
             "Local Machine".to_string()
         } else if let Some(conn) = self.connections.iter().find(|c| c.id == conn_id) {
@@ -2646,7 +2975,12 @@ impl AppState {
     }
 
     /// Toggle sort order or switch sort column for a pane.
-    pub fn sftp_toggle_sort(&mut self, pane: SftpActivePane, col: SftpSortColumn, cx: &mut Context<Self>) {
+    pub fn sftp_toggle_sort(
+        &mut self,
+        pane: SftpActivePane,
+        col: SftpSortColumn,
+        cx: &mut Context<Self>,
+    ) {
         let state = self.sftp_pane_mut(pane);
         if state.sort_column == col {
             state.sort_order = match state.sort_order {
@@ -2668,7 +3002,13 @@ impl AppState {
     }
 
     /// Toggle item selection in a pane.
-    pub fn sftp_toggle_selection(&mut self, pane: SftpActivePane, name: String, multi: bool, cx: &mut Context<Self>) {
+    pub fn sftp_toggle_selection(
+        &mut self,
+        pane: SftpActivePane,
+        name: String,
+        multi: bool,
+        cx: &mut Context<Self>,
+    ) {
         self.sftp_manager.focused_pane = pane;
         let state = self.sftp_pane_mut(pane);
         if multi {
@@ -2694,7 +3034,12 @@ impl AppState {
     }
 
     /// Select exactly one item in a pane.
-    pub fn sftp_select_single(&mut self, pane: SftpActivePane, name: String, cx: &mut Context<Self>) {
+    pub fn sftp_select_single(
+        &mut self,
+        pane: SftpActivePane,
+        name: String,
+        cx: &mut Context<Self>,
+    ) {
         self.sftp_manager.focused_pane = pane;
         let state = self.sftp_pane_mut(pane);
         state.selected.clear();
@@ -2782,7 +3127,11 @@ impl AppState {
                 let pane_state = self.sftp_pane(focused);
                 if pane_state.selected.len() == 1 {
                     let name = pane_state.selected.iter().next().unwrap().clone();
-                    if let Some(f) = pane_state.files.iter().find(|item| item.name == name && item.is_dir) {
+                    if let Some(f) = pane_state
+                        .files
+                        .iter()
+                        .find(|item| item.name == name && item.is_dir)
+                    {
                         let target_path = join_path(&pane_state.current_path, &f.name);
                         self.sftp_navigate(focused, target_path, cx);
                     }
@@ -2793,7 +3142,12 @@ impl AppState {
     }
 
     /// Set search/filter query in a pane.
-    pub fn sftp_set_search_query(&mut self, pane: SftpActivePane, query: String, cx: &mut Context<Self>) {
+    pub fn sftp_set_search_query(
+        &mut self,
+        pane: SftpActivePane,
+        query: String,
+        cx: &mut Context<Self>,
+    ) {
         self.sftp_pane_mut(pane).search_query = query;
         cx.notify();
     }
@@ -2804,7 +3158,8 @@ impl AppState {
         if self.sftp_manager.left_pane.files.is_empty() && !self.sftp_manager.left_pane.is_loading {
             self.sftp_load_pane(SftpActivePane::Left, cx);
         }
-        if self.sftp_manager.right_pane.files.is_empty() && !self.sftp_manager.right_pane.is_loading {
+        if self.sftp_manager.right_pane.files.is_empty() && !self.sftp_manager.right_pane.is_loading
+        {
             self.sftp_load_pane(SftpActivePane::Right, cx);
         }
         cx.notify();
@@ -2828,7 +3183,9 @@ impl AppState {
                 *name = text;
                 *error = None;
             }
-            Some(SftpModalState::Rename { new_name, error, .. }) => {
+            Some(SftpModalState::Rename {
+                new_name, error, ..
+            }) => {
                 *new_name = text;
                 *error = None;
             }
@@ -2848,7 +3205,12 @@ impl AppState {
     }
 
     /// Open modal for renaming a file/folder in a pane.
-    pub fn sftp_open_rename_modal(&mut self, pane: SftpActivePane, old_name: String, cx: &mut Context<Self>) {
+    pub fn sftp_open_rename_modal(
+        &mut self,
+        pane: SftpActivePane,
+        old_name: String,
+        cx: &mut Context<Self>,
+    ) {
         self.sftp_manager.modal = Some(SftpModalState::Rename {
             pane,
             new_name: old_name.clone(),
@@ -2859,7 +3221,12 @@ impl AppState {
     }
 
     /// Open modal confirming deletion of selected items in a pane.
-    pub fn sftp_open_delete_modal(&mut self, pane: SftpActivePane, targets: Vec<String>, cx: &mut Context<Self>) {
+    pub fn sftp_open_delete_modal(
+        &mut self,
+        pane: SftpActivePane,
+        targets: Vec<String>,
+        cx: &mut Context<Self>,
+    ) {
         if targets.is_empty() {
             return;
         }
@@ -2925,11 +3292,13 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(_) => {
-                                        this.notification = Some(format!("Directory '{}' created", name_for_notif));
+                                        this.notification =
+                                            Some(format!("Directory '{}' created", name_for_notif));
                                         this.sftp_load_pane(pane, cx);
                                     }
                                     Err(err) => {
-                                        this.notification = Some(format!("Failed to create folder: {err}"));
+                                        this.notification =
+                                            Some(format!("Failed to create folder: {err}"));
                                     }
                                 }
                                 cx.notify();
@@ -2943,7 +3312,13 @@ impl AppState {
     }
 
     /// Rename entry in a pane.
-    pub fn sftp_rename_entry(&mut self, pane: SftpActivePane, old_name: &str, new_name: &str, cx: &mut Context<Self>) {
+    pub fn sftp_rename_entry(
+        &mut self,
+        pane: SftpActivePane,
+        old_name: &str,
+        new_name: &str,
+        cx: &mut Context<Self>,
+    ) {
         let trimmed_new = new_name.trim();
         if trimmed_new.is_empty() {
             if let Some(SftpModalState::Rename { error, .. }) = &mut self.sftp_manager.modal {
@@ -2975,7 +3350,10 @@ impl AppState {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
 
         TOKIO_RT.spawn(async move {
-            match client.sftp_rename(&conn_id, &old_full_path, &new_full_path).await {
+            match client
+                .sftp_rename(&conn_id, &old_full_path, &new_full_path)
+                .await
+            {
                 Ok(_) => {
                     let _ = tx.send(Ok(()));
                 }
@@ -2997,11 +3375,15 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(_) => {
-                                        this.notification = Some(format!("Renamed '{}' to '{}'", old_label, new_label));
+                                        this.notification = Some(format!(
+                                            "Renamed '{}' to '{}'",
+                                            old_label, new_label
+                                        ));
                                         this.sftp_load_pane(pane, cx);
                                     }
                                     Err(err) => {
-                                        this.notification = Some(format!("Failed to rename: {err}"));
+                                        this.notification =
+                                            Some(format!("Failed to rename: {err}"));
                                     }
                                 }
                                 cx.notify();
@@ -3015,7 +3397,12 @@ impl AppState {
     }
 
     /// Delete selected items in a pane.
-    pub fn sftp_delete_selected(&mut self, pane: SftpActivePane, targets: Vec<String>, cx: &mut Context<Self>) {
+    pub fn sftp_delete_selected(
+        &mut self,
+        pane: SftpActivePane,
+        targets: Vec<String>,
+        cx: &mut Context<Self>,
+    ) {
         if targets.is_empty() {
             self.sftp_close_modal(cx);
             return;
@@ -3057,7 +3444,8 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(deleted) => {
-                                        this.notification = Some(format!("Deleted {} item(s)", deleted));
+                                        this.notification =
+                                            Some(format!("Deleted {} item(s)", deleted));
                                         this.sftp_clear_selection(pane, cx);
                                         this.sftp_load_pane(pane, cx);
                                     }
@@ -3119,7 +3507,10 @@ impl AppState {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<String, String>>();
 
         TOKIO_RT.spawn(async move {
-            match client.sftp_upload(&conn_id, &target_path, &filename, data).await {
+            match client
+                .sftp_upload(&conn_id, &target_path, &filename, data)
+                .await
+            {
                 Ok(remote_tx_id) => {
                     let _ = tx.send(Ok(remote_tx_id));
                 }
@@ -3137,7 +3528,12 @@ impl AppState {
                     cx_handle.update(|cx: &mut App| {
                         if let Some(app) = view_weak.upgrade() {
                             app.update(cx, |this, cx| {
-                                if let Some(item) = this.sftp_manager.transfers.iter_mut().find(|t| t.id == tx_id) {
+                                if let Some(item) = this
+                                    .sftp_manager
+                                    .transfers
+                                    .iter_mut()
+                                    .find(|t| t.id == tx_id)
+                                {
                                     match res {
                                         Ok(_) => {
                                             item.status = "completed".to_string();
@@ -3214,7 +3610,12 @@ impl AppState {
                     cx_handle.update(|cx: &mut App| {
                         if let Some(app) = view_weak.upgrade() {
                             app.update(cx, |this, cx| {
-                                if let Some(item) = this.sftp_manager.transfers.iter_mut().find(|t| t.id == tx_id) {
+                                if let Some(item) = this
+                                    .sftp_manager
+                                    .transfers
+                                    .iter_mut()
+                                    .find(|t| t.id == tx_id)
+                                {
                                     match res {
                                         Ok(bytes) => {
                                             item.status = "completed".to_string();
@@ -3291,7 +3692,10 @@ impl AppState {
                 match client.sftp_download(&src_conn, &src_file_path).await {
                     Ok(data) => {
                         let len = data.len();
-                        match client.sftp_upload(&dst_conn, &dst_target_dir, &fname, data).await {
+                        match client
+                            .sftp_upload(&dst_conn, &dst_target_dir, &fname, data)
+                            .await
+                        {
                             Ok(_) => {
                                 let _ = tx.send(Ok(len));
                             }
@@ -3315,7 +3719,12 @@ impl AppState {
                         cx_handle.update(|cx: &mut App| {
                             if let Some(app) = view_weak.upgrade() {
                                 app.update(cx, |this, cx| {
-                                    if let Some(item) = this.sftp_manager.transfers.iter_mut().find(|t| t.id == tx_id) {
+                                    if let Some(item) = this
+                                        .sftp_manager
+                                        .transfers
+                                        .iter_mut()
+                                        .find(|t| t.id == tx_id)
+                                    {
                                         match res {
                                             Ok(bytes_len) => {
                                                 item.status = "completed".to_string();
@@ -3350,7 +3759,8 @@ impl AppState {
         };
 
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<Vec<SftpTransferStatus>, String>>();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<Vec<SftpTransferStatus>, String>>();
 
         TOKIO_RT.spawn(async move {
             match client.sftp_list_transfers().await {
@@ -3373,13 +3783,20 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 if let Ok(remote_list) = res {
                                     for remote in remote_list {
-                                        if let Some(existing) = this.sftp_manager.transfers.iter_mut().find(|t| t.id == remote.id) {
+                                        if let Some(existing) = this
+                                            .sftp_manager
+                                            .transfers
+                                            .iter_mut()
+                                            .find(|t| t.id == remote.id)
+                                        {
                                             existing.bytes_transferred = remote.bytes_transferred;
                                             existing.total_bytes = remote.total_bytes;
                                             existing.status = remote.status;
                                             existing.error = remote.error;
                                         } else {
-                                            this.sftp_manager.transfers.push(SftpTransferItem::from(remote));
+                                            this.sftp_manager
+                                                .transfers
+                                                .push(SftpTransferItem::from(remote));
                                         }
                                     }
                                 }
@@ -3518,20 +3935,34 @@ impl AppState {
     pub fn open_create_forward_modal(&mut self, cx: &mut Context<Self>) {
         let default_conn_id = self.connections.first().map(|c| c.id.clone());
         self.forward_modal = Some(ForwardFormState::new_create(default_conn_id));
+        self.forward_sheet_closing = false;
+        self.close_other_sheets_for("forward");
         cx.notify();
     }
 
-    /// Open edit port forward modal.
+    /// Open edit port forward sheet.
     pub fn open_edit_forward_modal(&mut self, id: &str, cx: &mut Context<Self>) {
         if let Some(forward) = self.forwards.iter().find(|f| f.id == id).cloned() {
             self.forward_modal = Some(ForwardFormState::new_edit(&forward));
+            self.forward_sheet_closing = false;
+            self.close_other_sheets_for("forward");
             cx.notify();
         }
     }
 
-    /// Close port forward modal.
+    /// Play the forward sheet's exit animation, then unmount it.
     pub fn close_forward_modal(&mut self, cx: &mut Context<Self>) {
-        self.forward_modal = None;
+        if !self.forward_modal.is_some() || self.forward_sheet_closing {
+            return;
+        }
+        self.forward_sheet_closing = true;
+        Self::after_sheet_exit(cx, |this| {
+            // Re-opening during the exit cancels the pending unmount.
+            if this.forward_sheet_closing {
+                this.forward_modal = None;
+                this.forward_sheet_closing = false;
+            }
+        });
         cx.notify();
     }
 
@@ -3553,24 +3984,25 @@ impl AppState {
         };
 
         match mode {
-            ForwardModalMode::Create => match form.to_create_request() {
-                Ok(req) => {
-                    let view_weak = cx.entity().downgrade();
-                    let (tx, mut rx) =
-                        tokio::sync::mpsc::unbounded_channel::<Result<PortForward, String>>();
+            ForwardModalMode::Create => {
+                match form.to_create_request() {
+                    Ok(req) => {
+                        let view_weak = cx.entity().downgrade();
+                        let (tx, mut rx) =
+                            tokio::sync::mpsc::unbounded_channel::<Result<PortForward, String>>();
 
-                    TOKIO_RT.spawn(async move {
-                        match client.create_forward(&req).await {
-                            Ok(f) => {
-                                let _ = tx.send(Ok(f));
+                        TOKIO_RT.spawn(async move {
+                            match client.create_forward(&req).await {
+                                Ok(f) => {
+                                    let _ = tx.send(Ok(f));
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(Err(e.to_string()));
+                                }
                             }
-                            Err(e) => {
-                                let _ = tx.send(Err(e.to_string()));
-                            }
-                        }
-                    });
+                        });
 
-                    cx.spawn(move |_view, cx: &mut AsyncApp| {
+                        cx.spawn(move |_view, cx: &mut AsyncApp| {
                         let view_weak = view_weak.clone();
                         let cx_handle = cx.clone();
                         async move {
@@ -3580,7 +4012,7 @@ impl AppState {
                                         app.update(cx, |this, cx| {
                                             match res {
                                                 Ok(f) => {
-                                                    this.forward_modal = None;
+                                                    this.close_forward_modal(cx);
                                                     this.notification =
                                                         Some(format!("Port forward '{}' created successfully", f.name));
                                                     this.fetch_forwards(cx);
@@ -3599,31 +4031,33 @@ impl AppState {
                         }
                     })
                     .detach();
+                    }
+                    Err(err) => {
+                        form.error_message = Some(err);
+                        cx.notify();
+                    }
                 }
-                Err(err) => {
-                    form.error_message = Some(err);
-                    cx.notify();
-                }
-            },
-            ForwardModalMode::Edit(id) => match form.to_update_request() {
-                Ok(req) => {
-                    let view_weak = cx.entity().downgrade();
-                    let id_clone = id.clone();
-                    let (tx, mut rx) =
-                        tokio::sync::mpsc::unbounded_channel::<Result<PortForward, String>>();
+            }
+            ForwardModalMode::Edit(id) => {
+                match form.to_update_request() {
+                    Ok(req) => {
+                        let view_weak = cx.entity().downgrade();
+                        let id_clone = id.clone();
+                        let (tx, mut rx) =
+                            tokio::sync::mpsc::unbounded_channel::<Result<PortForward, String>>();
 
-                    TOKIO_RT.spawn(async move {
-                        match client.update_forward(&id_clone, &req).await {
-                            Ok(f) => {
-                                let _ = tx.send(Ok(f));
+                        TOKIO_RT.spawn(async move {
+                            match client.update_forward(&id_clone, &req).await {
+                                Ok(f) => {
+                                    let _ = tx.send(Ok(f));
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(Err(e.to_string()));
+                                }
                             }
-                            Err(e) => {
-                                let _ = tx.send(Err(e.to_string()));
-                            }
-                        }
-                    });
+                        });
 
-                    cx.spawn(move |_view, cx: &mut AsyncApp| {
+                        cx.spawn(move |_view, cx: &mut AsyncApp| {
                         let view_weak = view_weak.clone();
                         let cx_handle = cx.clone();
                         async move {
@@ -3633,7 +4067,7 @@ impl AppState {
                                         app.update(cx, |this, cx| {
                                             match res {
                                                 Ok(f) => {
-                                                    this.forward_modal = None;
+                                                    this.close_forward_modal(cx);
                                                     this.notification =
                                                         Some(format!("Port forward '{}' updated successfully", f.name));
                                                     this.fetch_forwards(cx);
@@ -3652,12 +4086,13 @@ impl AppState {
                         }
                     })
                     .detach();
+                    }
+                    Err(err) => {
+                        form.error_message = Some(err);
+                        cx.notify();
+                    }
                 }
-                Err(err) => {
-                    form.error_message = Some(err);
-                    cx.notify();
-                }
-            },
+            }
         }
     }
 
@@ -3676,8 +4111,7 @@ impl AppState {
         let id_str = id.to_string();
         let was_active = forward.active;
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<Result<String, String>>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<String, String>>();
 
         TOKIO_RT.spawn(async move {
             let res = if was_active {
@@ -3757,8 +4191,7 @@ impl AppState {
         let id_str = target.id.clone();
         let name_str = target.name.clone();
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
 
         TOKIO_RT.spawn(async move {
             match client.delete_forward(&id_str).await {
@@ -3781,10 +4214,8 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(_) => {
-                                        this.notification = Some(format!(
-                                            "Port forward '{}' deleted",
-                                            name_str
-                                        ));
+                                        this.notification =
+                                            Some(format!("Port forward '{}' deleted", name_str));
                                         this.fetch_forwards(cx);
                                     }
                                     Err(err) => {
@@ -3813,7 +4244,6 @@ impl AppState {
         cx.notify();
     }
 }
-
 
 impl Render for AppState {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {

@@ -1,6 +1,5 @@
 //! Navigation shell view: left sidebar and main content views.
 
-use gpui::*;
 use crate::actions::{
     CloseTab, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7, JumpTab8,
     JumpTab9, NewTab, NextTab, PrevTab,
@@ -10,6 +9,7 @@ use crate::views::hosts::render_hosts_view;
 use crate::views::new_tab_modal::render_new_tab_modal;
 use crate::views::reconnect_banner::render_reconnect_banner;
 use crate::views::tab_strip::render_tab_strip;
+use gpui::*;
 
 /// Render the left navigation sidebar and active content pane.
 pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
@@ -19,7 +19,11 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let items = [
         (View::Hosts, "Hosts", crate::icons::SERVER_SVG),
         (View::Keys, "SSH Keys", crate::icons::KEY_SVG),
-        (View::Forwards, "Port Forwards", crate::icons::ARROW_LEFT_RIGHT_SVG),
+        (
+            View::Forwards,
+            "Port Forwards",
+            crate::icons::ARROW_LEFT_RIGHT_SVG,
+        ),
         (View::Sftp, "SFTP", crate::icons::FILES_SVG),
     ];
 
@@ -39,32 +43,18 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         None
     };
 
-    let conn_modal_overlay = if app.connection_modal.is_some() {
-        Some(crate::views::connection_modal::render_connection_modal(app, cx))
-    } else {
-        None
-    };
-
     let import_modal_overlay = if app.show_import_modal {
         Some(crate::views::connection_modal::render_import_modal(app, cx))
     } else {
         None
     };
 
-    let add_key_modal_overlay = if app.show_add_key_modal {
-        Some(crate::views::keys::render_add_key_modal(app, cx))
-    } else {
-        None
-    };
+    let sheet_slot = render_sheet_slot(app, cx);
 
     let passphrase_modal_overlay = if app.pending_passphrase_conn.is_some() {
-        Some(crate::views::passphrase_modal::render_passphrase_modal(app, cx))
-    } else {
-        None
-    };
-
-    let forward_modal_overlay = if app.forward_modal.is_some() {
-        Some(crate::views::forwards::render_forward_modal(app, cx))
+        Some(crate::views::passphrase_modal::render_passphrase_modal(
+            app, cx,
+        ))
     } else {
         None
     };
@@ -112,10 +102,18 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                     .text_xs()
                     .text_color(app.muted_text())
                     .hover(|s| s.text_color(text_color))
-                    .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(app.muted_text()))
-                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                        this.dismiss_notification(cx);
-                    })),
+                    .child(
+                        svg()
+                            .data(crate::icons::X_SVG)
+                            .size(px(14.0))
+                            .text_color(app.muted_text()),
+                    )
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _window, cx| {
+                            this.dismiss_notification(cx);
+                        }),
+                    ),
             )
             .into_any_element()
     });
@@ -189,38 +187,28 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                             .gap_1()
                             // Brand Header: Clean "WebTerm" matching web client
                             .child(
-                                div()
-                                    .px_2()
-                                    .py_1()
-                                    .mb_3()
-                                    .child(
-                                        div()
-                                            .text_lg()
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_color(text_color)
-                                            .child("WebTerm"),
-                                    ),
+                                div().px_2().py_1().mb_3().child(
+                                    div()
+                                        .text_lg()
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(text_color)
+                                        .child("WebTerm"),
+                                ),
                             )
                             // Navigation items
                             .children(items.into_iter().map(|(view, label, icon)| {
-                                let is_active = active_view == view && (view != View::Hosts || app.show_hosts_catalog);
+                                let is_active = active_view == view
+                                    && (view != View::Hosts || app.show_hosts_catalog);
                                 let accent_color = app.accent_color();
                                 let accent_fg = app.accent_fg();
-                                let item_bg = if is_active {
-                                    accent_color
-                                } else {
-                                    sidebar_bg
-                                };
+                                let item_bg = if is_active { accent_color } else { sidebar_bg };
                                 let item_hover = if is_active {
                                     accent_color
                                 } else {
                                     app.muted_bg()
                                 };
-                                let item_text_color = if is_active {
-                                    accent_fg
-                                } else {
-                                    text_color
-                                };
+                                let item_text_color =
+                                    if is_active { accent_fg } else { text_color };
                                 let icon_color = if is_active {
                                     accent_fg
                                 } else {
@@ -250,82 +238,79 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                             .text_color(item_text_color)
                                             .child(label),
                                     )
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                        this.show_new_tab_popover = false;
-                                        if view == View::Sftp {
-                                            this.navigate_to_sftp(cx);
-                                        } else {
-                                            this.active_view = view;
-                                            if view == View::Hosts {
-                                                this.show_hosts_catalog = true;
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, _window, cx| {
+                                            this.show_new_tab_popover = false;
+                                            if view == View::Sftp {
+                                                this.navigate_to_sftp(cx);
+                                            } else {
+                                                this.active_view = view;
+                                                if view == View::Hosts {
+                                                    this.show_hosts_catalog = true;
+                                                }
+                                                cx.notify();
                                             }
-                                            cx.notify();
-                                        }
-                                    }))
+                                        }),
+                                    )
                             })),
                     )
                     // Bottom footer: Settings pinned to bottom
-                    .child(
-                        div()
-                            .pt_2()
-                            .border_t_1()
-                            .border_color(border_color)
-                            .child({
-                                let is_active = active_view == View::Settings;
-                                let accent_color = app.accent_color();
-                                let accent_fg = app.accent_fg();
-                                let item_bg = if is_active {
-                                    accent_color
-                                } else {
-                                    sidebar_bg
-                                };
-                                let item_hover = if is_active {
-                                    accent_color
-                                } else {
-                                    app.muted_bg()
-                                };
-                                let item_text_color = if is_active {
-                                    accent_fg
-                                } else {
-                                    text_color
-                                };
-                                let icon_color = if is_active {
-                                    accent_fg
-                                } else {
-                                    app.muted_text()
-                                };
+                    .child(div().pt_2().border_t_1().border_color(border_color).child({
+                        let is_active = active_view == View::Settings;
+                        let accent_color = app.accent_color();
+                        let accent_fg = app.accent_fg();
+                        let item_bg = if is_active { accent_color } else { sidebar_bg };
+                        let item_hover = if is_active {
+                            accent_color
+                        } else {
+                            app.muted_bg()
+                        };
+                        let item_text_color = if is_active { accent_fg } else { text_color };
+                        let icon_color = if is_active {
+                            accent_fg
+                        } else {
+                            app.muted_text()
+                        };
 
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_3()
+                            .px_3()
+                            .py_2()
+                            .rounded_lg()
+                            .bg(item_bg)
+                            .hover(move |s| s.bg(item_hover))
+                            .cursor_pointer()
+                            .child(
+                                svg()
+                                    .data(crate::icons::SETTINGS_SVG)
+                                    .size(px(16.0))
+                                    .text_color(icon_color),
+                            )
+                            .child(
                                 div()
-                                    .flex()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap_3()
-                                    .px_3()
-                                    .py_2()
-                                    .rounded_lg()
-                                    .bg(item_bg)
-                                    .hover(move |s| s.bg(item_hover))
-                                    .cursor_pointer()
-                                    .child(svg().data(crate::icons::SETTINGS_SVG).size(px(16.0)).text_color(icon_color))
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .font_weight(if is_active {
-                                                FontWeight::BOLD
-                                            } else {
-                                                FontWeight::MEDIUM
-                                            })
-                                            .text_color(item_text_color)
-                                            .child("Settings"),
-                                    )
-                                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                        this.show_new_tab_popover = false;
-                                        this.active_view = View::Settings;
-                                        this.show_hosts_catalog = false;
-                                        cx.notify();
-                                    }))
-                            }),
-                    ),
+                                    .text_sm()
+                                    .font_weight(if is_active {
+                                        FontWeight::BOLD
+                                    } else {
+                                        FontWeight::MEDIUM
+                                    })
+                                    .text_color(item_text_color)
+                                    .child("Settings"),
+                            )
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _window, cx| {
+                                    this.show_new_tab_popover = false;
+                                    this.active_view = View::Settings;
+                                    this.show_hosts_catalog = false;
+                                    cx.notify();
+                                }),
+                            )
+                    })),
             )
         } else {
             None
@@ -352,24 +337,33 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                             None
                         })
                         .child(
+                            // Row: active view content + right-side sheet that pushes it aside
                             div()
+                                .flex()
+                                .flex_row()
                                 .flex_1()
                                 .w_full()
+                                .min_h_0()
                                 .overflow_hidden()
-                                .child(content_pane),
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .overflow_hidden()
+                                        .child(content_pane),
+                                )
+                                .children(sheet_slot),
                         ),
                 )
                 // Backdrop when popover is open to dismiss on click outside
                 .children(if app.show_new_tab_popover {
-                    Some(
-                        div()
-                            .absolute()
-                            .inset_0()
-                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                this.show_new_tab_popover = false;
-                                cx.notify();
-                            })),
-                    )
+                    Some(div().absolute().inset_0().on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _window, cx| {
+                            this.show_new_tab_popover = false;
+                            cx.notify();
+                        }),
+                    ))
                 } else {
                     None
                 })
@@ -385,16 +379,57 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 ),
         )
         .children(modal_overlay)
-        .children(conn_modal_overlay)
         .children(import_modal_overlay)
-        .children(add_key_modal_overlay)
         .children(passphrase_modal_overlay)
-        .children(forward_modal_overlay)
         .children(delete_forward_modal_overlay)
         .children(sftp_context_menu_overlay)
         .children(sftp_modal_overlay)
         .children(notification_toast)
         .into_any_element()
+}
+
+/// Pick the currently open (or exiting) sheet and wrap it in the shared
+/// push-aside animation. Only one sheet is open at a time.
+fn render_sheet_slot(app: &mut AppState, cx: &mut Context<AppState>) -> Option<AnyElement> {
+    use crate::views::sheet::animated_sheet;
+
+    if app.connection_modal.is_some() || app.connection_sheet_closing {
+        let sheet = crate::views::connection_modal::render_connection_sheet(app, cx);
+        return Some(animated_sheet(
+            "connection-sheet-in",
+            "connection-sheet-out",
+            app.connection_sheet_closing,
+            sheet,
+        ));
+    }
+    if app.edit_key_modal.is_some() || app.edit_key_sheet_closing {
+        let sheet = crate::views::keys::render_edit_key_sheet(app, cx);
+        return Some(animated_sheet(
+            "edit-key-sheet-in",
+            "edit-key-sheet-out",
+            app.edit_key_sheet_closing,
+            sheet,
+        ));
+    }
+    if app.show_add_key_modal || app.add_key_sheet_closing {
+        let sheet = crate::views::keys::render_add_key_sheet(app, cx);
+        return Some(animated_sheet(
+            "add-key-sheet-in",
+            "add-key-sheet-out",
+            app.add_key_sheet_closing,
+            sheet,
+        ));
+    }
+    if app.forward_modal.is_some() || app.forward_sheet_closing {
+        let sheet = crate::views::forwards::render_forward_sheet(app, cx);
+        return Some(animated_sheet(
+            "forward-sheet-in",
+            "forward-sheet-out",
+            app.forward_sheet_closing,
+            sheet,
+        ));
+    }
+    None
 }
 
 fn render_content_pane(
@@ -405,16 +440,17 @@ fn render_content_pane(
 ) -> AnyElement {
     let bg = app.bg_color();
     match view {
-        View::NewTab => {
-            div()
-                .size_full()
-                .overflow_hidden()
-                .bg(bg)
-                .child(crate::views::new_tab::render_new_tab_page(app, cx))
-                .into_any_element()
-        }
+        View::NewTab => div()
+            .size_full()
+            .overflow_hidden()
+            .bg(bg)
+            .child(crate::views::new_tab::render_new_tab_page(app, cx))
+            .into_any_element(),
         View::Hosts => {
-            let active_tab_view = app.session_manager.active_tab().and_then(|t| t.view.clone());
+            let active_tab_view = app
+                .session_manager
+                .active_tab()
+                .and_then(|t| t.view.clone());
             let host_or_term = if app.show_hosts_catalog || active_tab_view.is_none() {
                 render_hosts_view(app, cx)
             } else if let Some(term_view) = active_tab_view {
@@ -430,45 +466,37 @@ fn render_content_pane(
                 .child(host_or_term)
                 .into_any_element()
         }
-        View::Keys => {
-            div()
-                .flex()
-                .flex_col()
-                .size_full()
-                .overflow_hidden()
-                .bg(bg)
-                .child(crate::views::keys::render_keys_view(app, cx))
-                .into_any_element()
-        }
-        View::Forwards => {
-            div()
-                .flex()
-                .flex_col()
-                .size_full()
-                .overflow_hidden()
-                .bg(bg)
-                .child(crate::views::forwards::render_forwards_view(app, cx))
-                .into_any_element()
-        }
-        View::Sftp => {
-            div()
-                .flex()
-                .flex_col()
-                .size_full()
-                .overflow_hidden()
-                .bg(bg)
-                .child(crate::views::sftp::render_sftp_view(app, cx))
-                .into_any_element()
-        }
-        View::Settings => {
-            div()
-                .flex()
-                .flex_col()
-                .size_full()
-                .overflow_hidden()
-                .bg(bg)
-                .child(crate::views::settings::render_settings_view(app, cx))
-                .into_any_element()
-        }
+        View::Keys => div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .overflow_hidden()
+            .bg(bg)
+            .child(crate::views::keys::render_keys_view(app, cx))
+            .into_any_element(),
+        View::Forwards => div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .overflow_hidden()
+            .bg(bg)
+            .child(crate::views::forwards::render_forwards_view(app, cx))
+            .into_any_element(),
+        View::Sftp => div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .overflow_hidden()
+            .bg(bg)
+            .child(crate::views::sftp::render_sftp_view(app, cx))
+            .into_any_element(),
+        View::Settings => div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .overflow_hidden()
+            .bg(bg)
+            .child(crate::views::settings::render_settings_view(app, cx))
+            .into_any_element(),
     }
 }

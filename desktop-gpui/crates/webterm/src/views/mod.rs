@@ -1,13 +1,14 @@
 pub mod connection_modal;
+pub mod forwards;
 pub mod hosts;
 pub mod keys;
 pub mod nav;
+pub mod new_tab;
 pub mod new_tab_modal;
 pub mod passphrase_modal;
 pub mod reconnect_banner;
 pub mod settings;
+pub mod sftp;
+pub mod sheet;
 pub mod status;
 pub mod tab_strip;
-pub mod sftp;
-pub mod forwards;
-pub mod new_tab;

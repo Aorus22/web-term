@@ -1,12 +1,13 @@
-//! Connection Create/Edit modal dialog and JSON Import modal.
+//! Connection Create/Edit sheet (right-side push-aside panel) and JSON Import modal.
 
-use gpui::*;
 use crate::app_state::{AppState, ConnectionModalMode};
+use crate::views::sheet::{
+    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_panel,
+};
+use gpui::*;
 
-/// Render the Connection Create/Edit modal dialog overlay.
-pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
-    let is_dark = app.is_dark();
-    let card_bg = app.card_bg();
+/// Render the Connection Create/Edit sheet (pushes the content pane aside).
+pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
@@ -21,7 +22,21 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
     };
 
     let is_edit = matches!(form.mode, ConnectionModalMode::Edit(_));
-    let title = if is_edit { "Edit SSH Host" } else { "Add New SSH Host" };
+    let title = if is_edit {
+        "Edit Connection"
+    } else {
+        "New Connection"
+    };
+    let description = if is_edit {
+        "Update your saved connection details."
+    } else {
+        "Add a new SSH connection to your library."
+    };
+    let submit_label = if is_edit {
+        "Save Changes"
+    } else {
+        "Create Connection"
+    };
 
     let label_display: SharedString = if form.label.is_empty() {
         "e.g. Production Web".into()
@@ -54,395 +69,412 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
 
     let popular_tags = ["prod", "staging", "web", "database", "infra"];
 
-    div()
-        .absolute()
-        .inset_0()
-        .flex()
-        .items_center()
-        .justify_center()
-        .bg(rgba(0x00000088))
-        // Dismiss on background click
-        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-            this.close_connection_modal(cx);
-        }))
-        // Modal Card
+    sheet_panel(app)
+        .child(sheet_header(
+            app,
+            cx,
+            title,
+            description,
+            AppState::close_connection_modal,
+        ))
+        .children(
+            form.error_message
+                .map(|err| sheet_error_banner(app, err.into()).into_any_element()),
+        )
         .child(
-            div()
-                .flex()
-                .flex_col()
-                .w(px(540.0))
-                .max_h(px(640.0))
-                .rounded_xl()
-                .bg(card_bg)
-                .border_1()
-                .border_color(border_color)
-                .shadow_lg()
-                .p_6()
-                .gap_4()
-                .on_mouse_down(MouseButton::Left, |_, _, _| {}) // stop propagation
-                // Modal Header
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            div()
-                                .text_lg()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(text_color)
-                                .child(title),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .size(px(24.0))
-                                .rounded_md()
-                                .hover(|s| s.bg(tag_bg))
-                                .cursor_pointer()
-                                .text_color(muted_text)
-                                .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.close_connection_modal(cx);
-                                })),
-                        ),
-                )
-                // Error banner (if validation failed)
-                .children(form.error_message.map(|err| {
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_1p5()
-                        .px_3()
-                        .py_2()
-                        .rounded_md()
-                        .bg(if is_dark { rgb(0x451a1a) } else { rgb(0xfee2e2) })
-                        .border_1()
-                        .border_color(rgb(0xef4444))
-                        .text_xs()
-                        .text_color(if is_dark { rgb(0xfca5a5) } else { rgb(0xb91c1c) })
-                        .child(svg().data(crate::icons::ALERT_TRIANGLE_SVG).size(px(13.0)).text_color(rgb(0xef4444)))
-                        .child(err)
-                }))
-                // Form Fields
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_3()
-                        // Label Row
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Connection Label *"))
-                                .child(
-                                    div()
-                                        .px_3()
-                                        .py_1p5()
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_sm()
-                                        .text_color(if form.label.is_empty() { muted_text } else { text_color })
-                                        .child(label_display),
-                                ),
-                        )
-                        // Host & Port Row
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap_3()
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .flex()
-                                        .flex_col()
-                                        .gap_1()
-                                        .child(div().text_xs().text_color(muted_text).child("Host / IP *"))
-                                        .child(
-                                            div()
-                                                .px_3()
-                                                .py_1p5()
-                                                .rounded_md()
-                                                .bg(input_bg)
-                                                .border_1()
-                                                .border_color(border_color)
-                                                .text_sm()
-                                                .text_color(if form.host.is_empty() { muted_text } else { text_color })
-                                                .child(host_display),
-                                        ),
-                                )
-                                .child(
-                                    div()
-                                        .w(px(80.0))
-                                        .flex()
-                                        .flex_col()
-                                        .gap_1()
-                                        .child(div().text_xs().text_color(muted_text).child("Port *"))
-                                        .child(
-                                            div()
-                                                .px_3()
-                                                .py_1p5()
-                                                .rounded_md()
-                                                .bg(input_bg)
-                                                .border_1()
-                                                .border_color(border_color)
-                                                .text_sm()
-                                                .text_color(text_color)
-                                                .child(port_display),
-                                        ),
-                                ),
-                        )
-                        // Username Row
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Username *"))
-                                .child(
-                                    div()
-                                        .px_3()
-                                        .py_1p5()
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_sm()
-                                        .text_color(text_color)
-                                        .child(user_display),
-                                ),
-                        )
-                        // Auth Method Toggle (Password vs SSH Key)
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Authentication Method"))
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_row()
-                                        .gap_2()
-                                        // Password Pill
-                                        .child(
-                                            div()
-                                                .flex()
-                                                .flex_row()
-                                                .items_center()
-                                                .gap_1p5()
-                                                .px_3()
-                                                .py_1p5()
-                                                .rounded_md()
-                                                .bg(if !is_key_auth {
-                                                    primary_color
-                                                } else {
-                                                    tag_bg
-                                                })
-                                                .text_color(if !is_key_auth { primary_fg } else { muted_text })
-                                                .cursor_pointer()
-                                                .text_xs()
-                                                .font_weight(FontWeight::SEMIBOLD)
-                                                .child(svg().data(crate::icons::LOCK_SVG).size(px(13.0)).text_color(if !is_key_auth { primary_fg } else { muted_text }))
-                                                .child("Password")
-                                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+            // Scrollable form body
+            sheet_body().child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    // Label Row
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted_text)
+                                    .child("Connection Label *"),
+                            )
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(border_color)
+                                    .text_sm()
+                                    .text_color(if form.label.is_empty() {
+                                        muted_text
+                                    } else {
+                                        text_color
+                                    })
+                                    .child(label_display),
+                            ),
+                    )
+                    // Host & Port Row
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .gap_3()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .child(
+                                        div().text_xs().text_color(muted_text).child("Host / IP *"),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(input_bg)
+                                            .border_1()
+                                            .border_color(border_color)
+                                            .text_sm()
+                                            .text_color(if form.host.is_empty() {
+                                                muted_text
+                                            } else {
+                                                text_color
+                                            })
+                                            .child(host_display),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .w(px(80.0))
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .child(div().text_xs().text_color(muted_text).child("Port *"))
+                                    .child(
+                                        div()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(input_bg)
+                                            .border_1()
+                                            .border_color(border_color)
+                                            .text_sm()
+                                            .text_color(text_color)
+                                            .child(port_display),
+                                    ),
+                            ),
+                    )
+                    // Username Row
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(div().text_xs().text_color(muted_text).child("Username *"))
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(border_color)
+                                    .text_sm()
+                                    .text_color(text_color)
+                                    .child(user_display),
+                            ),
+                    )
+                    // Auth Method Toggle (Password vs SSH Key)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted_text)
+                                    .child("Authentication Method"),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .gap_2()
+                                    // Password Pill
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .gap_1p5()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(if !is_key_auth { primary_color } else { tag_bg })
+                                            .text_color(if !is_key_auth {
+                                                primary_fg
+                                            } else {
+                                                muted_text
+                                            })
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(
+                                                svg()
+                                                    .data(crate::icons::LOCK_SVG)
+                                                    .size(px(13.0))
+                                                    .text_color(if !is_key_auth {
+                                                        primary_fg
+                                                    } else {
+                                                        muted_text
+                                                    }),
+                                            )
+                                            .child("Password")
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, _window, cx| {
                                                     if let Some(f) = &mut this.connection_modal {
                                                         f.auth_method = "password".to_string();
                                                         cx.notify();
                                                     }
-                                                })),
-                                        )
-                                        // SSH Key Pill
-                                        .child(
-                                            div()
-                                                .flex()
-                                                .flex_row()
-                                                .items_center()
-                                                .gap_1p5()
-                                                .px_3()
-                                                .py_1p5()
-                                                .rounded_md()
-                                                .bg(if is_key_auth {
-                                                    primary_color
-                                                } else {
-                                                    tag_bg
-                                                })
-                                                .text_color(if is_key_auth { primary_fg } else { muted_text })
-                                                .cursor_pointer()
-                                                .text_xs()
-                                                .font_weight(FontWeight::SEMIBOLD)
-                                                .child(svg().data(crate::icons::KEY_SVG).size(px(13.0)).text_color(if is_key_auth { primary_fg } else { muted_text }))
-                                                .child("SSH Key")
-                                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                                }),
+                                            ),
+                                    )
+                                    // SSH Key Pill
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .gap_1p5()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(if is_key_auth { primary_color } else { tag_bg })
+                                            .text_color(if is_key_auth {
+                                                primary_fg
+                                            } else {
+                                                muted_text
+                                            })
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(
+                                                svg()
+                                                    .data(crate::icons::KEY_SVG)
+                                                    .size(px(13.0))
+                                                    .text_color(if is_key_auth {
+                                                        primary_fg
+                                                    } else {
+                                                        muted_text
+                                                    }),
+                                            )
+                                            .child("SSH Key")
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, _window, cx| {
                                                     if let Some(f) = &mut this.connection_modal {
                                                         f.auth_method = "key".to_string();
-                                                        if f.ssh_key_id.is_none() && !this.ssh_keys.is_empty() {
-                                                            f.ssh_key_id = Some(this.ssh_keys[0].id.clone());
+                                                        if f.ssh_key_id.is_none()
+                                                            && !this.ssh_keys.is_empty()
+                                                        {
+                                                            f.ssh_key_id =
+                                                                Some(this.ssh_keys[0].id.clone());
                                                         }
                                                         cx.notify();
                                                     }
-                                                })),
-                                        ),
-                                ),
-                        )
-                        // Dynamic Auth Section (Password input or Key selector)
-                        .child(if is_key_auth {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Select SSH Key *"))
-                                .child(if available_keys.is_empty() {
-                                    div()
-                                        .p_3()
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_xs()
-                                        .text_color(muted_text)
-                                        .child("No SSH keys found. Upload a key in the 'SSH Keys' view.")
-                                        .into_any_element()
-                                } else {
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .gap_1()
-                                        .children(available_keys.into_iter().map(|key| {
-                                            let is_selected = selected_key_id.as_deref() == Some(&key.id);
-                                            let key_id_clone = key.id.clone();
-                                            div()
-                                                .px_3()
-                                                .py_1p5()
-                                                .rounded_md()
-                                                .cursor_pointer()
-                                                .border_1()
-                                                .border_color(if is_selected {
-                                                    primary_color
-                                                } else {
-                                                    border_color
-                                                })
-                                                .bg(if is_selected {
-                                                    tag_bg
-                                                } else {
-                                                    input_bg
-                                                })
-                                                .hover(|s| s.bg(tag_bg))
-                                                .flex()
-                                                .flex_row()
-                                                .items_center()
-                                                .justify_between()
-                                                .child(
-                                                    div()
-                                                        .flex()
-                                                        .flex_row()
-                                                        .items_center()
-                                                        .gap_1p5()
-                                                        .child(svg().data(crate::icons::KEY_SVG).size(px(13.0)).text_color(if is_selected { primary_color } else { muted_text }))
-                                                        .child(
-                                                            div()
-                                                                .text_xs()
-                                                                .font_weight(if is_selected { FontWeight::BOLD } else { FontWeight::NORMAL })
-                                                                .text_color(text_color)
-                                                                .child(format!("{} ({})", key.name, key.key_type)),
-                                                        ),
-                                                )
-                                                .child(
-                                                    div()
-                                                        .text_xs()
-                                                        .font_family("JetBrains Mono")
-                                                        .text_color(muted_text)
-                                                        .child(if key.fingerprint.len() > 16 {
-                                                            format!("{}...", &key.fingerprint[..16])
-                                                        } else {
-                                                            key.fingerprint
-                                                        }),
-                                                )
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                }),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    // Dynamic Auth Section (Password input or Key selector)
+                    .child(if is_key_auth {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted_text)
+                                    .child("Select SSH Key *"),
+                            )
+                            .child(if available_keys.is_empty() {
+                                div()
+                                    .p_3()
+                                    .rounded_md()
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(border_color)
+                                    .text_xs()
+                                    .text_color(muted_text)
+                                    .child(
+                                        "No SSH keys found. Upload a key in the 'SSH Keys' view.",
+                                    )
+                                    .into_any_element()
+                            } else {
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .children(available_keys.into_iter().map(|key| {
+                                        let is_selected =
+                                            selected_key_id.as_deref() == Some(&key.id);
+                                        let key_id_clone = key.id.clone();
+                                        div()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .cursor_pointer()
+                                            .border_1()
+                                            .border_color(if is_selected {
+                                                primary_color
+                                            } else {
+                                                border_color
+                                            })
+                                            .bg(if is_selected { tag_bg } else { input_bg })
+                                            .hover(|s| s.bg(tag_bg))
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .justify_between()
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_row()
+                                                    .items_center()
+                                                    .gap_1p5()
+                                                    .child(
+                                                        svg()
+                                                            .data(crate::icons::KEY_SVG)
+                                                            .size(px(13.0))
+                                                            .text_color(if is_selected {
+                                                                primary_color
+                                                            } else {
+                                                                muted_text
+                                                            }),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .text_xs()
+                                                            .font_weight(if is_selected {
+                                                                FontWeight::BOLD
+                                                            } else {
+                                                                FontWeight::NORMAL
+                                                            })
+                                                            .text_color(text_color)
+                                                            .child(format!(
+                                                                "{} ({})",
+                                                                key.name, key.key_type
+                                                            )),
+                                                    ),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .font_family("JetBrains Mono")
+                                                    .text_color(muted_text)
+                                                    .child(if key.fingerprint.len() > 16 {
+                                                        format!("{}...", &key.fingerprint[..16])
+                                                    } else {
+                                                        key.fingerprint
+                                                    }),
+                                            )
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(move |this, _, _window, cx| {
                                                     if let Some(f) = &mut this.connection_modal {
                                                         f.ssh_key_id = Some(key_id_clone.clone());
                                                         cx.notify();
                                                     }
-                                                }))
-                                        }))
-                                        .into_any_element()
-                                })
-                        } else {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child(if is_edit {
-                                    "Password (leave blank to keep current)"
-                                } else {
-                                    "Password (optional)"
-                                }))
-                                .child(
-                                    div()
-                                        .px_3()
-                                        .py_1p5()
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_sm()
-                                        .text_color(muted_text)
-                                        .child(if form.password.is_empty() {
-                                            "••••••••"
-                                        } else {
-                                            "●●●●●●●●"
-                                        }),
-                                )
-                        })
-                        // Tags Row & Quick Presets
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Tags"))
-                                .child(
-                                    div()
-                                        .px_3()
-                                        .py_1p5()
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_xs()
-                                        .text_color(if form.tags.is_empty() { muted_text } else { text_color })
-                                        .child(tags_display),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_row()
-                                        .items_center()
-                                        .gap_1()
-                                        .pt_1()
-                                        .child(div().text_xs().text_color(muted_text).child("Quick add:"))
-                                        .children(popular_tags.iter().map(|tag| {
-                                            let tag_str = tag.to_string();
-                                            div()
-                                                .px_2()
-                                                .py_0p5()
-                                                .rounded_md()
-                                                .bg(tag_bg)
-                                                .hover(|s| s.bg(border_color))
-                                                .cursor_pointer()
-                                                .text_xs()
-                                                .text_color(text_color)
-                                                .child(format!("+ {}", tag))
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                }),
+                                            )
+                                    }))
+                                    .into_any_element()
+                            })
+                    } else {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(div().text_xs().text_color(muted_text).child(if is_edit {
+                                "Password (leave blank to keep current)"
+                            } else {
+                                "Password (optional)"
+                            }))
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(border_color)
+                                    .text_sm()
+                                    .text_color(muted_text)
+                                    .child(if form.password.is_empty() {
+                                        "••••••••"
+                                    } else {
+                                        "●●●●●●●●"
+                                    }),
+                            )
+                    })
+                    // Tags Row & Quick Presets
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(div().text_xs().text_color(muted_text).child("Tags"))
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(border_color)
+                                    .text_xs()
+                                    .text_color(if form.tags.is_empty() {
+                                        muted_text
+                                    } else {
+                                        text_color
+                                    })
+                                    .child(tags_display),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap_1()
+                                    .pt_1()
+                                    .child(
+                                        div().text_xs().text_color(muted_text).child("Quick add:"),
+                                    )
+                                    .children(popular_tags.iter().map(|tag| {
+                                        let tag_str = tag.to_string();
+                                        div()
+                                            .px_2()
+                                            .py_0p5()
+                                            .rounded_md()
+                                            .bg(tag_bg)
+                                            .hover(|s| s.bg(border_color))
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .text_color(text_color)
+                                            .child(format!("+ {}", tag))
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(move |this, _, _window, cx| {
                                                     if let Some(f) = &mut this.connection_modal {
                                                         let mut current_tags = f.parse_tags();
                                                         if !current_tags.contains(&tag_str) {
@@ -451,52 +483,21 @@ pub fn render_connection_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                                             cx.notify();
                                                         }
                                                     }
-                                                }))
-                                        })),
-                                ),
-                        ),
-                )
-                // Action Buttons (Cancel / Save)
-                .child(
-                    div()
-                        .mt_2()
-                        .flex()
-                        .flex_row()
-                        .justify_end()
-                        .gap_2()
-                        .child(
-                            div()
-                                .px_4()
-                                .py_2()
-                                .rounded_md()
-                                .bg(tag_bg)
-                                .hover(|s| s.bg(border_color))
-                                .cursor_pointer()
-                                .text_sm()
-                                .text_color(text_color)
-                                .child("Cancel")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.close_connection_modal(cx);
-                                })),
-                        )
-                        .child(
-                            div()
-                                .px_4()
-                                .py_2()
-                                .rounded_md()
-                                .bg(primary_color)
-                                .hover(|s| s.opacity(0.9))
-                                .cursor_pointer()
-                                .text_sm()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(primary_fg)
-                                .child("Save Host")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.save_connection_form(cx);
-                                })),
-                        ),
-                ),
+                                                }),
+                                            )
+                                    })),
+                            ),
+                    ),
+            ),
         )
+        .child(sheet_footer(
+            app,
+            cx,
+            "Cancel",
+            submit_label,
+            AppState::close_connection_modal,
+            AppState::save_connection_form,
+        ))
         .into_any_element()
 }
 

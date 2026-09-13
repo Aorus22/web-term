@@ -1,11 +1,13 @@
-use std::time::Duration;
-use thiserror::Error;
-use crate::terminal_ws::{normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsConnectRequest};
+use crate::terminal_ws::{
+    normalize_ws_url, TerminalWsClient, TerminalWsError, TerminalWsHandle, WsConnectRequest,
+};
 use crate::types::{
     Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
     ForwardActionResponse, ImportResult, PortForward, SessionInfo, Settings, SftpFileInfo,
-    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest,
+    SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest, UpdateKeyRequest,
 };
+use std::time::Duration;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ClientError {
@@ -72,73 +74,9 @@ impl BackendClient {
     /// Fetch system settings from GET /api/settings.
     pub async fn get_settings(&self) -> Result<Settings, ClientError> {
         let url = format!("{}/api/settings", self.base_url);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(ClientError::Status { url, status, body });
-        }
-
-        resp.json::<Settings>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
-    }
-
-    /// Fetch connections list from GET /api/connections.
-    pub async fn list_connections(&self) -> Result<Vec<Connection>, ClientError> {
-        let url = format!("{}/api/connections", self.base_url);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(ClientError::Status { url, status, body });
-        }
-
-        resp.json::<Vec<Connection>>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
-    }
-
-    /// Fetch single connection from GET /api/connections/:id.
-    pub async fn get_connection(&self, id: &str) -> Result<Connection, ClientError> {
-        let url = format!("{}/api/connections/{}", self.base_url, id);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(ClientError::Status { url, status, body });
-        }
-
-        resp.json::<Connection>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
-    }
-
-    /// Create new connection via POST /api/connections.
-    pub async fn create_connection(
-        &self,
-        req: &CreateConnectionRequest,
-    ) -> Result<Connection, ClientError> {
-        let url = format!("{}/api/connections", self.base_url);
         let resp = self
             .http
-            .post(&url)
-            .json(req)
+            .get(&url)
             .send()
             .await
             .map_err(|e| ClientError::Request {
@@ -152,10 +90,85 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<Connection>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<Settings>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
+    }
+
+    /// Fetch connections list from GET /api/connections.
+    pub async fn list_connections(&self) -> Result<Vec<Connection>, ClientError> {
+        let url = format!("{}/api/connections", self.base_url);
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Vec<Connection>>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
+    }
+
+    /// Fetch single connection from GET /api/connections/:id.
+    pub async fn get_connection(&self, id: &str) -> Result<Connection, ClientError> {
+        let url = format!("{}/api/connections/{}", self.base_url, id);
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Connection>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
+    }
+
+    /// Create new connection via POST /api/connections.
+    pub async fn create_connection(
+        &self,
+        req: &CreateConnectionRequest,
+    ) -> Result<Connection, ClientError> {
+        let url = format!("{}/api/connections", self.base_url);
+        let resp =
+            self.http
+                .post(&url)
+                .json(req)
+                .send()
+                .await
+                .map_err(|e| ClientError::Request {
+                    url: url.clone(),
+                    source: e,
+                })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<Connection>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Update existing connection via PUT /api/connections/:id.
@@ -165,16 +178,16 @@ impl BackendClient {
         req: &UpdateConnectionRequest,
     ) -> Result<Connection, ClientError> {
         let url = format!("{}/api/connections/{}", self.base_url, id);
-        let resp = self
-            .http
-            .put(&url)
-            .json(req)
-            .send()
-            .await
-            .map_err(|e| ClientError::Request {
-                url: url.clone(),
-                source: e,
-            })?;
+        let resp =
+            self.http
+                .put(&url)
+                .json(req)
+                .send()
+                .await
+                .map_err(|e| ClientError::Request {
+                    url: url.clone(),
+                    source: e,
+                })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -182,19 +195,23 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<Connection>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<Connection>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Delete connection via DELETE /api/connections/:id.
     pub async fn delete_connection(&self, id: &str) -> Result<(), ClientError> {
         let url = format!("{}/api/connections/{}", self.base_url, id);
-        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .delete(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -208,10 +225,15 @@ impl BackendClient {
     /// Export all connections via GET /api/connections/export.
     pub async fn export_connections(&self) -> Result<Vec<Connection>, ClientError> {
         let url = format!("{}/api/connections/export", self.base_url);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -219,10 +241,9 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<Vec<Connection>>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<Vec<Connection>>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Import connections via POST /api/connections/import.
@@ -231,16 +252,16 @@ impl BackendClient {
         req: &[Connection],
     ) -> Result<ImportResult, ClientError> {
         let url = format!("{}/api/connections/import", self.base_url);
-        let resp = self
-            .http
-            .post(&url)
-            .json(req)
-            .send()
-            .await
-            .map_err(|e| ClientError::Request {
-                url: url.clone(),
-                source: e,
-            })?;
+        let resp =
+            self.http
+                .post(&url)
+                .json(req)
+                .send()
+                .await
+                .map_err(|e| ClientError::Request {
+                    url: url.clone(),
+                    source: e,
+                })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -248,59 +269,17 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<ImportResult>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<ImportResult>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Fetch SSH keys list from GET /api/keys.
     pub async fn list_keys(&self) -> Result<Vec<SshKey>, ClientError> {
         let url = format!("{}/api/keys", self.base_url);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(ClientError::Status { url, status, body });
-        }
-
-        resp.json::<Vec<SshKey>>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
-    }
-
-    /// Fetch single SSH key from GET /api/keys/:id.
-    pub async fn get_key(&self, id: &str) -> Result<SshKey, ClientError> {
-        let url = format!("{}/api/keys/{}", self.base_url, id);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(ClientError::Status { url, status, body });
-        }
-
-        resp.json::<SshKey>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
-    }
-
-    /// Create new SSH key via POST /api/keys.
-    pub async fn create_key(&self, req: &CreateKeyRequest) -> Result<SshKey, ClientError> {
-        let url = format!("{}/api/keys", self.base_url);
         let resp = self
             .http
-            .post(&url)
-            .json(req)
+            .get(&url)
             .send()
             .await
             .map_err(|e| ClientError::Request {
@@ -314,19 +293,101 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<SshKey>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<Vec<SshKey>>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
+    }
+
+    /// Fetch single SSH key from GET /api/keys/:id.
+    pub async fn get_key(&self, id: &str) -> Result<SshKey, ClientError> {
+        let url = format!("{}/api/keys/{}", self.base_url, id);
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<SshKey>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
+    }
+
+    /// Create new SSH key via POST /api/keys.
+    pub async fn create_key(&self, req: &CreateKeyRequest) -> Result<SshKey, ClientError> {
+        let url = format!("{}/api/keys", self.base_url);
+        let resp =
+            self.http
+                .post(&url)
+                .json(req)
+                .send()
+                .await
+                .map_err(|e| ClientError::Request {
+                    url: url.clone(),
+                    source: e,
+                })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<SshKey>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
+    }
+
+    /// Update SSH key (rename / replace key material) via PUT /api/keys/:id.
+    pub async fn update_key(
+        &self,
+        id: &str,
+        req: &UpdateKeyRequest,
+    ) -> Result<SshKey, ClientError> {
+        let url = format!("{}/api/keys/{}", self.base_url, id);
+        let resp =
+            self.http
+                .put(&url)
+                .json(req)
+                .send()
+                .await
+                .map_err(|e| ClientError::Request {
+                    url: url.clone(),
+                    source: e,
+                })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ClientError::Status { url, status, body });
+        }
+
+        resp.json::<SshKey>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Delete SSH key via DELETE /api/keys/:id.
     pub async fn delete_key(&self, id: &str) -> Result<(), ClientError> {
         let url = format!("{}/api/keys/{}", self.base_url, id);
-        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .delete(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -340,10 +401,15 @@ impl BackendClient {
     /// Fetch active backend sessions from GET /api/sessions.
     pub async fn list_sessions(&self) -> Result<Vec<SessionInfo>, ClientError> {
         let url = format!("{}/api/sessions", self.base_url);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -351,19 +417,23 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<Vec<SessionInfo>>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<Vec<SessionInfo>>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Terminate an active backend session via DELETE /api/sessions/:id.
     pub async fn delete_session(&self, session_id: &str) -> Result<(), ClientError> {
         let url = format!("{}/api/sessions/{}", self.base_url, session_id);
-        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .delete(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -385,10 +455,7 @@ impl BackendClient {
     }
 
     /// Re-attach to an existing backend terminal session by session ID.
-    pub async fn attach_terminal(
-        &self,
-        session_id: &str,
-    ) -> Result<TerminalWsHandle, ClientError> {
+    pub async fn attach_terminal(&self, session_id: &str) -> Result<TerminalWsHandle, ClientError> {
         let ws_url = normalize_ws_url(&self.base_url);
         let handle = TerminalWsClient::attach(&ws_url, session_id).await?;
         Ok(handle)
@@ -421,18 +488,11 @@ impl BackendClient {
         resp.json::<Option<Vec<SftpFileInfo>>>()
             .await
             .map(|opt| opt.unwrap_or_default())
-            .map_err(|e| ClientError::Decode {
-                url,
-                source: e,
-            })
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Create a directory via POST /api/sftp/mkdir?connectionId={id}&path={path}.
-    pub async fn sftp_mkdir(
-        &self,
-        connection_id: &str,
-        path: &str,
-    ) -> Result<(), ClientError> {
+    pub async fn sftp_mkdir(&self, connection_id: &str, path: &str) -> Result<(), ClientError> {
         let url = format!("{}/api/sftp/mkdir", self.base_url);
         let resp = self
             .http
@@ -487,11 +547,7 @@ impl BackendClient {
     }
 
     /// Remove a file or directory via DELETE /api/sftp/remove?connectionId={id}&path={path}.
-    pub async fn sftp_remove(
-        &self,
-        connection_id: &str,
-        path: &str,
-    ) -> Result<(), ClientError> {
+    pub async fn sftp_remove(&self, connection_id: &str, path: &str) -> Result<(), ClientError> {
         let url = format!("{}/api/sftp/remove", self.base_url);
         let resp = self
             .http
@@ -537,10 +593,10 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        let bytes = resp.bytes().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })?;
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })?;
         Ok(bytes.to_vec())
     }
 
@@ -589,10 +645,10 @@ impl BackendClient {
             transfer_id: String,
         }
 
-        let parsed = resp.json::<UploadResp>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })?;
+        let parsed = resp
+            .json::<UploadResp>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })?;
         Ok(parsed.transfer_id)
     }
 
@@ -618,10 +674,7 @@ impl BackendClient {
         resp.json::<Option<Vec<SftpTransferStatus>>>()
             .await
             .map(|opt| opt.unwrap_or_default())
-            .map_err(|e| ClientError::Decode {
-                url,
-                source: e,
-            })
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Query status of a specific transfer via GET /api/sftp/transfer/status?transferId={id}.
@@ -647,10 +700,9 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<SftpTransferStatus>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<SftpTransferStatus>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Get the home directory path via GET /api/sftp/home?connectionId={id}.
@@ -678,10 +730,10 @@ impl BackendClient {
             path: String,
         }
 
-        let parsed = resp.json::<HomeResp>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })?;
+        let parsed = resp
+            .json::<HomeResp>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })?;
         Ok(parsed.path)
     }
 
@@ -692,10 +744,15 @@ impl BackendClient {
     /// List all port forwards via GET /api/forwards.
     pub async fn list_forwards(&self) -> Result<Vec<PortForward>, ClientError> {
         let url = format!("{}/api/forwards", self.base_url);
-        let resp = self.http.get(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -707,10 +764,7 @@ impl BackendClient {
         let forwards = resp
             .json::<Option<Vec<PortForward>>>()
             .await
-            .map_err(|e| ClientError::Decode {
-                url,
-                source: e,
-            })?;
+            .map_err(|e| ClientError::Decode { url, source: e })?;
         Ok(forwards.unwrap_or_default())
     }
 
@@ -720,16 +774,16 @@ impl BackendClient {
         req: &CreateForwardRequest,
     ) -> Result<PortForward, ClientError> {
         let url = format!("{}/api/forwards", self.base_url);
-        let resp = self
-            .http
-            .post(&url)
-            .json(req)
-            .send()
-            .await
-            .map_err(|e| ClientError::Request {
-                url: url.clone(),
-                source: e,
-            })?;
+        let resp =
+            self.http
+                .post(&url)
+                .json(req)
+                .send()
+                .await
+                .map_err(|e| ClientError::Request {
+                    url: url.clone(),
+                    source: e,
+                })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -737,10 +791,9 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<PortForward>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<PortForward>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Update an existing port forward rule via PUT /api/forwards/:id.
@@ -750,16 +803,16 @@ impl BackendClient {
         req: &UpdateForwardRequest,
     ) -> Result<PortForward, ClientError> {
         let url = format!("{}/api/forwards/{}", self.base_url, id);
-        let resp = self
-            .http
-            .put(&url)
-            .json(req)
-            .send()
-            .await
-            .map_err(|e| ClientError::Request {
-                url: url.clone(),
-                source: e,
-            })?;
+        let resp =
+            self.http
+                .put(&url)
+                .json(req)
+                .send()
+                .await
+                .map_err(|e| ClientError::Request {
+                    url: url.clone(),
+                    source: e,
+                })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -767,19 +820,23 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        resp.json::<PortForward>().await.map_err(|e| ClientError::Decode {
-            url,
-            source: e,
-        })
+        resp.json::<PortForward>()
+            .await
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Delete a port forward rule via DELETE /api/forwards/:id.
     pub async fn delete_forward(&self, id: &str) -> Result<(), ClientError> {
         let url = format!("{}/api/forwards/{}", self.base_url, id);
-        let resp = self.http.delete(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .delete(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -793,10 +850,15 @@ impl BackendClient {
     /// Start a port forward tunnel via POST /api/forwards/:id/start.
     pub async fn start_forward(&self, id: &str) -> Result<ForwardActionResponse, ClientError> {
         let url = format!("{}/api/forwards/{}/start", self.base_url, id);
-        let resp = self.http.post(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .post(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -806,19 +868,21 @@ impl BackendClient {
 
         resp.json::<ForwardActionResponse>()
             .await
-            .map_err(|e| ClientError::Decode {
-                url,
-                source: e,
-            })
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 
     /// Stop an active port forward tunnel via POST /api/forwards/:id/stop.
     pub async fn stop_forward(&self, id: &str) -> Result<ForwardActionResponse, ClientError> {
         let url = format!("{}/api/forwards/{}/stop", self.base_url, id);
-        let resp = self.http.post(&url).send().await.map_err(|e| ClientError::Request {
-            url: url.clone(),
-            source: e,
-        })?;
+        let resp = self
+            .http
+            .post(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::Request {
+                url: url.clone(),
+                source: e,
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -828,11 +892,6 @@ impl BackendClient {
 
         resp.json::<ForwardActionResponse>()
             .await
-            .map_err(|e| ClientError::Decode {
-                url,
-                source: e,
-            })
+            .map_err(|e| ClientError::Decode { url, source: e })
     }
 }
-
-

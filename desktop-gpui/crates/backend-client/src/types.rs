@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 fn default_port() -> u16 {
     22
@@ -72,6 +72,15 @@ pub struct SshKey {
 pub struct CreateKeyRequest {
     pub name: String,
     pub key_base64: String,
+}
+
+/// Request body for PUT /api/keys/:id. `key_base64` is optional; when absent
+/// the backend keeps the existing key material.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UpdateKeyRequest {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_base64: Option<String>,
 }
 
 /// Request body for POST /api/connections.
@@ -178,9 +187,15 @@ impl PortForward {
 
     pub fn mapping_display(&self) -> String {
         if self.is_reverse() {
-            format!(":{} \u{2190} localhost:{}", self.remote_port, self.local_port)
+            format!(
+                ":{} \u{2190} localhost:{}",
+                self.remote_port, self.local_port
+            )
         } else {
-            format!("localhost:{} \u{2192} :{}", self.local_port, self.remote_port)
+            format!(
+                "localhost:{} \u{2192} :{}",
+                self.local_port, self.remote_port
+            )
         }
     }
 }
@@ -212,4 +227,3 @@ pub struct UpdateForwardRequest {
 pub struct ForwardActionResponse {
     pub status: String,
 }
-
