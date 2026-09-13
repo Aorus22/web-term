@@ -14,6 +14,7 @@ use crate::render::TerminalRenderer;
 use crate::terminal::Terminal;
 use alacritty_terminal::index::{Column, Line, Point as AlacPoint};
 use gpui::*;
+use alacritty_terminal::vte::ansi::CursorShape;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -200,6 +201,12 @@ impl TerminalView {
         self.renderer.font_size = size;
         self.renderer.cell_width = size * 0.6;
         self.renderer.cell_height = size * self.renderer.line_height_multiplier;
+        cx.notify();
+    }
+
+    /// Dynamically update the cursor shape override for this terminal view.
+    pub fn set_cursor_shape(&mut self, shape: Option<CursorShape>, cx: &mut Context<Self>) {
+        self.renderer.cursor_shape_override = shape;
         cx.notify();
     }
 

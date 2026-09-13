@@ -13,6 +13,8 @@
 //! - Terminal Font modal with family selector, size stepper/presets, and terminal preview.
 
 use gpui::*;
+use gpui_component::input::Input;
+use gpui_component::Sizable;
 use crate::app_state::AppState;
 
 const MONO_FONTS: &[&str] = &[
@@ -38,6 +40,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let muted_text = app.muted_text();
     let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
+    let accent_color = app.accent_color();
+    let accent_fg = app.accent_fg();
     let secondary_bg = app.secondary_bg();
     let active_preset_id = app.settings.theme_preset.clone();
     let theme_mode = app.theme_mode_filter.clone();
@@ -764,6 +768,89 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                             None
                                         }),
                                 ),
+                        ),
+                ),
+        )
+        // ====================================================
+        // ADVANCED: Backend binary path (override)
+        // ====================================================
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2()
+                        .child(
+                            svg()
+                                .data(crate::icons::TERMINAL_SVG)
+                                .size(px(16.0))
+                                .text_color(muted_text),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(text_color)
+                                .child("Backend Binary"),
+                        ),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(muted_text)
+                        .child("Override the path to the backend executable. Takes effect after restarting the app."),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2()
+                        .child(
+                            div().flex_1().child(
+                                Input::new(&app.inputs().backend_path)
+                                    .with_size(gpui_component::Size::Small)
+                                    .w_full()
+                                    .text_size(px(12.0)),
+                            ),
+                        )
+                        .child(
+                            div()
+                                .px_3()
+                                .py_1p5()
+                                .rounded_md()
+                                .bg(accent_color)
+                                .hover(|s| s.opacity(0.9))
+                                .cursor_pointer()
+                                .text_xs()
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(accent_fg)
+                                .child("Save")
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    let value = AppState::input_value(&this.inputs().backend_path, cx);
+                                    this.set_backend_path_override(&value, window, cx);
+                                })),
+                        )
+                        .child(
+                            div()
+                                .px_3()
+                                .py_1p5()
+                                .rounded_md()
+                                .bg(tag_bg)
+                                .hover(|s| s.bg(border_color))
+                                .cursor_pointer()
+                                .text_xs()
+                                .text_color(text_color)
+                                .child("Reset")
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    this.reset_backend_path_override(window, cx);
+                                    AppState::set_input_value(&this.inputs().backend_path, "", window, cx);
+                                })),
                         ),
                 ),
         )

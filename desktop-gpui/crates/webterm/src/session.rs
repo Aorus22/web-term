@@ -37,17 +37,25 @@ impl TerminalTab {
         session_type: impl Into<String>,
         connection_id: Option<String>,
         palette: ColorPalette,
+        scrollback_limit: usize,
+        cursor_style: &str,
         cx: &mut App,
     ) -> Self {
+        let cursor_shape = webterm_terminal::cursor_shape_from_style(cursor_style);
+        let config = webterm_terminal::terminal::TerminalConfig {
+            scrollback_limit,
+        };
 
         let view = cx.new(|cx| {
-            let terminal = Terminal::new(80, 24);
-            TerminalView::new(terminal, cx).with_renderer(TerminalRenderer::new(
+            let terminal = webterm_terminal::terminal::Terminal::with_config(80, 24, config);
+            let mut renderer = TerminalRenderer::new(
                 "JetBrains Mono".to_string(),
                 px(14.0),
                 1.2,
                 palette,
-            ))
+            );
+            renderer.cursor_shape_override = cursor_shape;
+            TerminalView::new(terminal, cx).with_renderer(renderer)
         });
 
         Self {

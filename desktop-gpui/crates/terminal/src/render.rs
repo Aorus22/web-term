@@ -60,6 +60,9 @@ pub struct TerminalRenderer {
     pub cell_height: Pixels,
     pub line_height_multiplier: f32,
     pub palette: ColorPalette,
+    /// When set, overrides the application-reported cursor shape
+    /// (Block / Underline / Beam) from the terminal settings.
+    pub cursor_shape_override: Option<CursorShape>,
 }
 
 impl TerminalRenderer {
@@ -81,6 +84,7 @@ impl TerminalRenderer {
             cell_height,
             line_height_multiplier,
             palette,
+            cursor_shape_override: None,
         }
     }
 

@@ -80,6 +80,7 @@ impl AppState {
         let sftp_search_right = mk_input("Filter files...", window, cx);
         let sftp_modal_name = mk_input("Name", window, cx);
         let backend_path = mk_input("Path to backend executable", window, cx);
+        AppState::set_input_value(&backend_path, &self.backend_path_input, window, cx);
 
         // Live filters: propagate typing into AppState and re-render.
         let hosts = hosts_search.clone();
@@ -2682,7 +2683,14 @@ impl AppState {
                                     let tab_id = this.session_manager.alloc_tab_id();
                                     let palette = this.current_terminal_palette();
                                     let mut tab = TerminalTab::new(
-                                        tab_id, title, stype, conn_id, palette, cx,
+                                        tab_id,
+                                        title,
+                                        stype,
+                                        conn_id,
+                                        palette,
+                                        this.scrollback as usize,
+                                        &this.cursor_style,
+                                        cx,
                                     );
                                     tab.session_id = Some(session_id.clone());
                                     this.session_manager.add_tab(tab);
@@ -2739,6 +2747,8 @@ impl AppState {
             "local",
             Some("local".to_string()),
             palette,
+            self.scrollback as usize,
+            &self.cursor_style,
             cx,
         );
         let connect_req = WsConnectRequest::for_local_with_cwd(80, 24, cwd);
@@ -2812,7 +2822,16 @@ impl AppState {
         let tab_id = self.session_manager.alloc_tab_id();
         let palette = self.current_terminal_palette();
         let mut tab =
-            TerminalTab::new(tab_id, title, "ssh", req.connection_id.clone(), palette, cx);
+            TerminalTab::new(
+            tab_id,
+            title,
+            "ssh",
+            req.connection_id.clone(),
+            palette,
+            self.scrollback as usize,
+            &self.cursor_style,
+            cx,
+        );
         tab.last_connect_req = Some(req.clone());
         self.show_hosts_catalog = false;
         self.active_view = View::Hosts;
@@ -3232,6 +3251,14 @@ impl AppState {
         self.settings.cursor_style = style;
         self.show_cursor_style_picker = false;
         let _ = self.settings.save();
+        let shape = webterm_terminal::cursor_shape_from_style(&self.cursor_style);
+        for session in self.session_manager.tabs_mut() {
+            if let Some(ref view) = session.view {
+                view.update(cx, |this, cx| {
+                    this.set_cursor_shape(shape, cx);
+                });
+            }
+        }
         cx.notify();
     }
 
@@ -3253,11 +3280,17 @@ impl AppState {
     }
 
     /// Set a custom backend executable path override and save to settings.
-    pub fn set_backend_path_override(&mut self, path_str: &str, cx: &mut Context<Self>) {
+    pub fn set_backend_path_override(
+        &mut self,
+        path_str: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let trimmed = path_str.trim();
         if trimmed.is_empty() {
             self.settings.backend_path = None;
             self.backend_path_input.clear();
+            AppState::set_input_value(&self.inputs().backend_path, "", window, cx);
             self.push_notification("Reset backend path to default bundled binary".to_string(), false, cx);
         } else {
             self.settings.backend_path = Some(std::path::PathBuf::from(trimmed));
@@ -3270,7 +3303,7 @@ impl AppState {
     }
 
     /// Reset backend executable path override to default bundled binary.
-    pub fn reset_backend_path_override(&mut self, cx: &mut Context<Self>) {
+    pub fn reset_backend_path_override(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.settings.backend_path = None;
         self.backend_path_input.clear();
         let _ = self.settings.save();

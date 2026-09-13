@@ -18,6 +18,11 @@ pub struct TermDimensions {
 
 impl TermDimensions {
     pub fn new(columns: usize, screen_lines: usize) -> Self {
+        Self::with_config(columns, screen_lines, TerminalConfig::default())
+    }
+
+    /// Create a terminal with an explicit configuration (scrollback, etc.).
+    pub fn with_config(columns: usize, screen_lines: usize, config: TerminalConfig) -> Self {
         Self {
             columns: columns.max(1),
             screen_lines: screen_lines.max(1),
