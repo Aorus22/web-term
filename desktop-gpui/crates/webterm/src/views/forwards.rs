@@ -2,7 +2,7 @@
 
 use crate::app_state::{AppState, ForwardModalMode};
 use crate::views::sheet::{
-    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_panel,
+    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_input_row, sheet_panel,
 };
 use gpui::*;
 
@@ -88,8 +88,8 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .cursor_pointer()
                         .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
                         .child("Create Forward")
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                            this.open_create_forward_modal(cx);
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                            this.open_create_forward_modal(window, cx);
                         })),
                 ),
         )
@@ -157,8 +157,8 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .text_color(primary_fg)
                                 .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
                                 .child("Create First Forward")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.open_create_forward_modal(cx);
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    this.open_create_forward_modal(window, cx);
                                 })),
                         )
                         .into_any_element()
@@ -364,8 +364,8 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .cursor_pointer()
                                                 .hover(move |s| s.bg(muted_bg))
                                                 .child(svg().data(crate::icons::EDIT_SVG).size(px(14.0)).text_color(muted_text))
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    this.open_edit_forward_modal(&id_edit, cx);
+                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                    this.open_edit_forward_modal(&id_edit, window, cx);
                                                 })),
                                         )
                                         // Delete Button
@@ -499,23 +499,7 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .flex()
                         .flex_col()
                         .gap_1()
-                        .child(div().text_xs().text_color(muted_text).child("Rule Name *"))
-                        .child(
-                            div()
-                                .px_3()
-                                .py_1p5()
-                                .rounded_md()
-                                .bg(input_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_sm()
-                                .text_color(if form.name.is_empty() { muted_text } else { text_color })
-                                .child(if form.name.is_empty() {
-                                    "e.g. Local Postgres or Staging API".to_string()
-                                } else {
-                                    form.name.clone()
-                                }),
-                        )
+                        .child(sheet_input_row(app, "Rule Name *", &app.inputs().fwd_name))
                         // Preset names for quick selection
                         .child(
                             div()
@@ -537,11 +521,8 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .text_xs()
                                         .text_color(text_color)
                                         .child(p_str.clone())
-                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                            if let Some(f) = &mut this.forward_modal {
-                                                f.name = p_str.clone();
-                                                cx.notify();
-                                            }
+                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                            AppState::set_input_value(&this.inputs().fwd_name, &p_str, window, cx);
                                         }))
                                 })),
                         ),
@@ -634,19 +615,7 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .flex()
                                 .flex_col()
                                 .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Local Port *"))
-                                .child(
-                                    div()
-                                        .px_3()
-                                        .py_1p5()
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_sm()
-                                        .text_color(if form.local_port.is_empty() { muted_text } else { text_color })
-                                        .child(if form.local_port.is_empty() { "e.g. 5432".to_string() } else { form.local_port.clone() }),
-                                )
+                                .child(sheet_input_row(app, "Local Port *", &app.inputs().fwd_local_port))
                                 .child(
                                     div()
                                         .flex()
@@ -666,13 +635,11 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .text_xs()
                                                 .text_color(text_color)
                                                 .child(port_str.clone())
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    if let Some(f) = &mut this.forward_modal {
-                                                        f.local_port = port_str.clone();
-                                                        if f.remote_port.is_empty() {
-                                                            f.remote_port = port_str.clone();
-                                                        }
-                                                        cx.notify();
+                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                    AppState::set_input_value(&this.inputs().fwd_local_port, &port_str, window, cx);
+                                                    let remote = AppState::input_value(&this.inputs().fwd_remote_port, cx);
+                                                    if remote.trim().is_empty() {
+                                                        AppState::set_input_value(&this.inputs().fwd_remote_port, &port_str, window, cx);
                                                     }
                                                 }))
                                         })),
@@ -685,19 +652,7 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .flex()
                                 .flex_col()
                                 .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Remote Port *"))
-                                .child(
-                                    div()
-                                        .px_3()
-                                        .py_1p5()
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_sm()
-                                        .text_color(if form.remote_port.is_empty() { muted_text } else { text_color })
-                                        .child(if form.remote_port.is_empty() { "e.g. 5432".to_string() } else { form.remote_port.clone() }),
-                                )
+                                .child(sheet_input_row(app, "Remote Port *", &app.inputs().fwd_remote_port))
                                 .child(
                                     div()
                                         .flex()
@@ -717,11 +672,8 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .text_xs()
                                                 .text_color(text_color)
                                                 .child(port_str.clone())
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    if let Some(f) = &mut this.forward_modal {
-                                                        f.remote_port = port_str.clone();
-                                                        cx.notify();
-                                                    }
+                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                    AppState::set_input_value(&this.inputs().fwd_remote_port, &port_str, window, cx);
                                                 }))
                                         })),
                                 ),
@@ -734,8 +686,8 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
             cx,
             "Cancel",
             if is_edit { "Save Changes" } else { "Create Forward" },
-            AppState::close_forward_modal,
-            AppState::save_forward_form,
+            |this, _window, cx| this.close_forward_modal(cx),
+            |this, window, cx| this.save_forward_form(window, cx),
         ))
         .into_any_element()
 }

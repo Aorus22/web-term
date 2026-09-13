@@ -2,7 +2,7 @@
 
 use crate::app_state::{AppState, ConnectionModalMode};
 use crate::views::sheet::{
-    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_panel,
+    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_input_row, sheet_panel,
 };
 use gpui::*;
 
@@ -11,7 +11,6 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let input_bg = app.bg_color();
     let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
     let primary_fg = app.primary_fg();
@@ -36,31 +35,6 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
         "Save Changes"
     } else {
         "Create Connection"
-    };
-
-    let label_display: SharedString = if form.label.is_empty() {
-        "e.g. Production Web".into()
-    } else {
-        form.label.clone().into()
-    };
-
-    let host_display: SharedString = if form.host.is_empty() {
-        "e.g. 192.168.1.50 or host.domain.com".into()
-    } else {
-        form.host.clone().into()
-    };
-
-    let port_display: SharedString = form.port.clone().into();
-    let user_display: SharedString = if form.username.is_empty() {
-        "root".into()
-    } else {
-        form.username.clone().into()
-    };
-
-    let tags_display: SharedString = if form.tags.is_empty() {
-        "e.g. prod, web, us-east (click tags below to add)".into()
-    } else {
-        form.tags.clone().into()
     };
 
     let is_key_auth = form.auth_method == "key";
@@ -89,34 +63,11 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                     .flex_col()
                     .gap_3()
                     // Label Row
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(muted_text)
-                                    .child("Connection Label *"),
-                            )
-                            .child(
-                                div()
-                                    .px_3()
-                                    .py_1p5()
-                                    .rounded_md()
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(border_color)
-                                    .text_sm()
-                                    .text_color(if form.label.is_empty() {
-                                        muted_text
-                                    } else {
-                                        text_color
-                                    })
-                                    .child(label_display),
-                            ),
-                    )
+                    .child(sheet_input_row(
+                        app,
+                        "Connection Label *",
+                        &app.inputs().conn_label,
+                    ))
                     // Host & Port Row
                     .child(
                         div()
@@ -124,72 +75,36 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                             .flex_row()
                             .gap_3()
                             .child(
-                                div()
-                                    .flex_1()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_1()
-                                    .child(
-                                        div().text_xs().text_color(muted_text).child("Host / IP *"),
-                                    )
-                                    .child(
-                                        div()
-                                            .px_3()
-                                            .py_1p5()
-                                            .rounded_md()
-                                            .bg(input_bg)
-                                            .border_1()
-                                            .border_color(border_color)
-                                            .text_sm()
-                                            .text_color(if form.host.is_empty() {
-                                                muted_text
-                                            } else {
-                                                text_color
-                                            })
-                                            .child(host_display),
-                                    ),
+                                div().flex_1().child(sheet_input_row(
+                                    app,
+                                    "Host / IP *",
+                                    &app.inputs().conn_host,
+                                )),
                             )
                             .child(
-                                div()
-                                    .w(px(80.0))
-                                    .flex()
-                                    .flex_col()
-                                    .gap_1()
-                                    .child(div().text_xs().text_color(muted_text).child("Port *"))
-                                    .child(
-                                        div()
-                                            .px_3()
-                                            .py_1p5()
-                                            .rounded_md()
-                                            .bg(input_bg)
-                                            .border_1()
-                                            .border_color(border_color)
-                                            .text_sm()
-                                            .text_color(text_color)
-                                            .child(port_display),
-                                    ),
+                                div().w(px(90.0)).child(sheet_input_row(
+                                    app,
+                                    "Port *",
+                                    &app.inputs().conn_port,
+                                )),
                             ),
                     )
                     // Username Row
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(div().text_xs().text_color(muted_text).child("Username *"))
-                            .child(
-                                div()
-                                    .px_3()
-                                    .py_1p5()
-                                    .rounded_md()
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(border_color)
-                                    .text_sm()
-                                    .text_color(text_color)
-                                    .child(user_display),
-                            ),
-                    )
+                    .child(sheet_input_row(
+                        app,
+                        "Username *",
+                        &app.inputs().conn_username,
+                    ))
+                    // Password Row
+                    .child(sheet_input_row(
+                        app,
+                        if is_edit {
+                            "Password (leave blank to keep current)"
+                        } else {
+                            "Password (optional)"
+                        },
+                        &app.inputs().conn_password,
+                    ))
                     // Auth Method Toggle (Password vs SSH Key)
                     .child(
                         div()
@@ -217,7 +132,11 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             .px_3()
                                             .py_1p5()
                                             .rounded_md()
-                                            .bg(if !is_key_auth { primary_color } else { tag_bg })
+                                            .bg(if !is_key_auth {
+                                                primary_color
+                                            } else {
+                                                tag_bg
+                                            })
                                             .text_color(if !is_key_auth {
                                                 primary_fg
                                             } else {
@@ -257,7 +176,11 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             .px_3()
                                             .py_1p5()
                                             .rounded_md()
-                                            .bg(if is_key_auth { primary_color } else { tag_bg })
+                                            .bg(if is_key_auth {
+                                                primary_color
+                                            } else {
+                                                tag_bg
+                                            })
                                             .text_color(if is_key_auth {
                                                 primary_fg
                                             } else {
@@ -295,7 +218,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                     ),
                             ),
                     )
-                    // Dynamic Auth Section (Password input or Key selector)
+                    // Dynamic Auth Section (Key selector when key auth)
                     .child(if is_key_auth {
                         div()
                             .flex()
@@ -311,7 +234,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                 div()
                                     .p_3()
                                     .rounded_md()
-                                    .bg(input_bg)
+                                    .bg(app.bg_color())
                                     .border_1()
                                     .border_color(border_color)
                                     .text_xs()
@@ -340,7 +263,11 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             } else {
                                                 border_color
                                             })
-                                            .bg(if is_selected { tag_bg } else { input_bg })
+                                            .bg(if is_selected {
+                                                tag_bg
+                                            } else {
+                                                app.bg_color()
+                                            })
                                             .hover(|s| s.bg(tag_bg))
                                             .flex()
                                             .flex_row()
@@ -400,32 +327,9 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                     }))
                                     .into_any_element()
                             })
+                            .into_any_element()
                     } else {
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(div().text_xs().text_color(muted_text).child(if is_edit {
-                                "Password (leave blank to keep current)"
-                            } else {
-                                "Password (optional)"
-                            }))
-                            .child(
-                                div()
-                                    .px_3()
-                                    .py_1p5()
-                                    .rounded_md()
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(border_color)
-                                    .text_sm()
-                                    .text_color(muted_text)
-                                    .child(if form.password.is_empty() {
-                                        "••••••••"
-                                    } else {
-                                        "●●●●●●●●"
-                                    }),
-                            )
+                        div().into_any_element()
                     })
                     // Tags Row & Quick Presets
                     .child(
@@ -433,23 +337,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                             .flex()
                             .flex_col()
                             .gap_1()
-                            .child(div().text_xs().text_color(muted_text).child("Tags"))
-                            .child(
-                                div()
-                                    .px_3()
-                                    .py_1p5()
-                                    .rounded_md()
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(border_color)
-                                    .text_xs()
-                                    .text_color(if form.tags.is_empty() {
-                                        muted_text
-                                    } else {
-                                        text_color
-                                    })
-                                    .child(tags_display),
-                            )
+                            .child(sheet_input_row(app, "Tags", &app.inputs().conn_tags))
                             .child(
                                 div()
                                     .flex()
@@ -474,15 +362,26 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             .child(format!("+ {}", tag))
                                             .on_mouse_down(
                                                 MouseButton::Left,
-                                                cx.listener(move |this, _, _window, cx| {
-                                                    if let Some(f) = &mut this.connection_modal {
-                                                        let mut current_tags = f.parse_tags();
-                                                        if !current_tags.contains(&tag_str) {
-                                                            current_tags.push(tag_str.clone());
-                                                            f.tags = current_tags.join(", ");
-                                                            cx.notify();
-                                                        }
+                                                cx.listener(move |this, _, window, cx| {
+                                                    let current = AppState::input_value(
+                                                        &this.inputs().conn_tags,
+                                                        cx,
+                                                    );
+                                                    let mut tags: Vec<String> = current
+                                                        .split(',')
+                                                        .map(|s| s.trim().to_string())
+                                                        .filter(|s| !s.is_empty())
+                                                        .collect();
+                                                    if !tags.contains(&tag_str) {
+                                                        tags.push(tag_str.clone());
                                                     }
+                                                    let joined = tags.join(", ");
+                                                    AppState::set_input_value(
+                                                        &this.inputs().conn_tags,
+                                                        &joined,
+                                                        window,
+                                                        cx,
+                                                    );
                                                 }),
                                             )
                                     })),
@@ -495,8 +394,8 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
             cx,
             "Cancel",
             submit_label,
-            AppState::close_connection_modal,
-            AppState::save_connection_form,
+            |this, _window, cx| this.close_connection_modal(cx),
+            |this, window, cx| this.save_connection_form(window, cx),
         ))
         .into_any_element()
 }

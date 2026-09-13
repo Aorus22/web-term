@@ -5,6 +5,8 @@
 //! narrows smoothly instead of being covered by an overlay.
 
 use gpui::*;
+use gpui_component::input::{Input, InputState, Textarea, TextareaState};
+use gpui_component::Sizable;
 
 use crate::app_state::AppState;
 
@@ -141,14 +143,15 @@ pub fn sheet_body() -> Stateful<Div> {
 }
 
 /// Sheet footer pinned to the bottom: Cancel + primary action, matching the
-/// web SheetFooter (border-t, right-aligned buttons).
+/// web SheetFooter (border-t, right-aligned buttons). Handlers receive the
+/// window so they can read/replace text input values.
 pub fn sheet_footer(
     app: &AppState,
     cx: &mut Context<AppState>,
     cancel_label: &'static str,
     submit_label: &'static str,
-    on_cancel: fn(&mut AppState, &mut Context<AppState>),
-    on_submit: fn(&mut AppState, &mut Context<AppState>),
+    on_cancel: impl Fn(&mut AppState, &mut Window, &mut Context<AppState>) + 'static,
+    on_submit: impl Fn(&mut AppState, &mut Window, &mut Context<AppState>) + 'static,
 ) -> Div {
     let border_color = app.border_color();
     let text_color = app.text_color();
@@ -179,8 +182,8 @@ pub fn sheet_footer(
                 .child(cancel_label)
                 .on_mouse_down(
                     MouseButton::Left,
-                    cx.listener(move |this, _, _window, cx| {
-                        on_cancel(this, cx);
+                    cx.listener(move |this, _, window, cx| {
+                        on_cancel(this, window, cx);
                     }),
                 ),
         )
@@ -198,8 +201,8 @@ pub fn sheet_footer(
                 .child(submit_label)
                 .on_mouse_down(
                     MouseButton::Left,
-                    cx.listener(move |this, _, _window, cx| {
-                        on_submit(this, cx);
+                    cx.listener(move |this, _, window, cx| {
+                        on_submit(this, window, cx);
                     }),
                 ),
         )
@@ -236,4 +239,43 @@ pub fn sheet_error_banner(app: &AppState, message: SharedString) -> Div {
                 .text_color(rgb(0xef4444)),
         )
         .child(message)
+}
+
+/// Labeled single-line text input row for sheet forms.
+pub fn sheet_input_row(
+    app: &AppState,
+    label: impl Into<SharedString>,
+    input: &Entity<InputState>,
+) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child(div().text_xs().text_color(app.muted_text()).child(label.into()))
+        .child(
+            Input::new(input)
+                .with_size(gpui_component::Size::Small)
+                .w_full()
+                .text_size(px(13.0)),
+        )
+}
+
+/// Labeled multi-line textarea row for sheet forms (PEM content, etc.).
+pub fn sheet_textarea_row(
+    app: &AppState,
+    label: impl Into<SharedString>,
+    input: &Entity<TextareaState>,
+    height: f32,
+) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child(div().text_xs().text_color(app.muted_text()).child(label.into()))
+        .child(
+            Textarea::new(input)
+                .w_full()
+                .h(px(height))
+                .text_size(px(12.0)),
+        )
 }

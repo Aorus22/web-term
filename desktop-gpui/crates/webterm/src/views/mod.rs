@@ -4,7 +4,6 @@ pub mod hosts;
 pub mod keys;
 pub mod nav;
 pub mod new_tab;
-pub mod new_tab_modal;
 pub mod passphrase_modal;
 pub mod reconnect_banner;
 pub mod settings;

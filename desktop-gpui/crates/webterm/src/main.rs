@@ -95,6 +95,10 @@ fn main() {
             app_state.update(cx, |this, cx| {
                 this.start_supervisor(cx);
             });
+            // Input states need a Window; create them before first render.
+            app_state.update(cx, |this, cx| {
+                this.init_form_inputs(window, cx);
+            });
             app_state
         });
     });

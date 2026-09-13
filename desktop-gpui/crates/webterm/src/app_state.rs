@@ -14,6 +14,183 @@ use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
 
 use crate::session::{SessionStatus, TerminalSessionManager, TerminalTab};
 use crate::views::{nav::render_nav_shell, status::render_status_page};
+use gpui_component::input::{InputEvent, InputState, TextareaState};
+
+/// Editable text input entities shared by every form in the app.
+///
+/// gpui-component `InputState`/`TextareaState` entities are created once at
+/// startup (they need a `Window`), reused across form opens, and are the
+/// source of truth for text fields; form structs keep only non-text state.
+pub struct FormInputs {
+    pub conn_label: Entity<InputState>,
+    pub conn_host: Entity<InputState>,
+    pub conn_port: Entity<InputState>,
+    pub conn_username: Entity<InputState>,
+    pub conn_password: Entity<InputState>,
+    pub conn_tags: Entity<InputState>,
+    pub new_key_name: Entity<InputState>,
+    pub new_key_pem: Entity<TextareaState>,
+    pub edit_key_name: Entity<InputState>,
+    pub edit_key_pem: Entity<TextareaState>,
+    pub fwd_name: Entity<InputState>,
+    pub fwd_local_port: Entity<InputState>,
+    pub fwd_remote_port: Entity<InputState>,
+    pub passphrase: Entity<InputState>,
+    pub quick_connect: Entity<InputState>,
+    pub hosts_search: Entity<InputState>,
+    pub sftp_search_left: Entity<InputState>,
+    pub sftp_search_right: Entity<InputState>,
+    pub sftp_modal_name: Entity<InputState>,
+    pub backend_path: Entity<InputState>,
+}
+
+impl AppState {
+    /// Create every form input entity and wire live-filter subscriptions.
+    /// Must be called once from a `Window` context (input states need it).
+    pub fn init_form_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let mk_input = |placeholder: &'static str,
+                        window: &mut Window,
+                        cx: &mut Context<AppState>|
+         -> Entity<InputState> {
+            cx.new(|cx| InputState::new(window, cx).placeholder(placeholder))
+        };
+
+        let conn_label = mk_input("My Production Server", window, cx);
+        let conn_host = mk_input("10.0.0.1", window, cx);
+        let conn_port = mk_input("22", window, cx);
+        let conn_username = mk_input("root", window, cx);
+        let conn_password = cx.new(|cx| InputState::new(window, cx).placeholder("Password").masked(true));
+        let conn_tags = mk_input("prod, aws, web", window, cx);
+        let new_key_name = mk_input("e.g. id_ed25519_deploy", window, cx);
+        let new_key_pem: Entity<TextareaState> = cx.new(|cx| {
+            TextareaState::new(window, cx).placeholder("Paste OpenSSH private key PEM content here...")
+        });
+        let edit_key_name = mk_input("e.g. id_ed25519_deploy", window, cx);
+        let edit_key_pem: Entity<TextareaState> = cx.new(|cx| {
+            TextareaState::new(window, cx).placeholder("(leave empty to keep current key)")
+        });
+        let fwd_name = mk_input("e.g. Production Database", window, cx);
+        let fwd_local_port = mk_input("e.g. 5432", window, cx);
+        let fwd_remote_port = mk_input("e.g. 5432", window, cx);
+        let passphrase = cx.new(|cx| InputState::new(window, cx).placeholder("Passphrase").masked(true));
+        let quick_connect = mk_input("Search or user@host...", window, cx);
+        let hosts_search = mk_input("Search hosts...", window, cx);
+        let sftp_search_left = mk_input("Filter files...", window, cx);
+        let sftp_search_right = mk_input("Filter files...", window, cx);
+        let sftp_modal_name = mk_input("Name", window, cx);
+        let backend_path = mk_input("Path to backend executable", window, cx);
+
+        // Live filters: propagate typing into AppState and re-render.
+        let hosts = hosts_search.clone();
+        cx.subscribe(&hosts, move |this, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                this.search_query = this.inputs().hosts_search.read(cx).value().to_string();
+                cx.notify();
+            }
+        })
+        .detach();
+
+        let quick = quick_connect.clone();
+        cx.subscribe(&quick, move |this, _, event: &InputEvent, cx| {
+            match event {
+                InputEvent::Change => {
+                    this.quick_connect_query =
+                        this.inputs().quick_connect.read(cx).value().to_string();
+                    cx.notify();
+                }
+                InputEvent::PressEnter { .. } => {
+                    let text = this.inputs().quick_connect.read(cx).value().to_string();
+                    this.quick_connect_submit(&text, cx);
+                }
+                _ => {}
+            }
+        })
+        .detach();
+
+        for (entity, pane) in [
+            (sftp_search_left.clone(), 0usize),
+            (sftp_search_right.clone(), 1usize),
+        ] {
+            cx.subscribe(&entity, move |this, _, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let query = if pane == 0 {
+                        this.inputs().sftp_search_left.read(cx).value().to_string()
+                    } else {
+                        this.inputs().sftp_search_right.read(cx).value().to_string()
+                    };
+                    let target = if pane == 0 {
+                        &mut this.sftp_manager.left_pane
+                    } else {
+                        &mut this.sftp_manager.right_pane
+                    };
+                    target.search_query = query;
+                    cx.notify();
+                }
+            })
+            .detach();
+        }
+
+        self.form_inputs = Some(FormInputs {
+            conn_label,
+            conn_host,
+            conn_port,
+            conn_username,
+            conn_password,
+            conn_tags,
+            new_key_name,
+            new_key_pem,
+            edit_key_name,
+            edit_key_pem,
+            fwd_name,
+            fwd_local_port,
+            fwd_remote_port,
+            passphrase,
+            quick_connect,
+            hosts_search,
+            sftp_search_left,
+            sftp_search_right,
+            sftp_modal_name,
+            backend_path,
+        });
+    }
+
+    /// Panics only if called before `init_form_inputs`, which main.rs runs
+    /// right after the window opens, before any view can render.
+    pub fn inputs(&self) -> &FormInputs {
+        self.form_inputs
+            .as_ref()
+            .expect("form inputs initialized at startup")
+    }
+
+    /// Read the current text of an input entity.
+    pub fn input_value(entity: &Entity<InputState>, cx: &App) -> String {
+        entity.read(cx).value().to_string()
+    }
+
+    /// Replace the text of an input entity (used when (re)opening forms).
+    pub fn set_input_value(entity: &Entity<InputState>, value: &str, window: &mut Window, cx: &mut App) {
+        entity.update(cx, |state, cx| {
+            state.set_value(value, window, cx);
+        });
+    }
+
+    /// Read the current text of a textarea entity.
+    pub fn input_value_textarea(entity: &Entity<TextareaState>, cx: &App) -> String {
+        entity.read(cx).value().to_string()
+    }
+
+    /// Replace the text of a textarea entity.
+    pub fn set_textarea_value(
+        entity: &Entity<TextareaState>,
+        value: &str,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        entity.update(cx, |state, cx| {
+            state.set_value(value, window, cx);
+        });
+    }
+}
 
 /// Standard RFC 4648 Base64 encoding for PEM payloads.
 pub fn encode_base64(bytes: &[u8]) -> String {
@@ -776,13 +953,8 @@ pub struct AppState {
     pub settings: DesktopSettings,
     pub spawn_opts: Option<SpawnOptions>,
     pub session_manager: TerminalSessionManager,
-    pub show_new_tab_modal: bool,
     pub show_new_tab_popover: bool,
     pub quick_connect_query: String,
-    pub new_tab_host: String,
-    pub new_tab_user: String,
-    pub new_tab_port: String,
-    pub new_tab_password: String,
     pub show_hosts_catalog: bool,
     pub connections: Vec<Connection>,
     pub search_query: String,
@@ -795,6 +967,8 @@ pub struct AppState {
     pub show_import_modal: bool,
     pub import_payload: String,
     pub notification: Option<String>,
+    pub notification_is_error: bool,
+    pub notification_serial: u64,
     pub show_add_key_modal: bool,
     pub add_key_sheet_closing: bool,
     pub edit_key_modal: Option<EditKeyFormState>,
@@ -828,6 +1002,9 @@ pub struct AppState {
     pub is_maximized: bool,
     pub backend_path_input: String,
     pub sidebar_open: bool,
+    /// Editable form inputs, initialized once the window exists (see
+    /// `init_form_inputs`, called from main.rs right after the window opens).
+    pub form_inputs: Option<FormInputs>,
 }
 
 impl AppState {
@@ -859,13 +1036,8 @@ impl AppState {
             settings,
             spawn_opts,
             session_manager: TerminalSessionManager::new(),
-            show_new_tab_modal: false,
             show_new_tab_popover: false,
             quick_connect_query: String::new(),
-            new_tab_host: String::new(),
-            new_tab_user: "root".to_string(),
-            new_tab_port: "22".to_string(),
-            new_tab_password: String::new(),
             show_hosts_catalog: true,
             connections: Vec::new(),
             search_query: String::new(),
@@ -878,6 +1050,8 @@ impl AppState {
             show_import_modal: false,
             import_payload: String::new(),
             notification: None,
+            notification_is_error: false,
+            notification_serial: 0,
             show_add_key_modal: false,
             add_key_sheet_closing: false,
             edit_key_modal: None,
@@ -911,6 +1085,7 @@ impl AppState {
             is_maximized,
             backend_path_input,
             sidebar_open: true,
+            form_inputs: None,
         }
     }
 
@@ -1006,7 +1181,6 @@ impl AppState {
     /// Open the onboarding / New Tab page (Welcome to WebTerm).
     pub fn open_new_tab_page(&mut self, cx: &mut Context<Self>) {
         self.show_new_tab_popover = false;
-        self.show_new_tab_modal = false;
         self.show_hosts_catalog = false;
         self.active_view = View::NewTab;
         self.quick_connect_query.clear();
@@ -1094,42 +1268,9 @@ impl AppState {
         self.quick_connect_query.clear();
     }
 
-    /// Toggle new tab launcher modal.
-    pub fn toggle_new_tab_modal(&mut self, cx: &mut Context<Self>) {
-        self.show_new_tab_modal = !self.show_new_tab_modal;
-        cx.notify();
-    }
-
     /// Close new tab launcher modal.
     pub fn close_new_tab_modal(&mut self, cx: &mut Context<Self>) {
-        self.show_new_tab_modal = false;
         cx.notify();
-    }
-
-    /// Open a quick SSH tab from the new tab launcher modal inputs.
-    pub fn open_quick_ssh_tab(&mut self, cx: &mut Context<Self>) {
-        self.show_new_tab_modal = false;
-        let host = if self.new_tab_host.trim().is_empty() {
-            "localhost".to_string()
-        } else {
-            self.new_tab_host.trim().to_string()
-        };
-        let user = if self.new_tab_user.trim().is_empty() {
-            "root".to_string()
-        } else {
-            self.new_tab_user.trim().to_string()
-        };
-        let port: u16 = self.new_tab_port.trim().parse().unwrap_or(22);
-        let password = if self.new_tab_password.is_empty() {
-            String::new()
-        } else {
-            self.new_tab_password.clone()
-        };
-
-        let title = format!("{user}@{host}:{port}");
-        let req = WsConnectRequest::for_quick_connect(host, port, user, password, 80, 24);
-        self.show_hosts_catalog = false;
-        self.open_ssh_tab(req, &title, cx);
     }
 
     /// Fetch all saved connections from the backend.
@@ -1197,6 +1338,18 @@ impl AppState {
                     self.connect_to_host_with_passphrase(conn_id, Some(&cached_pass), cx);
                     return;
                 }
+                // Encrypted key without a cached passphrase: prompt first,
+                // matching the web client's needs-passphrase flow.
+                let needs_passphrase = self
+                    .ssh_keys
+                    .iter()
+                    .find(|k| &k.id == key_id)
+                    .map(|k| k.has_passphrase)
+                    .unwrap_or(false);
+                if needs_passphrase {
+                    self.prompt_passphrase_for_connection(conn_id, key_id, cx);
+                    return;
+                }
             }
         }
 
@@ -1225,45 +1378,40 @@ impl AppState {
     }
 
     /// Prompt user for passphrase before connecting with an encrypted SSH key.
-    pub fn prompt_passphrase_for_connection(
-        &mut self,
-        conn_id: &str,
-        key_id: &str,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn prompt_passphrase_for_connection(&mut self, conn_id: &str, key_id: &str, cx: &mut Context<Self>) {
         if let Some(cached_pass) = self.passphrase_cache.get(key_id).cloned() {
             self.connect_to_host_with_passphrase(conn_id, Some(&cached_pass), cx);
             return;
         }
 
         self.pending_passphrase_conn = Some((conn_id.to_string(), key_id.to_string()));
-        self.passphrase_input.clear();
         self.passphrase_error = None;
         cx.notify();
     }
 
     /// Submit passphrase entered in PassphraseModal, caching it in memory for this session.
-    pub fn submit_passphrase(&mut self, cx: &mut Context<Self>) {
+    pub fn submit_passphrase(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let (conn_id, key_id) = match self.pending_passphrase_conn.take() {
             Some(pair) => pair,
             None => return,
         };
 
-        let pass = self.passphrase_input.trim().to_string();
+        let pass = AppState::input_value(&self.inputs().passphrase, cx);
+        let pass = pass.trim().to_string();
         if !pass.is_empty() {
             self.passphrase_cache.insert(key_id, pass.clone());
         }
 
-        self.passphrase_input.clear();
+        AppState::set_input_value(&self.inputs().passphrase, "", window, cx);
         self.passphrase_error = None;
         self.connect_to_host_with_passphrase(&conn_id, Some(&pass), cx);
         cx.notify();
     }
 
     /// Cancel passphrase entry dialog.
-    pub fn cancel_passphrase(&mut self, cx: &mut Context<Self>) {
+    pub fn cancel_passphrase(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.pending_passphrase_conn = None;
-        self.passphrase_input.clear();
+        AppState::set_input_value(&self.inputs().passphrase, "", window, cx);
         self.passphrase_error = None;
         cx.notify();
     }
@@ -1295,7 +1443,7 @@ impl AppState {
     }
 
     /// Open Add SSH Key sheet (right-side push-aside panel).
-    pub fn open_add_key_modal(&mut self, cx: &mut Context<Self>) {
+    pub fn open_add_key_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.show_add_key_modal = true;
         self.add_key_sheet_closing = false;
         // Only one sheet open at a time; force-close the others instantly.
@@ -1305,8 +1453,9 @@ impl AppState {
         self.edit_key_sheet_closing = false;
         self.forward_modal = None;
         self.forward_sheet_closing = false;
-        self.new_key_name.clear();
-        self.new_key_pem.clear();
+        let inputs = self.inputs();
+        AppState::set_input_value(&inputs.new_key_name, "", window, cx);
+        AppState::set_textarea_value(&inputs.new_key_pem, "", window, cx);
         self.add_key_error = None;
         cx.notify();
     }
@@ -1328,11 +1477,14 @@ impl AppState {
     }
 
     /// Open Edit SSH Key sheet (rename / replace key material).
-    pub fn open_edit_key_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+    pub fn open_edit_key_modal(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(key) = self.ssh_keys.iter().find(|k| k.id == id) else {
             return;
         };
         self.edit_key_modal = Some(EditKeyFormState::new(key));
+        let inputs = self.inputs();
+        AppState::set_input_value(&inputs.edit_key_name, &key.name, window, cx);
+        AppState::set_textarea_value(&inputs.edit_key_pem, "", window, cx);
         self.edit_key_sheet_closing = false;
         self.connection_modal = None;
         self.connection_sheet_closing = false;
@@ -1359,7 +1511,13 @@ impl AppState {
     }
 
     /// Save Edit SSH Key form (rename and optionally replace key material).
-    pub fn save_edit_key_form(&mut self, cx: &mut Context<Self>) {
+    pub fn save_edit_key_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let name_value = AppState::input_value(&self.inputs().edit_key_name, cx);
+        let pem_value = AppState::input_value_textarea(&self.inputs().edit_key_pem, cx);
+        if let Some(f) = &mut self.edit_key_modal {
+            f.name = name_value;
+            f.new_pem = pem_value;
+        }
         let form = match &mut self.edit_key_modal {
             Some(f) => f,
             None => return,
@@ -1425,7 +1583,7 @@ impl AppState {
                                             format!("SSH key '{}' updated", key.name)
                                         };
                                         this.close_edit_key_modal(cx);
-                                        this.notification = Some(msg);
+                                        this.push_notification(msg, false, cx);
                                         this.fetch_ssh_keys(cx);
                                     }
                                     Err(e) => {
@@ -1446,7 +1604,12 @@ impl AppState {
     }
 
     /// Upload and save new SSH Key to backend pool.
-    pub fn create_ssh_key(&mut self, cx: &mut Context<Self>) {
+    pub fn create_ssh_key(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let name_value = AppState::input_value(&self.inputs().new_key_name, cx);
+        let pem_value = AppState::input_value_textarea(&self.inputs().new_key_pem, cx);
+        self.new_key_name = name_value.clone();
+        self.new_key_pem = pem_value.clone();
+
         if self.new_key_name.trim().is_empty() {
             self.add_key_error = Some("Key name is required".to_string());
             cx.notify();
@@ -1499,8 +1662,7 @@ impl AppState {
                                 match res {
                                     Ok(key) => {
                                         this.close_add_key_modal(cx);
-                                        this.notification =
-                                            Some(format!("SSH Key '{}' added", key.name));
+                                        this.push_notification(format!("SSH Key '{}' added", key.name), false, cx);
                                         this.fetch_ssh_keys(cx);
                                     }
                                     Err(e) => {
@@ -1554,10 +1716,10 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(()) => {
-                                        this.notification = Some("SSH Key deleted".to_string());
+                                        this.push_notification("SSH Key deleted".to_string(), false, cx);
                                     }
                                     Err(e) => {
-                                        this.notification = Some(format!("Delete key failed: {e}"));
+                                        this.push_notification(format!("Delete key failed: {e}"), false, cx);
                                         this.fetch_ssh_keys(cx);
                                     }
                                 }
@@ -1641,20 +1803,34 @@ impl AppState {
     }
 
     /// Open create connection modal.
-    pub fn open_create_connection_modal(&mut self, cx: &mut Context<Self>) {
+    pub fn open_create_connection_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.connection_modal = Some(ConnectionFormState::new_create());
         self.connection_sheet_closing = false;
         self.close_other_sheets_for("connection");
+        let inputs = self.inputs();
+        AppState::set_input_value(&inputs.conn_label, "", window, cx);
+        AppState::set_input_value(&inputs.conn_host, "", window, cx);
+        AppState::set_input_value(&inputs.conn_port, "22", window, cx);
+        AppState::set_input_value(&inputs.conn_username, "root", window, cx);
+        AppState::set_input_value(&inputs.conn_password, "", window, cx);
+        AppState::set_input_value(&inputs.conn_tags, "", window, cx);
         self.fetch_ssh_keys(cx);
         cx.notify();
     }
 
     /// Open edit connection sheet.
-    pub fn open_edit_connection_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+    pub fn open_edit_connection_modal(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(conn) = self.connections.iter().find(|c| c.id == id).cloned() {
             self.connection_modal = Some(ConnectionFormState::new_edit(&conn));
             self.connection_sheet_closing = false;
             self.close_other_sheets_for("connection");
+            let inputs = self.inputs();
+            AppState::set_input_value(&inputs.conn_label, &conn.label, window, cx);
+            AppState::set_input_value(&inputs.conn_host, &conn.host, window, cx);
+            AppState::set_input_value(&inputs.conn_port, &conn.port.to_string(), window, cx);
+            AppState::set_input_value(&inputs.conn_username, &conn.username, window, cx);
+            AppState::set_input_value(&inputs.conn_password, "", window, cx);
+            AppState::set_input_value(&inputs.conn_tags, &conn.tags.join(", "), window, cx);
             self.fetch_ssh_keys(cx);
 
             if let Some(client) = self.client.clone() {
@@ -1743,7 +1919,26 @@ impl AppState {
     }
 
     /// Save connection form (Create or Update).
-    pub fn save_connection_form(&mut self, cx: &mut Context<Self>) {
+    pub fn save_connection_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (label, host, port, username, password, tags) = {
+            let inputs = self.inputs();
+            (
+                AppState::input_value(&inputs.conn_label, cx),
+                AppState::input_value(&inputs.conn_host, cx),
+                AppState::input_value(&inputs.conn_port, cx),
+                AppState::input_value(&inputs.conn_username, cx),
+                AppState::input_value(&inputs.conn_password, cx),
+                AppState::input_value(&inputs.conn_tags, cx),
+            )
+        };
+        if let Some(f) = &mut self.connection_modal {
+            f.label = label;
+            f.host = host;
+            f.port = if port.trim().is_empty() { "22".to_string() } else { port };
+            f.username = if username.trim().is_empty() { "root".to_string() } else { username };
+            f.password = password;
+            f.tags = tags;
+        }
         let form = match &mut self.connection_modal {
             Some(f) => f,
             None => return,
@@ -1812,7 +2007,7 @@ impl AppState {
                                 match res {
                                     Ok(msg) => {
                                         this.close_connection_modal(cx);
-                                        this.notification = Some(msg);
+                                        this.push_notification(msg, false, cx);
                                         this.fetch_connections(cx);
                                     }
                                     Err(e) => {
@@ -1867,10 +2062,10 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(()) => {
-                                        this.notification = Some("Connection deleted".to_string());
+                                        this.push_notification("Connection deleted".to_string(), false, cx);
                                     }
                                     Err(e) => {
-                                        this.notification = Some(format!("Delete failed: {e}"));
+                                        this.push_notification(format!("Delete failed: {e}"), false, cx);
                                         this.fetch_connections(cx);
                                     }
                                 }
@@ -1928,12 +2123,12 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(count) => {
-                                        this.notification = Some(format!(
+                                        this.push_notification(format!(
                                             "Exported {count} connection(s) to webterm-connections-export.json"
-                                        ));
+                                        ), false, cx);
                                     }
                                     Err(e) => {
-                                        this.notification = Some(format!("Export failed: {e}"));
+                                        this.push_notification(format!("Export failed: {e}"), false, cx);
                                     }
                                 }
                                 cx.notify();
@@ -1965,7 +2160,7 @@ impl AppState {
         let client = match self.client.clone() {
             Some(c) => c,
             None => {
-                self.notification = Some("Backend client is not connected".to_string());
+                self.push_notification("Backend client is not connected".to_string(), false, cx);
                 cx.notify();
                 return;
             }
@@ -1979,22 +2174,19 @@ impl AppState {
                     Ok(content) => match serde_json::from_str::<Vec<Connection>>(&content) {
                         Ok(c) => c,
                         Err(e) => {
-                            self.notification =
-                                Some(format!("JSON parsing error from export file: {e}"));
+                            self.push_notification(format!("JSON parsing error from export file: {e}"), true, cx);
                             cx.notify();
                             return;
                         }
                     },
                     Err(e) => {
-                        self.notification = Some(format!("Failed to read export file: {e}"));
+                        self.push_notification(format!("Failed to read export file: {e}"), true, cx);
                         cx.notify();
                         return;
                     }
                 }
             } else {
-                self.notification = Some(
-                    "Please paste JSON array or create webterm-connections-export.json".to_string(),
-                );
+                self.push_notification("Please paste JSON array or create webterm-connections-export.json".to_string(), false, cx);
                 cx.notify();
                 return;
             }
@@ -2002,7 +2194,7 @@ impl AppState {
             match serde_json::from_str::<Vec<Connection>>(payload) {
                 Ok(c) => c,
                 Err(e) => {
-                    self.notification = Some(format!("Invalid JSON array: {e}"));
+                    self.push_notification(format!("Invalid JSON array: {e}"), true, cx);
                     cx.notify();
                     return;
                 }
@@ -2035,14 +2227,14 @@ impl AppState {
                                     Ok(result) => {
                                         this.show_import_modal = false;
                                         this.import_payload.clear();
-                                        this.notification = Some(format!(
+                                        this.push_notification(format!(
                                             "Import finished: {} imported, {} skipped",
                                             result.imported, result.skipped
-                                        ));
+                                        ), false, cx);
                                         this.fetch_connections(cx);
                                     }
                                     Err(e) => {
-                                        this.notification = Some(format!("Import error: {e}"));
+                                        this.push_notification(format!("Import error: {e}"), true, cx);
                                     }
                                 }
                                 cx.notify();
@@ -2055,7 +2247,40 @@ impl AppState {
         .detach();
     }
 
-    /// Dismiss active notification banner.
+    /// Set the notification toast; auto-dismisses after 4 seconds unless a
+    /// newer toast replaces it first.
+    pub fn push_notification(&mut self, message: String, is_error: bool, cx: &mut Context<Self>) {
+        self.notification_serial += 1;
+        let serial = self.notification_serial;
+        self.notification = Some(message);
+        self.notification_is_error = is_error;
+        let view_weak = cx.entity().downgrade();
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                cx_handle
+                    .background_executor()
+                    .timer(std::time::Duration::from_millis(4000))
+                    .await;
+                cx_handle.update(|cx: &mut App| {
+                    if let Some(app) = view_weak.upgrade() {
+                        app.update(cx, |this, cx| {
+                            if this.notification_serial == serial {
+                                this.notification = None;
+                                this.notification_is_error = false;
+                                cx.notify();
+                            }
+                        });
+                    }
+                });
+            }
+        })
+        .detach();
+        cx.notify();
+    }
+
+    /// Dismiss the notification toast.
     pub fn dismiss_notification(&mut self, cx: &mut Context<Self>) {
         self.notification = None;
         cx.notify();
@@ -2781,14 +3006,12 @@ impl AppState {
         if trimmed.is_empty() {
             self.settings.backend_path = None;
             self.backend_path_input.clear();
-            self.notification = Some("Reset backend path to default bundled binary".to_string());
+            self.push_notification("Reset backend path to default bundled binary".to_string(), false, cx);
         } else {
             self.settings.backend_path = Some(std::path::PathBuf::from(trimmed));
             self.backend_path_input = trimmed.to_string();
-            self.notification = Some(
-                "Backend path override saved. Restart app to launch with updated binary."
-                    .to_string(),
-            );
+            self.push_notification("Backend path override saved. Restart app to launch with updated binary."
+                    .to_string(), false, cx);
         }
         let _ = self.settings.save();
         cx.notify();
@@ -2799,7 +3022,7 @@ impl AppState {
         self.settings.backend_path = None;
         self.backend_path_input.clear();
         let _ = self.settings.save();
-        self.notification = Some("Reset backend path to default bundled binary".to_string());
+        self.push_notification("Reset backend path to default bundled binary".to_string(), false, cx);
         cx.notify();
     }
 
@@ -3077,7 +3300,7 @@ impl AppState {
         let current_path = self.sftp_pane(pane).current_path.clone();
         let full_path = join_path(&current_path, filename);
         cx.write_to_clipboard(ClipboardItem::new_string(full_path.clone()));
-        self.notification = Some(format!("Copied '{}' to clipboard", full_path));
+        self.push_notification(format!("Copied '{}' to clipboard", full_path), false, cx);
         cx.notify();
     }
 
@@ -3085,7 +3308,7 @@ impl AppState {
     pub fn sftp_transfer_selected(&mut self, from_pane: SftpActivePane, cx: &mut Context<Self>) {
         let targets: Vec<String> = self.sftp_pane(from_pane).selected.iter().cloned().collect();
         if targets.is_empty() {
-            self.notification = Some("No files selected to transfer".to_string());
+            self.push_notification("No files selected to transfer".to_string(), false, cx);
             cx.notify();
             return;
         }
@@ -3097,7 +3320,7 @@ impl AppState {
     }
 
     /// Handle SFTP keyboard shortcuts: Enter, Backspace, Alt+Up, F2, Delete, F5.
-    pub fn sftp_handle_key(&mut self, key: &str, is_alt: bool, cx: &mut Context<Self>) {
+    pub fn sftp_handle_key(&mut self, key: &str, is_alt: bool, window: &mut Window, cx: &mut Context<Self>) {
         let focused = self.sftp_manager.focused_pane;
         match key {
             "f5" => {
@@ -3107,7 +3330,7 @@ impl AppState {
                 let pane_state = self.sftp_pane(focused);
                 if pane_state.selected.len() == 1 {
                     let target = pane_state.selected.iter().next().unwrap().clone();
-                    self.sftp_open_rename_modal(focused, target, cx);
+                    self.sftp_open_rename_modal(focused, target, window, cx);
                 }
             }
             "delete" => {
@@ -3176,31 +3399,19 @@ impl AppState {
         cx.notify();
     }
 
-    /// Set modal input text.
-    pub fn sftp_set_modal_input(&mut self, text: String, cx: &mut Context<Self>) {
-        match &mut self.sftp_manager.modal {
-            Some(SftpModalState::NewFolder { name, error, .. }) => {
-                *name = text;
-                *error = None;
-            }
-            Some(SftpModalState::Rename {
-                new_name, error, ..
-            }) => {
-                *new_name = text;
-                *error = None;
-            }
-            _ => {}
-        }
-        cx.notify();
-    }
-
     /// Open modal for creating a new folder in a pane.
-    pub fn sftp_open_new_folder_modal(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+    pub fn sftp_open_new_folder_modal(
+        &mut self,
+        pane: SftpActivePane,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.sftp_manager.modal = Some(SftpModalState::NewFolder {
             pane,
             name: "new-folder".to_string(),
             error: None,
         });
+        AppState::set_input_value(&self.inputs().sftp_modal_name, "new-folder", window, cx);
         cx.notify();
     }
 
@@ -3209,8 +3420,10 @@ impl AppState {
         &mut self,
         pane: SftpActivePane,
         old_name: String,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        AppState::set_input_value(&self.inputs().sftp_modal_name, &old_name, window, cx);
         self.sftp_manager.modal = Some(SftpModalState::Rename {
             pane,
             new_name: old_name.clone(),
@@ -3292,13 +3505,11 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(_) => {
-                                        this.notification =
-                                            Some(format!("Directory '{}' created", name_for_notif));
+                                        this.push_notification(format!("Directory '{}' created", name_for_notif), false, cx);
                                         this.sftp_load_pane(pane, cx);
                                     }
                                     Err(err) => {
-                                        this.notification =
-                                            Some(format!("Failed to create folder: {err}"));
+                                        this.push_notification(format!("Failed to create folder: {err}"), true, cx);
                                     }
                                 }
                                 cx.notify();
@@ -3375,15 +3586,14 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(_) => {
-                                        this.notification = Some(format!(
+                                        this.push_notification(format!(
                                             "Renamed '{}' to '{}'",
                                             old_label, new_label
-                                        ));
+                                        ), false, cx);
                                         this.sftp_load_pane(pane, cx);
                                     }
                                     Err(err) => {
-                                        this.notification =
-                                            Some(format!("Failed to rename: {err}"));
+                                        this.push_notification(format!("Failed to rename: {err}"), true, cx);
                                     }
                                 }
                                 cx.notify();
@@ -3444,13 +3654,12 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(deleted) => {
-                                        this.notification =
-                                            Some(format!("Deleted {} item(s)", deleted));
+                                        this.push_notification(format!("Deleted {} item(s)", deleted), false, cx);
                                         this.sftp_clear_selection(pane, cx);
                                         this.sftp_load_pane(pane, cx);
                                     }
                                     Err(err) => {
-                                        this.notification = Some(err);
+                                        this.push_notification(err, false, cx);
                                         this.sftp_load_pane(pane, cx);
                                     }
                                 }
@@ -3932,20 +4141,33 @@ impl AppState {
     }
 
     /// Open create port forward modal.
-    pub fn open_create_forward_modal(&mut self, cx: &mut Context<Self>) {
+    pub fn open_create_forward_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let default_conn_id = self.connections.first().map(|c| c.id.clone());
         self.forward_modal = Some(ForwardFormState::new_create(default_conn_id));
         self.forward_sheet_closing = false;
         self.close_other_sheets_for("forward");
+        let inputs = self.inputs();
+        AppState::set_input_value(&inputs.fwd_name, "", window, cx);
+        AppState::set_input_value(&inputs.fwd_local_port, "", window, cx);
+        AppState::set_input_value(&inputs.fwd_remote_port, "", window, cx);
         cx.notify();
     }
 
     /// Open edit port forward sheet.
-    pub fn open_edit_forward_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+    pub fn open_edit_forward_modal(
+        &mut self,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(forward) = self.forwards.iter().find(|f| f.id == id).cloned() {
             self.forward_modal = Some(ForwardFormState::new_edit(&forward));
             self.forward_sheet_closing = false;
             self.close_other_sheets_for("forward");
+            let inputs = self.inputs();
+            AppState::set_input_value(&inputs.fwd_name, &forward.name, window, cx);
+            AppState::set_input_value(&inputs.fwd_local_port, &forward.local_port.to_string(), window, cx);
+            AppState::set_input_value(&inputs.fwd_remote_port, &forward.remote_port.to_string(), window, cx);
             cx.notify();
         }
     }
@@ -3967,7 +4189,20 @@ impl AppState {
     }
 
     /// Save port forward modal form (Create or Update).
-    pub fn save_forward_form(&mut self, cx: &mut Context<Self>) {
+    pub fn save_forward_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (name, local_port, remote_port) = {
+            let inputs = self.inputs();
+            (
+                AppState::input_value(&inputs.fwd_name, cx),
+                AppState::input_value(&inputs.fwd_local_port, cx),
+                AppState::input_value(&inputs.fwd_remote_port, cx),
+            )
+        };
+        if let Some(f) = &mut self.forward_modal {
+            f.name = name;
+            f.local_port = local_port;
+            f.remote_port = remote_port;
+        }
         let form = match &mut self.forward_modal {
             Some(f) => f,
             None => return,
@@ -4013,8 +4248,7 @@ impl AppState {
                                             match res {
                                                 Ok(f) => {
                                                     this.close_forward_modal(cx);
-                                                    this.notification =
-                                                        Some(format!("Port forward '{}' created successfully", f.name));
+                                                    this.push_notification(format!("Port forward '{}' created successfully", f.name), false, cx);
                                                     this.fetch_forwards(cx);
                                                 }
                                                 Err(err) => {
@@ -4068,8 +4302,7 @@ impl AppState {
                                             match res {
                                                 Ok(f) => {
                                                     this.close_forward_modal(cx);
-                                                    this.notification =
-                                                        Some(format!("Port forward '{}' updated successfully", f.name));
+                                                    this.push_notification(format!("Port forward '{}' updated successfully", f.name), false, cx);
                                                     this.fetch_forwards(cx);
                                                 }
                                                 Err(err) => {
@@ -4140,17 +4373,17 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(status) => {
-                                        this.notification = Some(format!(
+                                        this.push_notification(format!(
                                             "Port forward '{}' is now {}",
                                             forward.name, status
-                                        ));
+                                        ), false, cx);
                                         this.fetch_forwards(cx);
                                     }
                                     Err(err) => {
-                                        this.notification = Some(format!(
+                                        this.push_notification(format!(
                                             "Failed to toggle forward '{}': {err}",
                                             forward.name
-                                        ));
+                                        ), true, cx);
                                         this.fetch_forwards(cx);
                                     }
                                 }
@@ -4214,15 +4447,14 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(_) => {
-                                        this.notification =
-                                            Some(format!("Port forward '{}' deleted", name_str));
+                                        this.push_notification(format!("Port forward '{}' deleted", name_str), false, cx);
                                         this.fetch_forwards(cx);
                                     }
                                     Err(err) => {
-                                        this.notification = Some(format!(
+                                        this.push_notification(format!(
                                             "Failed to delete forward '{}': {err}",
                                             name_str
-                                        ));
+                                        ), true, cx);
                                     }
                                 }
                                 cx.notify();

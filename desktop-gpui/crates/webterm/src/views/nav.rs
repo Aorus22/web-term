@@ -6,7 +6,6 @@ use crate::actions::{
 };
 use crate::app_state::{AppState, View};
 use crate::views::hosts::render_hosts_view;
-use crate::views::new_tab_modal::render_new_tab_modal;
 use crate::views::reconnect_banner::render_reconnect_banner;
 use crate::views::tab_strip::render_tab_strip;
 use gpui::*;
@@ -34,14 +33,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let _muted_text = app.muted_text();
     let border_color = app.border_color();
 
-    let show_modal = app.show_new_tab_modal;
     let content_pane = render_content_pane(app, active_view, is_dark, cx);
-
-    let modal_overlay = if show_modal {
-        Some(render_new_tab_modal(app, cx))
-    } else {
-        None
-    };
 
     let import_modal_overlay = if app.show_import_modal {
         Some(crate::views::connection_modal::render_import_modal(app, cx))
@@ -378,7 +370,6 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         .child(render_tab_strip(app, cx)),
                 ),
         )
-        .children(modal_overlay)
         .children(import_modal_overlay)
         .children(passphrase_modal_overlay)
         .children(delete_forward_modal_overlay)

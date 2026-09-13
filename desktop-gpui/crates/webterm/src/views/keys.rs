@@ -2,7 +2,8 @@
 
 use crate::app_state::AppState;
 use crate::views::sheet::{
-    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_panel,
+    sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_input_row, sheet_panel,
+    sheet_textarea_row,
 };
 use gpui::*;
 
@@ -80,8 +81,8 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         .cursor_pointer()
                         .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
                         .child("Upload Key")
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                            this.open_add_key_modal(cx);
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                            this.open_add_key_modal(window, cx);
                         })),
                 ),
         )
@@ -144,8 +145,8 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         .text_color(primary_fg)
                         .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
                         .child("Upload First Key")
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                            this.open_add_key_modal(cx);
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                            this.open_add_key_modal(window, cx);
                         })),
                 )
                 .into_any_element()
@@ -281,8 +282,8 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                                         .size(px(13.0))
                                                         .text_color(muted_text),
                                                 )
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    this.open_edit_key_modal(&key_id_edit, cx);
+                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                    this.open_edit_key_modal(&key_id_edit, window, cx);
                                                 })),
                                         )
                                         // Delete icon button
@@ -324,23 +325,9 @@ const ED25519_SAMPLE_PEM: &str = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza
 /// Render the Upload SSH Key sheet (right-side push-aside panel).
 pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let is_dark = app.is_dark();
-    let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let input_bg = app.bg_color();
     let tag_bg = app.muted_bg();
-
-    let name_display: SharedString = if app.new_key_name.is_empty() {
-        "e.g. id_ed25519_deploy".into()
-    } else {
-        app.new_key_name.clone().into()
-    };
-
-    let pem_display: SharedString = if app.new_key_pem.is_empty() {
-        "Paste OpenSSH private key PEM content here...".into()
-    } else {
-        format!("{} characters entered", app.new_key_pem.len()).into()
-    };
 
     sheet_panel(app)
         .child(sheet_header(
@@ -359,58 +346,19 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
         .child(
             sheet_body()
                 // Key Name
+                .child(sheet_input_row(app, "Key Name *", &app.inputs().new_key_name))
+                // SSH Private Key PEM
                 .child(
                     div()
                         .flex()
                         .flex_col()
                         .gap_1()
-                        .child(div().text_xs().text_color(muted_text).child("Key Name *"))
-                        .child(
-                            div()
-                                .px_3()
-                                .py_1p5()
-                                .rounded_md()
-                                .bg(input_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_sm()
-                                .text_color(if app.new_key_name.is_empty() {
-                                    muted_text
-                                } else {
-                                    text_color
-                                })
-                                .child(name_display),
-                        ),
-                )
-                // Private Key PEM
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(muted_text)
-                                .child("SSH Private Key *"),
-                        )
-                        .child(
-                            div()
-                                .p_3()
-                                .h(px(240.0))
-                                .rounded_md()
-                                .bg(input_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_xs()
-                                .font_family("JetBrains Mono")
-                                .text_color(if app.new_key_pem.is_empty() {
-                                    muted_text
-                                } else {
-                                    text_color
-                                })
-                                .child(pem_display),
-                        )
+                        .child(sheet_textarea_row(
+                            app,
+                            "SSH Private Key *",
+                            &app.inputs().new_key_pem,
+                            240.0,
+                        ))
                         .child(
                             div()
                                 .flex()
@@ -438,9 +386,19 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .child("Load Test Ed25519 Key")
                                         .on_mouse_down(
                                             MouseButton::Left,
-                                            cx.listener(|this, _, _window, cx| {
-                                                this.new_key_name = "test_ed25519".to_string();
-                                                this.new_key_pem = ED25519_SAMPLE_PEM.to_string();
+                                            cx.listener(|this, _, window, cx| {
+                                                AppState::set_input_value(
+                                                    &this.inputs().new_key_name,
+                                                    "test_ed25519",
+                                                    window,
+                                                    cx,
+                                                );
+                                                AppState::set_textarea_value(
+                                                    &this.inputs().new_key_pem,
+                                                    ED25519_SAMPLE_PEM,
+                                                    window,
+                                                    cx,
+                                                );
                                                 cx.notify();
                                             }),
                                         ),
@@ -453,8 +411,8 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
             cx,
             "Cancel",
             "Upload Key",
-            AppState::close_add_key_modal,
-            AppState::create_ssh_key,
+            |this, _window, cx| this.close_add_key_modal(cx),
+            |this, window, cx| this.create_ssh_key(window, cx),
         ))
         .into_any_element()
 }
@@ -462,29 +420,14 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
 /// Render the Edit SSH Key sheet (rename / replace key material).
 pub fn render_edit_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let is_dark = app.is_dark();
-    let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let input_bg = app.bg_color();
     let tag_bg = app.muted_bg();
 
     let Some(form) = app.edit_key_modal.clone() else {
         return div().into_any_element();
     };
-
-    let name_display: SharedString = if form.name.is_empty() {
-        "e.g. id_ed25519_deploy".into()
-    } else {
-        form.name.clone().into()
-    };
-
-    let pem_display: SharedString = if form.new_pem.is_empty() {
-        "(leave empty to keep current key)".into()
-    } else {
-        format!("{} characters entered", form.new_pem.len()).into()
-    };
-
-    let submit_label = "Save Changes";
+    let _ = form;
 
     sheet_panel(app)
         .child(sheet_header(
@@ -494,87 +437,77 @@ pub fn render_edit_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> 
             "Update the name for your SSH key. You can also upload a new key file to replace the existing one.",
             AppState::close_edit_key_modal,
         ))
-        .children(form
-            .error_message
-            .map(|err| sheet_error_banner(app, err.into()).into_any_element()))
+        .children(
+            app.edit_key_modal
+                .as_ref()
+                .and_then(|f| f.error_message.clone())
+                .map(|err| sheet_error_banner(app, err.into()).into_any_element()),
+        )
         // Scrollable form body
-        .child(sheet_body()
-                        // Key Name
+        .child(
+            sheet_body()
+                // Key Name
+                .child(sheet_input_row(app, "Key Name *", &app.inputs().edit_key_name))
+                // Replace Key PEM (optional)
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(sheet_textarea_row(
+                            app,
+                            "Replace Key File (optional)",
+                            &app.inputs().edit_key_pem,
+                            200.0,
+                        ))
                         .child(
                             div()
                                 .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Key Name *"))
+                                .flex_row()
+                                .items_center()
+                                .gap_2()
+                                .pt_1()
+                                .child(div().text_xs().text_color(muted_text).child("Quick fill:"))
                                 .child(
                                     div()
-                                        .px_3()
-                                        .py_1p5()
+                                        .px_2()
+                                        .py_0p5()
                                         .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
-                                        .text_sm()
-                                        .text_color(if form.name.is_empty() { muted_text } else { text_color })
-                                        .child(name_display),
-                                ),
-                        )
-                        // Replace Key PEM (optional)
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .child(div().text_xs().text_color(muted_text).child("Replace Key File (optional)"))
-                                .child(
-                                    div()
-                                        .p_3()
-                                        .h(px(200.0))
-                                        .rounded_md()
-                                        .bg(input_bg)
-                                        .border_1()
-                                        .border_color(border_color)
+                                        .bg(tag_bg)
+                                        .hover(|s| {
+                                            s.bg(if is_dark {
+                                                rgb(0x52525b)
+                                            } else {
+                                                rgb(0xcbd5e1)
+                                            })
+                                        })
+                                        .cursor_pointer()
                                         .text_xs()
-                                        .font_family("JetBrains Mono")
-                                        .text_color(if form.new_pem.is_empty() { muted_text } else { text_color })
-                                        .child(pem_display),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_row()
-                                        .items_center()
-                                        .gap_2()
-                                        .pt_1()
-                                        .child(div().text_xs().text_color(muted_text).child("Quick fill:"))
-                                        .child(
-                                            div()
-                                                .px_2()
-                                                .py_0p5()
-                                                .rounded_md()
-                                                .bg(tag_bg)
-                                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
-                                                .cursor_pointer()
-                                                .text_xs()
-                                                .text_color(text_color)
-                                                .child("Load Test Ed25519 Key")
-                                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                                    if let Some(f) = &mut this.edit_key_modal {
-                                                        f.new_pem = ED25519_SAMPLE_PEM.to_string();
-                                                        cx.notify();
-                                                    }
-                                                })),
+                                        .text_color(text_color)
+                                        .child("Load Test Ed25519 Key")
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(|this, _, window, cx| {
+                                                AppState::set_textarea_value(
+                                                    &this.inputs().edit_key_pem,
+                                                    ED25519_SAMPLE_PEM,
+                                                    window,
+                                                    cx,
+                                                );
+                                                cx.notify();
+                                            }),
                                         ),
                                 ),
                         ),
+                ),
         )
         .child(sheet_footer(
             app,
             cx,
             "Cancel",
-            submit_label,
-            AppState::close_edit_key_modal,
-            AppState::save_edit_key_form,
+            "Save Changes",
+            |this, _window, cx| this.close_edit_key_modal(cx),
+            |this, window, cx| this.save_edit_key_form(window, cx),
         ))
         .into_any_element()
 }

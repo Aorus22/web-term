@@ -1,6 +1,8 @@
 //! SFTP Dual-Pane File Manager view: directory browsing, breadcrumbs, sorting, and source selection.
 
 use gpui::*;
+use gpui_component::input::Input;
+use gpui_component::Sizable;
 use webterm_backend_client::SftpFileInfo;
 
 use crate::app_state::{
@@ -56,10 +58,10 @@ pub fn render_sftp_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     div()
         .track_focus(&focus_handle)
         .key_context("Sftp")
-        .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _window, cx| {
+        .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
             let key = ev.keystroke.key.to_lowercase();
             let is_alt = ev.keystroke.modifiers.alt;
-            this.sftp_handle_key(&key, is_alt, cx);
+            this.sftp_handle_key(&key, is_alt, window, cx);
         }))
         .relative()
         .flex()
@@ -1210,9 +1212,9 @@ fn render_actions_dropdown(
                 .text_color(text_color)
                 .child(svg().data(crate::icons::FOLDER_PLUS_SVG).size(px(13.0)).text_color(muted_text))
                 .child("New Folder")
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                     this.sftp_pane_mut(pane).show_actions_menu = false;
-                    this.sftp_open_new_folder_modal(pane, cx);
+                    this.sftp_open_new_folder_modal(pane, window, cx);
                 })),
         )
         // Separator
@@ -1234,10 +1236,10 @@ fn render_actions_dropdown(
                 .text_color(text_color)
                 .child(svg().data(crate::icons::EDIT_SVG).size(px(13.0)).text_color(muted_text))
                 .child("Rename")
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                     if let Some(ref item) = single_item {
                         this.sftp_pane_mut(pane).show_actions_menu = false;
-                        this.sftp_open_rename_modal(pane, item.clone(), cx);
+                        this.sftp_open_rename_modal(pane, item.clone(), window, cx);
                     }
                 })),
         )
@@ -1630,20 +1632,10 @@ pub fn render_sftp_modal(
                             )
                             // Input field
                             .child(
-                                div()
-                                    .px_3()
-                                    .py_2()
-                                    .rounded_md()
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(border_color)
-                                    .text_sm()
-                                    .text_color(text_color)
-                                    .child(if folder_name.is_empty() {
-                                        "new-folder".to_string()
-                                    } else {
-                                        folder_name.clone()
-                                    }),
+                                Input::new(&app.inputs().sftp_modal_name)
+                                    .with_size(gpui_component::Size::Small)
+                                    .w_full()
+                                    .text_size(px(13.0)),
                             )
                             // Quick presets
                             .child(
@@ -1664,8 +1656,8 @@ pub fn render_sftp_modal(
                                             .text_xs()
                                             .text_color(text_color)
                                             .child(format!("+ {}", p))
-                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                this.sftp_set_modal_input(p.clone(), cx);
+                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                AppState::set_input_value(&this.inputs().sftp_modal_name, &p, window, cx);
                                             }))
                                     })),
                             )
@@ -1716,8 +1708,9 @@ pub fn render_sftp_modal(
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child("Create")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                this.sftp_create_folder(pane, &folder_name, cx);
+                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                let name = AppState::input_value(&this.inputs().sftp_modal_name, cx);
+                                                this.sftp_create_folder(pane, &name, cx);
                                             })),
                                     ),
                             ),
@@ -1763,20 +1756,10 @@ pub fn render_sftp_modal(
                             )
                             // Input field
                             .child(
-                                div()
-                                    .px_3()
-                                    .py_2()
-                                    .rounded_md()
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(border_color)
-                                    .text_sm()
-                                    .text_color(text_color)
-                                    .child(if new_name_clone.is_empty() {
-                                        "new-name".to_string()
-                                    } else {
-                                        new_name_clone.clone()
-                                    }),
+                                Input::new(&app.inputs().sftp_modal_name)
+                                    .with_size(gpui_component::Size::Small)
+                                    .w_full()
+                                    .text_size(px(13.0)),
                             )
                             // Error banner
                             .children(err_opt.map(|err| {
@@ -1825,8 +1808,9 @@ pub fn render_sftp_modal(
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child("Rename")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                this.sftp_rename_entry(pane, &old_name_clone, &new_name_clone, cx);
+                                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                let new_name = AppState::input_value(&this.inputs().sftp_modal_name, cx);
+                                                this.sftp_rename_entry(pane, &old_name_clone, &new_name, cx);
                                             })),
                                     ),
                             ),
@@ -2065,9 +2049,9 @@ pub fn render_sftp_context_menu(
                             .text_color(text_color)
                             .child(svg().data(crate::icons::EDIT_SVG).size(px(12.0)).text_color(muted_text))
                             .child("Rename")
-                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                                 this.sftp_close_context_menu(cx);
-                                this.sftp_open_rename_modal(pane, fn_rename.clone(), cx);
+                                this.sftp_open_rename_modal(pane, fn_rename.clone(), window, cx);
                             })),
                     )
                     // 3. Delete

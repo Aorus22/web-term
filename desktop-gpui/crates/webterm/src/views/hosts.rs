@@ -230,8 +230,8 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                         .text_color(primary_fg),
                                 )
                                 .child("New Host")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.open_create_connection_modal(cx);
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    this.open_create_connection_modal(window, cx);
                                 })),
                         ),
                 ),
@@ -473,8 +473,8 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                                 .size(px(13.0))
                                                                 .text_color(muted_text),
                                                         )
-                                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                            this.open_edit_connection_modal(&conn_id_edit, cx);
+                                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                            this.open_edit_connection_modal(&conn_id_edit, window, cx);
                                                         })),
                                                 )
                                                 // Delete icon button

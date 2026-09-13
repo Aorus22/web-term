@@ -1,6 +1,8 @@
 //! Onboarding / New Tab Page ("Welcome to WebTerm") matching fe/src/components/NewTabView.tsx 1:1.
 
 use gpui::*;
+use gpui_component::input::Input;
+use gpui_component::Sizable;
 use crate::app_state::AppState;
 use crate::icons::{KEY_SVG, PLUS_SVG, SEARCH_SVG, TAG_SVG, TERMINAL_SVG};
 
@@ -105,19 +107,12 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                         .text_color(muted_text),
                                 )
                                 .child(
-                                    div()
-                                        .flex_1()
-                                        .text_sm()
-                                        .text_color(if app.quick_connect_query.is_empty() {
-                                            muted_text
-                                        } else {
-                                            text_color
-                                        })
-                                        .child(if app.quick_connect_query.is_empty() {
-                                            "Search or user@host...".to_string()
-                                        } else {
-                                            app.quick_connect_query.clone()
-                                        }),
+                                    div().flex_1().child(
+                                        Input::new(&app.inputs().quick_connect)
+                                            .with_size(gpui_component::Size::Small)
+                                            .w_full()
+                                            .text_size(px(13.0)),
+                                    ),
                                 ),
                         )
                         // Group: New Connection
@@ -157,8 +152,8 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                         .text_color(text_color)
                                         .child("Create New..."),
                                 )
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.open_create_connection_modal(cx);
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    this.open_create_connection_modal(window, cx);
                                 })),
                         )
                         // Group: Saved Connections (if any)
@@ -350,8 +345,8 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                                 .text_color(muted_text),
                                         )
                                         .child("New Connection")
-                                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                            this.open_create_connection_modal(cx);
+                                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                            this.open_create_connection_modal(window, cx);
                                         })),
                                 ),
                         )

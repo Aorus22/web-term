@@ -1,6 +1,9 @@
 //! Session-scoped SSH Key Passphrase prompt dialog.
 
 use gpui::*;
+use gpui_component::input::Input;
+use gpui_component::Sizable;
+
 use crate::app_state::AppState;
 
 /// Render the passphrase prompt dialog overlay for an encrypted SSH key.
@@ -10,16 +13,9 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
     let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let input_bg = app.bg_color();
     let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
     let primary_fg = app.primary_fg();
-
-    let pass_display: SharedString = if app.passphrase_input.is_empty() {
-        "Enter private key passphrase...".into()
-    } else {
-        "●".repeat(app.passphrase_input.len()).into()
-    };
 
     div()
         .absolute()
@@ -29,8 +25,8 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
         .justify_center()
         .bg(rgba(0x00000088))
         // Dismiss on background click
-        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-            this.cancel_passphrase(cx);
+        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+            this.cancel_passphrase(window, cx);
         }))
         // Modal Card
         .child(
@@ -79,8 +75,8 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                 .cursor_pointer()
                                 .text_color(muted_text)
                                 .child(svg().data(crate::icons::X_SVG).size(px(14.0)).text_color(muted_text))
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.cancel_passphrase(cx);
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    this.cancel_passphrase(window, cx);
                                 })),
                         ),
                 )
@@ -117,16 +113,10 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                         .gap_1()
                         .child(div().text_xs().text_color(muted_text).child("Passphrase"))
                         .child(
-                            div()
-                                .px_3()
-                                .py_2()
-                                .rounded_md()
-                                .bg(input_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_sm()
-                                .text_color(if app.passphrase_input.is_empty() { muted_text } else { text_color })
-                                .child(pass_display),
+                            Input::new(&app.inputs().passphrase)
+                                .with_size(gpui_component::Size::Small)
+                                .w_full()
+                                .text_size(px(13.0)),
                         ),
                 )
                 // Action Buttons
@@ -148,8 +138,8 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                 .text_sm()
                                 .text_color(text_color)
                                 .child("Cancel")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.cancel_passphrase(cx);
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    this.cancel_passphrase(window, cx);
                                 })),
                         )
                         .child(
@@ -164,8 +154,8 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(primary_fg)
                                 .child("Unlock & Connect")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.submit_passphrase(cx);
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                    this.submit_passphrase(window, cx);
                                 })),
                         ),
                 ),
