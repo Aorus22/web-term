@@ -2743,7 +2743,6 @@ pub fn render_sftp_modal(
                     .into_any_element(),
             )
         }
-        _ => None,
     }
 }
 
