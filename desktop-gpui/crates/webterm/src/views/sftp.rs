@@ -1521,6 +1521,21 @@ fn render_transfers_drawer(
                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                 this.sftp_toggle_transfers_drawer(cx);
                             })),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_1()
+                            .cursor_pointer()
+                            .text_xs()
+                            .text_color(muted_text)
+                            .hover(|s| s.text_color(text_color))
+                            .child("Clear History")
+                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                this.sftp_clear_transfer_history(cx);
+                            })),
                     ),
             )
             .child(
@@ -1552,9 +1567,8 @@ fn render_transfers_drawer(
                         };
                         div()
                             .flex()
-                            .flex_row()
-                            .items_center()
-                            .justify_between()
+                            .flex_col()
+                            .gap_0p5()
                             .px_2()
                             .py_1()
                             .rounded_sm()
@@ -1563,14 +1577,41 @@ fn render_transfers_drawer(
                             .child(
                                 div()
                                     .flex()
-                                    .flex_col()
-                                    .child(div().font_weight(FontWeight::MEDIUM).child(item.name.clone()))
-                                    .child(div().text_color(muted_text).child(format!("Status: {}", item.status))),
+                                    .flex_row()
+                                    .items_center()
+                                    .justify_between()
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .child(div().font_weight(FontWeight::MEDIUM).child(item.name.clone()))
+                                            .child(div().text_color(muted_text).child(format!("Status: {}", item.status))),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(muted_text)
+                                            .child(format!(
+                                                "{} / {} ({}%)",
+                                                format_file_size(item.bytes_transferred),
+                                                format_file_size(item.total_bytes),
+                                                pct
+                                            )),
+                                    ),
                             )
+                            // Progress bar
                             .child(
                                 div()
-                                    .text_color(muted_text)
-                                    .child(format!("{} / {} ({}%)", format_file_size(item.bytes_transferred), format_file_size(item.total_bytes), pct)),
+                                    .w_full()
+                                    .h(px(3.0))
+                                    .rounded_full()
+                                    .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xcbd5e1) })
+                                    .child(
+                                        div()
+                                            .h_full()
+                                            .rounded_full()
+                                            .bg(rgb(0x38bdf8))
+                                            .w(px((pct as f32 / 100.0) * 720.0)),
+                                    ),
                             )
                             .into_any_element()
                     })),
@@ -1811,6 +1852,110 @@ pub fn render_sftp_modal(
                                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                                                 let new_name = AppState::input_value(&this.inputs().sftp_modal_name, cx);
                                                 this.sftp_rename_entry(pane, &old_name_clone, &new_name, cx);
+                                            })),
+                                    ),
+                            ),
+                    )
+                    .into_any_element(),
+            )
+        }
+        SftpModalState::Conflict {
+            conflict_name,
+            remaining_transfers,
+            ..
+        } => {
+            let conflict_name = conflict_name.clone();
+            let count = remaining_transfers.len();
+            Some(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .bg(rgba(0x00000088))
+                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                        this.sftp_conflict_cancel(cx);
+                    }))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .w(px(420.0))
+                            .rounded_xl()
+                            .bg(card_bg)
+                            .border_1()
+                            .border_color(border_color)
+                            .p_6()
+                            .gap_3()
+                            .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(text_color)
+                                    .child("Replace existing file?"),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted_text)
+                                    .child(format!(
+                                        "\"{}\" already exists in the destination.{}",
+                                        conflict_name,
+                                        if count > 1 {
+                                            format!(" ({} items total)", count)
+                                        } else {
+                                            String::new()
+                                        }
+                                    )),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .justify_end()
+                                    .gap_2()
+                                    .mt_2()
+                                    .child(
+                                        div()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .child("Cancel")
+                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                                this.sftp_conflict_cancel(cx);
+                                            })),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(if is_dark { rgb(0x3f3f46) } else { rgb(0xe2e8f0) })
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .child("Keep Both")
+                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                                this.sftp_conflict_keep_both(cx);
+                                            })),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_3()
+                                            .py_1p5()
+                                            .rounded_md()
+                                            .bg(if is_dark { rgb(0x0284c7) } else { rgb(0x38bdf8) })
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(rgb(0xffffff))
+                                            .child("Overwrite")
+                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
+                                                this.sftp_conflict_overwrite(cx);
                                             })),
                                     ),
                             ),

@@ -662,6 +662,8 @@ pub struct SftpTransferItem {
     pub total_bytes: i64,
     pub status: String,
     pub error: Option<String>,
+    /// For cut/paste: delete the source entry once the transfer completes.
+    pub delete_source_after: Option<(String, String)>,
 }
 
 impl From<SftpTransferStatus> for SftpTransferItem {
@@ -675,6 +677,7 @@ impl From<SftpTransferStatus> for SftpTransferItem {
             total_bytes: st.total_bytes,
             status: st.status,
             error: st.error,
+            delete_source_after: None,
         }
     }
 }
@@ -695,6 +698,14 @@ pub struct SftpDraggedItem {
     pub filenames: Vec<String>,
 }
 
+/// File clipboard for cut/copy/paste between (or within) SFTP panes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SftpClipboard {
+    pub cut: bool,
+    pub source_pane: SftpActivePane,
+    pub items: Vec<String>,
+}
+
 /// Manager state orchestrating both panes, modals, and transfers.
 #[derive(Debug, Clone)]
 pub struct SftpManager {
@@ -705,6 +716,10 @@ pub struct SftpManager {
     pub context_menu: Option<SftpContextMenu>,
     pub transfers: Vec<SftpTransferItem>,
     pub transfers_drawer_open: bool,
+    pub clipboard: Option<SftpClipboard>,
+    pub transfer_poll_active: bool,
+    pub split_ratio: f32,
+    pub split_dragging: bool,
     pub focus_handle: Option<FocusHandle>,
 }
 
@@ -743,6 +758,10 @@ impl Default for SftpManager {
             context_menu: None,
             transfers: Vec::new(),
             transfers_drawer_open: false,
+            clipboard: None,
+            transfer_poll_active: false,
+            split_ratio: 0.5,
+            split_dragging: false,
             focus_handle: None,
         }
     }
@@ -3938,6 +3957,7 @@ impl AppState {
             total_bytes,
             status: "in_progress".to_string(),
             error: None,
+            delete_source_after: None,
         };
 
         self.sftp_manager.transfers.push(transfer_item);
@@ -3998,88 +4018,6 @@ impl AppState {
         .detach();
     }
 
-    /// Download a file from source pane.
-    pub fn sftp_download_file(
-        &mut self,
-        source_pane: SftpActivePane,
-        file_path: String,
-        cx: &mut Context<Self>,
-    ) {
-        let client = match self.client.clone() {
-            Some(c) => c,
-            None => return,
-        };
-
-        let conn_id = self.sftp_pane(source_pane).source_id.clone();
-        let full_path = join_path(&self.sftp_pane(source_pane).current_path, &file_path);
-        let transfer_id = next_transfer_id();
-
-        let transfer_item = SftpTransferItem {
-            id: transfer_id.clone(),
-            name: file_path.clone(),
-            from_source: self.sftp_pane(source_pane).source_label.clone(),
-            to_source: "Download".to_string(),
-            bytes_transferred: 0,
-            total_bytes: 0,
-            status: "in_progress".to_string(),
-            error: None,
-        };
-
-        self.sftp_manager.transfers.push(transfer_item);
-        self.sftp_manager.transfers_drawer_open = true;
-        cx.notify();
-
-        let tx_id = transfer_id.clone();
-        let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<Vec<u8>, String>>();
-
-        TOKIO_RT.spawn(async move {
-            match client.sftp_download(&conn_id, &full_path).await {
-                Ok(bytes) => {
-                    let _ = tx.send(Ok(bytes));
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(e.to_string()));
-                }
-            }
-        });
-
-        cx.spawn(move |_view, cx: &mut AsyncApp| {
-            let view_weak = view_weak.clone();
-            let cx_handle = cx.clone();
-            async move {
-                if let Some(res) = rx.recv().await {
-                    cx_handle.update(|cx: &mut App| {
-                        if let Some(app) = view_weak.upgrade() {
-                            app.update(cx, |this, cx| {
-                                if let Some(item) = this
-                                    .sftp_manager
-                                    .transfers
-                                    .iter_mut()
-                                    .find(|t| t.id == tx_id)
-                                {
-                                    match res {
-                                        Ok(bytes) => {
-                                            item.status = "completed".to_string();
-                                            item.total_bytes = bytes.len() as i64;
-                                            item.bytes_transferred = bytes.len() as i64;
-                                        }
-                                        Err(err) => {
-                                            item.status = "failed".to_string();
-                                            item.error = Some(err);
-                                        }
-                                    }
-                                }
-                                cx.notify();
-                            });
-                        }
-                    });
-                }
-            }
-        })
-        .detach();
-    }
-
     /// Transfer selected items from source pane to destination pane.
     pub fn sftp_transfer_between_panes(
         &mut self,
@@ -4091,109 +4029,10 @@ impl AppState {
         if targets.is_empty() {
             return;
         }
-
-        let client = match self.client.clone() {
-            Some(c) => c,
-            None => return,
-        };
-
-        let src_conn = self.sftp_pane(src_pane).source_id.clone();
-        let src_base = self.sftp_pane(src_pane).current_path.clone();
-        let dst_conn = self.sftp_pane(dst_pane).source_id.clone();
-        let dst_base = self.sftp_pane(dst_pane).current_path.clone();
-        let src_label = self.sftp_pane(src_pane).source_label.clone();
-        let dst_label = self.sftp_pane(dst_pane).source_label.clone();
-
-        self.sftp_manager.transfers_drawer_open = true;
-
-        for filename in targets {
-            let tx_id = next_transfer_id();
-            let transfer_item = SftpTransferItem {
-                id: tx_id.clone(),
-                name: filename.clone(),
-                from_source: src_label.clone(),
-                to_source: dst_label.clone(),
-                bytes_transferred: 0,
-                total_bytes: 0,
-                status: "in_progress".to_string(),
-                error: None,
-            };
-            self.sftp_manager.transfers.push(transfer_item);
-
-            let client = client.clone();
-            let src_conn = src_conn.clone();
-            let dst_conn = dst_conn.clone();
-            let src_file_path = join_path(&src_base, &filename);
-            let dst_target_dir = dst_base.clone();
-            let fname = filename.clone();
-
-            let view_weak = cx.entity().downgrade();
-            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<usize, String>>();
-
-            TOKIO_RT.spawn(async move {
-                match client.sftp_download(&src_conn, &src_file_path).await {
-                    Ok(data) => {
-                        let len = data.len();
-                        match client
-                            .sftp_upload(&dst_conn, &dst_target_dir, &fname, data)
-                            .await
-                        {
-                            Ok(_) => {
-                                let _ = tx.send(Ok(len));
-                            }
-                            Err(e) => {
-                                let _ = tx.send(Err(format!("Upload error: {e}")));
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(Err(format!("Download error: {e}")));
-                    }
-                }
-            });
-
-            cx.spawn(move |_view, cx: &mut AsyncApp| {
-                let view_weak = view_weak.clone();
-                let cx_handle = cx.clone();
-                let tx_id = tx_id.clone();
-                async move {
-                    if let Some(res) = rx.recv().await {
-                        cx_handle.update(|cx: &mut App| {
-                            if let Some(app) = view_weak.upgrade() {
-                                app.update(cx, |this, cx| {
-                                    if let Some(item) = this
-                                        .sftp_manager
-                                        .transfers
-                                        .iter_mut()
-                                        .find(|t| t.id == tx_id)
-                                    {
-                                        match res {
-                                            Ok(bytes_len) => {
-                                                item.status = "completed".to_string();
-                                                item.total_bytes = bytes_len as i64;
-                                                item.bytes_transferred = bytes_len as i64;
-                                                this.sftp_load_pane(dst_pane, cx);
-                                            }
-                                            Err(err) => {
-                                                item.status = "failed".to_string();
-                                                item.error = Some(err);
-                                            }
-                                        }
-                                    }
-                                    cx.notify();
-                                });
-                            }
-                        });
-                    }
-                }
-            })
-            .detach();
-        }
-
-        cx.notify();
+        self.sftp_transfer_with_conflict_check(src_pane, dst_pane, targets, false, cx);
     }
 
-    /// Poll backend transfers API and synchronize active status.
+    /// Poll backend transfer progress every 600ms until nothing is active.
     pub fn sftp_poll_transfers(&mut self, cx: &mut Context<Self>) {
         let client = match self.client.clone() {
             Some(c) => c,
@@ -4250,6 +4089,533 @@ impl AppState {
             }
         })
         .detach();
+    }
+
+    pub fn sftp_start_transfer_polling(&mut self, cx: &mut Context<Self>) {
+        if self.sftp_manager.transfer_poll_active {
+            return;
+        }
+        self.sftp_manager.transfer_poll_active = true;
+        let view_weak = cx.entity().downgrade();
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                loop {
+                    cx_handle
+                        .background_executor()
+                        .timer(std::time::Duration::from_millis(600))
+                        .await;
+                    let still_active = cx_handle
+                        .update(|cx: &mut App| {
+                            let mut active = false;
+                            if let Some(app) = view_weak.upgrade() {
+                                app.update(cx, |this, cx| {
+                                    this.sftp_poll_transfers(cx);
+                                    active = this.sftp_manager.transfers.iter().any(|t| {
+                                        matches!(
+                                            t.status.as_str(),
+                                            "in_progress"
+                                                | "uploading"
+                                                | "downloading"
+                                                | "transferring"
+                                                | "pending"
+                                        )
+                                    });
+                                    this.sftp_manager.transfer_poll_active = active;
+                                    cx.notify();
+                                });
+                            }
+                            active
+                        });
+                    if !still_active {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Remove completed/failed transfers from the drawer (web Clear History).
+    pub fn sftp_clear_transfer_history(&mut self, cx: &mut Context<Self>) {
+        self.sftp_manager
+            .transfers
+            .retain(|t| matches!(t.status.as_str(), "in_progress" | "uploading" | "downloading" | "transferring" | "pending"));
+        cx.notify();
+    }
+
+    // ==================== SFTP clipboard / conflict / transfers ====================
+
+    /// Copy or cut the pane's selected files into the SFTP clipboard.
+    pub fn sftp_clipboard_copy(&mut self, cut: bool, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let items: Vec<String> = self.sftp_pane(pane).selected.iter().cloned().collect();
+        if items.is_empty() {
+            return;
+        }
+        self.sftp_manager.clipboard = Some(SftpClipboard { cut, source_pane: pane, items });
+        self.push_notification(
+            if cut { "Cut to clipboard" } else { "Copied to clipboard" }.to_string(),
+            false,
+            cx,
+        );
+    }
+
+    /// Paste the clipboard into the given pane (conflicts open the
+    /// overwrite dialog, matching the web client).
+    pub fn sftp_paste(&mut self, dst_pane: SftpActivePane, cx: &mut Context<Self>) {
+        let Some(clip) = self.sftp_manager.clipboard.clone() else {
+            return;
+        };
+        let dst_path = self.sftp_pane(dst_pane).current_path.clone();
+        let src_path = self.sftp_pane(clip.source_pane).current_path.clone();
+        if clip.cut && clip.source_pane == dst_pane && src_path == dst_path {
+            return; // pasting into the same directory is a no-op
+        }
+        let items = clip.items.clone();
+        self.sftp_transfer_with_conflict_check(clip.source_pane, dst_pane, items, clip.cut, cx);
+        if clip.cut {
+            self.sftp_manager.clipboard = None;
+        }
+    }
+
+    /// Check destination listing for name conflicts before transferring.
+    /// Conflicts open the Overwrite dialog; otherwise the transfer runs.
+    pub fn sftp_transfer_with_conflict_check(
+        &mut self,
+        src_pane: SftpActivePane,
+        dst_pane: SftpActivePane,
+        targets: Vec<String>,
+        cut: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let dst_files: Vec<String> = self
+            .sftp_pane(dst_pane)
+            .files
+            .iter()
+            .map(|f| f.name.clone())
+            .collect();
+        let conflict = targets.iter().find(|t| dst_files.contains(t)).cloned();
+        if let Some(conflict_name) = conflict {
+            self.sftp_manager.modal = Some(SftpModalState::Conflict {
+                src_pane,
+                dst_pane,
+                conflict_name,
+                remaining_transfers: targets,
+            });
+            cx.notify();
+            return;
+        }
+        let pairs: Vec<(String, String)> =
+            targets.iter().map(|t| (t.clone(), t.clone())).collect();
+        self.sftp_run_pane_transfer(src_pane, dst_pane, pairs, cut, cx);
+    }
+
+    /// Run pane-to-pane transfers for (src_name, dst_name) pairs.
+    pub fn sftp_run_pane_transfer(
+        &mut self,
+        src_pane: SftpActivePane,
+        dst_pane: SftpActivePane,
+        pairs: Vec<(String, String)>,
+        delete_source: bool,
+        cx: &mut Context<Self>,
+    ) {
+        if pairs.is_empty() {
+            return;
+        }
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let src_conn = self.sftp_pane(src_pane).source_id.clone();
+        let src_base = self.sftp_pane(src_pane).current_path.clone();
+        let dst_conn = self.sftp_pane(dst_pane).source_id.clone();
+        let dst_base = self.sftp_pane(dst_pane).current_path.clone();
+        let src_label = self.sftp_pane(src_pane).source_label.clone();
+        let dst_label = self.sftp_pane(dst_pane).source_label.clone();
+
+        self.sftp_manager.transfers_drawer_open = true;
+
+        for (filename, dst_name) in pairs {
+            let tx_id = next_transfer_id();
+            let delete_after = if delete_source {
+                Some((src_conn.clone(), join_path(&src_base, &filename)))
+            } else {
+                None
+            };
+            let transfer_item = SftpTransferItem {
+                id: tx_id.clone(),
+                name: filename.clone(),
+                from_source: src_label.clone(),
+                to_source: dst_label.clone(),
+                bytes_transferred: 0,
+                total_bytes: 0,
+                status: "in_progress".to_string(),
+                error: None,
+                delete_source_after: delete_after,
+            };
+            self.sftp_manager.transfers.push(transfer_item);
+
+            let client = client.clone();
+            let src_conn = src_conn.clone();
+            let dst_conn = dst_conn.clone();
+            let src_file_path = join_path(&src_base, &filename);
+            let dst_target_dir = dst_base.clone();
+            let fname = dst_name.clone();
+            let view_weak = cx.entity().downgrade();
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<usize, String>>();
+
+            TOKIO_RT.spawn(async move {
+                match client.sftp_download(&src_conn, &src_file_path).await {
+                    Ok(data) => {
+                        let len = data.len();
+                        match client
+                            .sftp_upload(&dst_conn, &dst_target_dir, &fname, data)
+                            .await
+                        {
+                            Ok(_) => {
+                                let _ = tx.send(Ok(len));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Err(format!("Upload error: {e}")));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(format!("Download error: {e}")));
+                    }
+                }
+            });
+
+            cx.spawn(move |_view, cx: &mut AsyncApp| {
+                let view_weak = view_weak.clone();
+                let cx_handle = cx.clone();
+                let tx_id = tx_id.clone();
+                async move {
+                    if let Some(res) = rx.recv().await {
+                        cx_handle.update(|cx: &mut App| {
+                            if let Some(app) = view_weak.upgrade() {
+                                app.update(cx, |this, cx| {
+                                    let mut src_cleanup: Option<(String, String)> = None;
+                                    if let Some(item) = this
+                                        .sftp_manager
+                                        .transfers
+                                        .iter_mut()
+                                        .find(|t| t.id == tx_id)
+                                    {
+                                        match res {
+                                            Ok(bytes_len) => {
+                                                item.status = "completed".to_string();
+                                                item.total_bytes = bytes_len as i64;
+                                                item.bytes_transferred = bytes_len as i64;
+                                                src_cleanup = item.delete_source_after.take();
+                                                this.sftp_load_pane(dst_pane, cx);
+                                            }
+                                            Err(err) => {
+                                                item.status = "failed".to_string();
+                                                item.error = Some(err);
+                                            }
+                                        }
+                                    }
+                                    if let Some((del_conn, del_path)) = src_cleanup {
+                                        if let Some(del_client) = this.client.clone() {
+                                            let (dtx, mut drx) = tokio::sync::mpsc::
+                                                unbounded_channel::<Result<(), String>>();
+                                            TOKIO_RT.spawn(async move {
+                                                let r = del_client
+                                                    .sftp_remove(&del_conn, &del_path)
+                                                    .await;
+                                                let _ = dtx.send(r.map_err(|e| e.to_string()));
+                                            });
+                                            let view_weak2 = view_weak.clone();
+                                            cx.spawn(move |_view, cx: &mut AsyncApp| {
+                                                let view_weak2 = view_weak2.clone();
+                                                let cx_handle2 = cx.clone();
+                                                async move {
+                                                    let _ = drx.recv().await;
+                                                    cx_handle2.update(|cx: &mut App| {
+                                                        if let Some(app) = view_weak2.upgrade() {
+                                                            app.update(cx, |this, cx| {
+                                                                this.sftp_load_pane(src_pane, cx);
+                                                            });
+                                                        }
+                                                    });
+                                                }
+                                            })
+                                            .detach();
+                                        }
+                                    }
+                                    cx.notify();
+                                });
+                            }
+                        });
+                    }
+                }
+            })
+            .detach();
+        }
+
+        self.sftp_start_transfer_polling(cx);
+        cx.notify();
+    }
+
+    /// Resolve a transfer conflict by overwriting every pending target.
+    pub fn sftp_conflict_overwrite(&mut self, cx: &mut Context<Self>) {
+        let Some(SftpModalState::Conflict { src_pane, dst_pane, remaining_transfers, .. }) =
+            self.sftp_manager.modal.clone()
+        else {
+            return;
+        };
+        self.sftp_manager.modal = None;
+        let cut = self
+            .sftp_manager
+            .clipboard
+            .as_ref()
+            .map(|c| c.cut)
+            .unwrap_or(false);
+        let pairs: Vec<(String, String)> =
+            remaining_transfers.iter().map(|t| (t.clone(), t.clone())).collect();
+        self.sftp_run_pane_transfer(src_pane, dst_pane, pairs, cut, cx);
+    }
+
+    /// Resolve a transfer conflict by renaming conflicting targets
+    /// ("name (1)", "name (2)", ...) like the web's Keep Both.
+    pub fn sftp_conflict_keep_both(&mut self, cx: &mut Context<Self>) {
+        let Some(SftpModalState::Conflict { dst_pane, remaining_transfers, .. }) =
+            self.sftp_manager.modal.clone()
+        else {
+            return;
+        };
+        self.sftp_manager.modal = None;
+        let cut = self
+            .sftp_manager
+            .clipboard
+            .as_ref()
+            .map(|c| c.cut)
+            .unwrap_or(false);
+        let src_pane = self
+            .sftp_manager
+            .clipboard
+            .as_ref()
+            .map(|c| c.source_pane)
+            .unwrap_or(if dst_pane == SftpActivePane::Left {
+                SftpActivePane::Right
+            } else {
+                SftpActivePane::Left
+            });
+        let dst_files: Vec<String> = self
+            .sftp_pane(dst_pane)
+            .files
+            .iter()
+            .map(|f| f.name.clone())
+            .collect();
+        let mut taken = dst_files.clone();
+        let pairs: Vec<(String, String)> = remaining_transfers
+            .iter()
+            .map(|t| {
+                let mut dst = t.clone();
+                if taken.contains(t) {
+                    let (stem, ext) = match t.rfind('.') {
+                        Some(idx) if idx > 0 => (t[..idx].to_string(), format!(".{}", &t[idx + 1..])),
+                        _ => (t.clone(), String::new()),
+                    };
+                    let mut n = 1;
+                    loop {
+                        let candidate = format!("{stem} ({n}){ext}");
+                        if !taken.contains(&candidate) {
+                            dst = candidate;
+                            break;
+                        }
+                        n += 1;
+                    }
+                }
+                taken.push(dst.clone());
+                (t.clone(), dst)
+            })
+            .collect();
+        self.sftp_run_pane_transfer(src_pane, dst_pane, pairs, cut, cx);
+    }
+
+    /// Cancel a transfer conflict dialog, dropping the pending transfers.
+    pub fn sftp_conflict_cancel(&mut self, cx: &mut Context<Self>) {
+        self.sftp_manager.modal = None;
+        self.sftp_manager.clipboard = None;
+        cx.notify();
+    }
+
+    /// Upload files chosen via the native file picker (web parity for the
+    /// Upload File action).
+    pub fn sftp_upload_from_picker(&mut self, pane: SftpActivePane, cx: &mut Context<Self>) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+        let conn_id = self.sftp_pane(pane).source_id.clone();
+        let dir = self.sftp_pane(pane).current_path.clone();
+        let label = self.sftp_pane(pane).source_label.clone();
+
+        self.sftp_pane_mut(pane).show_actions_menu = false;
+
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<(String, usize), String>>();
+        TOKIO_RT.spawn(async move {
+            let picked = rfd::AsyncFileDialog::new().pick_files().await;
+            let Some(handles) = picked else {
+                return; // user cancelled
+            };
+            for handle in handles {
+                let name = handle.file_name();
+                let bytes = handle.read().await;
+                let len = bytes.len();
+                let _ = tx.send(Ok((name.clone(), len))).ok();
+                if let Err(e) = client.sftp_upload(&conn_id, &dir, &name, bytes).await {
+                    let _ = tx.send(Err(format!("Upload error: {e}"))).ok();
+                }
+            }
+        });
+
+        let view_weak = cx.entity().downgrade();
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                while let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok((name, len)) => {
+                                        this.sftp_manager.transfers.push(SftpTransferItem {
+                                            id: next_transfer_id(),
+                                            name,
+                                            from_source: "Local file".to_string(),
+                                            to_source: label.clone(),
+                                            bytes_transferred: len as i64,
+                                            total_bytes: len as i64,
+                                            status: "completed".to_string(),
+                                            error: None,
+                                            delete_source_after: None,
+                                        });
+                                        this.sftp_load_pane(pane, cx);
+                                    }
+                                    Err(err) => {
+                                        this.push_notification(err, true, cx);
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+        self.sftp_manager.transfers_drawer_open = true;
+        self.sftp_start_transfer_polling(cx);
+        cx.notify();
+    }
+
+    /// Download a file from a pane to a local folder chosen via the native
+    /// folder picker (web parity: browser download).
+    pub fn sftp_download_file(
+        &mut self,
+        source_pane: SftpActivePane,
+        file_path: String,
+        cx: &mut Context<Self>,
+    ) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let conn_id = self.sftp_pane(source_pane).source_id.clone();
+        let full_path = join_path(&self.sftp_pane(source_pane).current_path, &file_path);
+        let transfer_id = next_transfer_id();
+
+        let transfer_item = SftpTransferItem {
+            id: transfer_id.clone(),
+            name: file_path.clone(),
+            from_source: self.sftp_pane(source_pane).source_label.clone(),
+            to_source: "Download".to_string(),
+            bytes_transferred: 0,
+            total_bytes: 0,
+            status: "in_progress".to_string(),
+            error: None,
+            delete_source_after: None,
+        };
+
+        self.sftp_manager.transfers.push(transfer_item);
+        self.sftp_manager.transfers_drawer_open = true;
+        cx.notify();
+
+        let tx_id = transfer_id.clone();
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
+
+        TOKIO_RT.spawn(async move {
+            let folder = rfd::AsyncFileDialog::new().pick_folder().await;
+            let Some(handle) = folder else {
+                let _ = tx.send(Err("Download cancelled".to_string()));
+                return;
+            };
+            let dir = handle.path().to_path_buf();
+            match client.sftp_download(&conn_id, &full_path).await {
+                Ok(bytes) => {
+                    let name = std::path::Path::new(&full_path)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "download.bin".to_string());
+                    match std::fs::write(dir.join(name), bytes) {
+                        Ok(_) => {
+                            let _ = tx.send(Ok(()));
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(format!("Failed to write file: {e}")));
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                if let Some(item) = this
+                                    .sftp_manager
+                                    .transfers
+                                    .iter_mut()
+                                    .find(|t| t.id == tx_id)
+                                {
+                                    match res {
+                                        Ok(()) => {
+                                            item.status = "completed".to_string();
+                                            item.bytes_transferred = item.total_bytes;
+                                        }
+                                        Err(err) => {
+                                            item.status = "failed".to_string();
+                                            item.error = Some(err);
+                                        }
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+
+        self.sftp_start_transfer_polling(cx);
     }
 
     /// Toggle visibility of the transfers drawer.
