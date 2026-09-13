@@ -514,14 +514,8 @@ fn render_content_pane(
 /// Confirmation dialogs: close connected tab, delete connection, delete key
 /// (with the affected-connections warning step from the web client).
 pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> Option<AnyElement> {
-    let is_dark = app.is_dark();
-    let card_bg = app.card_bg();
-    let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
-    let tag_bg = app.muted_bg();
-    let destructive = app.destructive_color();
-    let _ = is_dark;
 
     if let Some(idx) = app.pending_close_tab {
         let title = app

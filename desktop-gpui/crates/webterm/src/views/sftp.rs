@@ -2180,9 +2180,12 @@ pub fn render_sftp_modal(
     };
 
     match modal {
-        SftpModalState::NewFolder { pane, name, error } => {
+        SftpModalState::NewFolder {
+            pane,
+            name: _name,
+            error,
+        } => {
             let pane = *pane;
-            let folder_name = name.clone();
             let err_opt = error.clone();
             let presets = ["docs", "assets", "src", "build", "backup", "temp"];
 
@@ -2337,7 +2340,7 @@ pub fn render_sftp_modal(
                                             .child("Create")
                                             .on_mouse_down(
                                                 MouseButton::Left,
-                                                cx.listener(move |this, _, window, cx| {
+                                                cx.listener(move |this, _, _window, cx| {
                                                     let name = AppState::input_value(
                                                         &this.inputs().sftp_modal_name,
                                                         cx,
@@ -2354,12 +2357,11 @@ pub fn render_sftp_modal(
         SftpModalState::Rename {
             pane,
             old_name,
-            new_name,
+            new_name: _new_name,
             error,
         } => {
             let pane = *pane;
             let old_name_clone = old_name.clone();
-            let new_name_clone = new_name.clone();
             let err_opt = error.clone();
 
             Some(
@@ -2481,7 +2483,7 @@ pub fn render_sftp_modal(
                                             .child("Rename")
                                             .on_mouse_down(
                                                 MouseButton::Left,
-                                                cx.listener(move |this, _, window, cx| {
+                                                cx.listener(move |this, _, _window, cx| {
                                                     let new_name = AppState::input_value(
                                                         &this.inputs().sftp_modal_name,
                                                         cx,

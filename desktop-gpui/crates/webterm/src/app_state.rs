@@ -3520,7 +3520,7 @@ impl AppState {
     }
 
     /// Reset backend executable path override to default bundled binary.
-    pub fn reset_backend_path_override(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn reset_backend_path_override(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         self.settings.backend_path = None;
         self.backend_path_input.clear();
         let _ = self.settings.save();
