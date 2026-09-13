@@ -15,6 +15,7 @@ license = "MIT"
 authors = ["WebTerm contributors"]
 
 [workspace.dependencies]
+rfd = "0.15"
 # Internal crates
 webterm-supervisor = { path = "crates/supervisor" }
 webterm-settings = { path = "crates/settings" }

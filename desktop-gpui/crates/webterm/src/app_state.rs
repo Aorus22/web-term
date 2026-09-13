@@ -5,7 +5,8 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 use webterm_backend_client::{
     BackendClient, Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
-    ImportResult, PortForward, SessionInfo, SftpFileInfo, SftpTransferStatus, SshKey,
+    ImportResult, KeyDeleteWarning, PortForward, SessionInfo, SftpFileInfo, SftpTransferStatus,
+    SshKey,
     TerminalWsHandle, UpdateConnectionRequest, UpdateForwardRequest, UpdateKeyRequest,
     WsConnectRequest,
 };
@@ -964,8 +965,6 @@ pub struct AppState {
     pub is_loading_keys: bool,
     pub connection_modal: Option<ConnectionFormState>,
     pub connection_sheet_closing: bool,
-    pub show_import_modal: bool,
-    pub import_payload: String,
     pub notification: Option<String>,
     pub notification_is_error: bool,
     pub notification_serial: u64,
@@ -986,6 +985,10 @@ pub struct AppState {
     pub forward_modal: Option<ForwardFormState>,
     pub forward_sheet_closing: bool,
     pub delete_forward_target: Option<PortForward>,
+    pub pending_close_tab: Option<usize>,
+    pub delete_connection_target: Option<Connection>,
+    pub delete_key_target: Option<SshKey>,
+    pub key_delete_warning: Option<(String, u32)>,
     pub terminal_font_size: f32,
     pub terminal_font_family: String,
     pub cursor_style: String,
@@ -1047,8 +1050,6 @@ impl AppState {
             is_loading_keys: false,
             connection_modal: None,
             connection_sheet_closing: false,
-            show_import_modal: false,
-            import_payload: String::new(),
             notification: None,
             notification_is_error: false,
             notification_serial: 0,
@@ -1069,6 +1070,10 @@ impl AppState {
             forward_modal: None,
             forward_sheet_closing: false,
             delete_forward_target: None,
+            pending_close_tab: None,
+            delete_connection_target: None,
+            delete_key_target: None,
+            key_delete_warning: None,
             terminal_font_size,
             terminal_font_family: terminal_font_family.clone(),
             cursor_style,
@@ -1170,6 +1175,73 @@ impl AppState {
     }
     pub fn is_dark(&self) -> bool {
         self.current_theme().is_dark
+    }
+
+    /// Escape closes the topmost overlay (popover > menus > dialogs >
+    /// sheets), matching the web client's dismissal behavior.
+    pub fn handle_escape(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.show_new_tab_popover {
+            self.show_new_tab_popover = false;
+            cx.notify();
+            return;
+        }
+        if self.sftp_manager.context_menu.is_some() {
+            self.sftp_manager.context_menu = None;
+            cx.notify();
+            return;
+        }
+        if self.sftp_manager.left_pane.show_actions_menu
+            || self.sftp_manager.right_pane.show_actions_menu
+        {
+            self.sftp_manager.left_pane.show_actions_menu = false;
+            self.sftp_manager.right_pane.show_actions_menu = false;
+            cx.notify();
+            return;
+        }
+        if self.sftp_manager.modal.is_some() {
+            self.sftp_close_modal(cx);
+            return;
+        }
+        if self.delete_key_target.is_some() || self.key_delete_warning.is_some() {
+            self.cancel_delete_key_modal(cx);
+            return;
+        }
+        if self.delete_connection_target.is_some() {
+            self.cancel_delete_connection_modal(cx);
+            return;
+        }
+        if self.delete_forward_target.is_some() {
+            self.close_delete_forward_modal(cx);
+            return;
+        }
+        if self.pending_close_tab.is_some() {
+            self.cancel_close_tab(cx);
+            return;
+        }
+        if self.connection_modal.is_some() || self.connection_sheet_closing {
+            self.close_connection_modal(cx);
+            return;
+        }
+        if self.edit_key_modal.is_some() || self.edit_key_sheet_closing {
+            self.close_edit_key_modal(cx);
+            return;
+        }
+        if self.show_add_key_modal || self.add_key_sheet_closing {
+            self.close_add_key_modal(cx);
+            return;
+        }
+        if self.forward_modal.is_some() || self.forward_sheet_closing {
+            self.close_forward_modal(cx);
+            return;
+        }
+        if self.pending_passphrase_conn.is_some() {
+            self.cancel_passphrase(window, cx);
+            return;
+        }
+        if self.show_font_dialog {
+            self.show_font_dialog = false;
+            cx.notify();
+        }
     }
 
     /// Toggle new tab launcher popover on the plus button.
@@ -1680,6 +1752,29 @@ impl AppState {
         .detach();
     }
 
+    /// Open the delete-key confirmation dialog.
+    pub fn open_delete_key_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.key_delete_warning = None;
+        self.delete_key_target = self.ssh_keys.iter().find(|k| k.id == id).cloned();
+        cx.notify();
+    }
+
+    /// Cancel the delete-key confirmation dialog.
+    pub fn cancel_delete_key_modal(&mut self, cx: &mut Context<Self>) {
+        self.delete_key_target = None;
+        self.key_delete_warning = None;
+        cx.notify();
+    }
+
+    /// Confirm key deletion. When the backend reports the key is still
+    /// referenced, show the affected-connections warning and re-confirm.
+    pub fn confirm_delete_key(&mut self, cx: &mut Context<Self>) {
+        let Some(key) = self.delete_key_target.clone() else {
+            return;
+        };
+        self.delete_ssh_key(&key.id, cx);
+    }
+
     /// Delete SSH key by ID.
     pub fn delete_ssh_key(&mut self, id: &str, cx: &mut Context<Self>) {
         let client = match self.client.clone() {
@@ -1689,12 +1784,13 @@ impl AppState {
 
         let id_str = id.to_string();
         let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<Option<KeyDeleteWarning>, String>>();
 
         TOKIO_RT.spawn(async move {
             match client.delete_key(&id_str).await {
-                Ok(_) => {
-                    let _ = tx.send(Ok(()));
+                Ok(w) => {
+                    let _ = tx.send(Ok(w));
                 }
                 Err(e) => {
                     let _ = tx.send(Err(e.to_string()));
@@ -1715,11 +1811,37 @@ impl AppState {
                         if let Some(app) = view_weak.upgrade() {
                             app.update(cx, |this, cx| {
                                 match res {
-                                    Ok(()) => {
-                                        this.push_notification("SSH Key deleted".to_string(), false, cx);
+                                    Ok(Some(warning)) => {
+                                        // 200 + body: key deleted, warn that
+                                        // connections lost key-based auth.
+                                        this.push_notification(
+                                            format!(
+                                                "{} ({} connection(s) affected)",
+                                                warning.warning, warning.affected_connections
+                                            ),
+                                            true,
+                                            cx,
+                                        );
+                                        this.delete_key_target = None;
+                                        this.key_delete_warning =
+                                            Some((warning.warning, warning.affected_connections));
+                                        this.fetch_ssh_keys(cx);
+                                    }
+                                    Ok(None) => {
+                                        this.push_notification(
+                                            "SSH Key deleted".to_string(),
+                                            false,
+                                            cx,
+                                        );
+                                        this.delete_key_target = None;
+                                        this.key_delete_warning = None;
                                     }
                                     Err(e) => {
-                                        this.push_notification(format!("Delete key failed: {e}"), false, cx);
+                                        this.push_notification(
+                                            format!("Delete key failed: {e}"),
+                                            true,
+                                            cx,
+                                        );
                                         this.fetch_ssh_keys(cx);
                                     }
                                 }
@@ -2027,6 +2149,87 @@ impl AppState {
         .detach();
     }
 
+    /// Duplicate a saved connection (creates a copy labeled "{label} (copy)").
+    pub fn duplicate_connection(&mut self, id: &str, cx: &mut Context<Self>) {
+        let Some(conn) = self.connections.iter().find(|c| c.id == id).cloned() else {
+            return;
+        };
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => return,
+        };
+        let req = CreateConnectionRequest {
+            label: format!("{} (copy)", conn.label),
+            host: conn.host.clone(),
+            port: conn.port,
+            username: conn.username.clone(),
+            password: None,
+            tags: conn.tags.clone(),
+            auth_method: conn.auth_method.clone(),
+            ssh_key_id: conn.ssh_key_id.clone(),
+        };
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<(), String>>();
+
+        TOKIO_RT.spawn(async move {
+            match client.create_connection(&req).await {
+                Ok(_) => {
+                    let _ = tx.send(Ok(()));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                if let Some(res) = rx.recv().await {
+                    cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view_weak.upgrade() {
+                            app.update(cx, |this, cx| {
+                                match res {
+                                    Ok(_) => {
+                                        this.push_notification(
+                                            "Connection duplicated".to_string(),
+                                            false,
+                                            cx,
+                                        );
+                                        this.fetch_connections(cx);
+                                    }
+                                    Err(e) => {
+                                        this.push_notification(
+                                            format!("Failed to duplicate connection: {e}"),
+                                            true,
+                                            cx,
+                                        );
+                                    }
+                                }
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Open the delete-connection confirmation dialog.
+    pub fn open_delete_connection_modal(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.delete_connection_target = self.connections.iter().find(|c| c.id == id).cloned();
+        cx.notify();
+    }
+
+    /// Cancel the delete-connection confirmation dialog.
+    pub fn cancel_delete_connection_modal(&mut self, cx: &mut Context<Self>) {
+        self.delete_connection_target = None;
+        cx.notify();
+    }
+
     /// Delete connection by ID.
     pub fn delete_connection(&mut self, id: &str, cx: &mut Context<Self>) {
         let client = match self.client.clone() {
@@ -2095,11 +2298,22 @@ impl AppState {
                     let count = conns.len();
                     match serde_json::to_string_pretty(&conns) {
                         Ok(json_str) => {
-                            let path = std::path::Path::new("webterm-connections-export.json");
-                            if let Err(e) = std::fs::write(path, json_str) {
-                                let _ = tx.send(Err(format!("Failed to write export file: {e}")));
-                            } else {
-                                let _ = tx.send(Ok(count));
+                            let picked = rfd::AsyncFileDialog::new()
+                                .add_filter("JSON", &["json"])
+                                .set_file_name("webterm-connections-export.json")
+                                .save_file()
+                                .await;
+                            let Some(handle) = picked else {
+                                return; // user cancelled
+                            };
+                            match handle.write(json_str.as_bytes()).await {
+                                Ok(_) => {
+                                    let _ = tx.send(Ok(count));
+                                }
+                                Err(e) => {
+                                    let _ =
+                                        tx.send(Err(format!("Failed to write export file: {e}")));
+                                }
                             }
                         }
                         Err(e) => {
@@ -2123,12 +2337,18 @@ impl AppState {
                             app.update(cx, |this, cx| {
                                 match res {
                                     Ok(count) => {
-                                        this.push_notification(format!(
-                                            "Exported {count} connection(s) to webterm-connections-export.json"
-                                        ), false, cx);
+                                        this.push_notification(
+                                            format!("Exported {count} connection(s)"),
+                                            false,
+                                            cx,
+                                        );
                                     }
                                     Err(e) => {
-                                        this.push_notification(format!("Export failed: {e}"), false, cx);
+                                        this.push_notification(
+                                            format!("Export failed: {e}"),
+                                            true,
+                                            cx,
+                                        );
                                     }
                                 }
                                 cx.notify();
@@ -2141,106 +2361,99 @@ impl AppState {
         .detach();
     }
 
-    /// Open import connections modal.
-    pub fn open_import_modal(&mut self, cx: &mut Context<Self>) {
-        self.show_import_modal = true;
-        self.import_payload = String::new();
-        cx.notify();
-    }
-
-    /// Close import connections modal.
-    pub fn close_import_modal(&mut self, cx: &mut Context<Self>) {
-        self.show_import_modal = false;
-        self.import_payload.clear();
-        cx.notify();
-    }
-
-    /// Submit imported connections JSON to backend.
-    pub fn submit_import_connections(&mut self, cx: &mut Context<Self>) {
+    /// Import connections from a JSON file chosen with the native file
+    /// picker (web parity: hidden file input + result alert).
+    pub fn import_connections_from_file(&mut self, cx: &mut Context<Self>) {
         let client = match self.client.clone() {
             Some(c) => c,
             None => {
-                self.push_notification("Backend client is not connected".to_string(), false, cx);
+                self.push_notification("Backend client is not connected".to_string(), true, cx);
                 cx.notify();
                 return;
             }
         };
 
-        let payload = self.import_payload.trim();
-        let conns: Vec<Connection> = if payload.is_empty() {
-            let path = std::path::Path::new("webterm-connections-export.json");
-            if path.exists() {
-                match std::fs::read_to_string(path) {
-                    Ok(content) => match serde_json::from_str::<Vec<Connection>>(&content) {
-                        Ok(c) => c,
-                        Err(e) => {
-                            self.push_notification(format!("JSON parsing error from export file: {e}"), true, cx);
-                            cx.notify();
-                            return;
-                        }
-                    },
-                    Err(e) => {
-                        self.push_notification(format!("Failed to read export file: {e}"), true, cx);
-                        cx.notify();
-                        return;
-                    }
-                }
-            } else {
-                self.push_notification("Please paste JSON array or create webterm-connections-export.json".to_string(), false, cx);
-                cx.notify();
-                return;
-            }
-        } else {
-            match serde_json::from_str::<Vec<Connection>>(payload) {
-                Ok(c) => c,
-                Err(e) => {
-                    self.push_notification(format!("Invalid JSON array: {e}"), true, cx);
-                    cx.notify();
-                    return;
-                }
-            }
-        };
-
-        let view_weak = cx.entity().downgrade();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<ImportResult, String>>();
-
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<Vec<Connection>, String>>();
         TOKIO_RT.spawn(async move {
-            match client.import_connections(&conns).await {
-                Ok(res) => {
-                    let _ = tx.send(Ok(res));
+            let picked = rfd::AsyncFileDialog::new()
+                .add_filter("JSON", &["json"])
+                .pick_file()
+                .await;
+            let Some(handle) = picked else {
+                return; // user cancelled
+            };
+            let bytes = handle.read().await;
+            match serde_json::from_slice::<Vec<Connection>>(&bytes) {
+                Ok(conns) => {
+                    let _ = tx.send(Ok(conns));
                 }
                 Err(e) => {
-                    let _ = tx.send(Err(e.to_string()));
+                    let _ = tx.send(Err(format!("Invalid JSON array: {e}")));
                 }
             }
         });
 
+        let view_weak = cx.entity().downgrade();
         cx.spawn(move |_view, cx: &mut AsyncApp| {
             let view_weak = view_weak.clone();
             let cx_handle = cx.clone();
             async move {
                 if let Some(res) = rx.recv().await {
-                    cx_handle.update(|cx: &mut App| {
-                        if let Some(app) = view_weak.upgrade() {
-                            app.update(cx, |this, cx| {
-                                match res {
-                                    Ok(result) => {
-                                        this.show_import_modal = false;
-                                        this.import_payload.clear();
-                                        this.push_notification(format!(
-                                            "Import finished: {} imported, {} skipped",
-                                            result.imported, result.skipped
-                                        ), false, cx);
-                                        this.fetch_connections(cx);
-                                    }
-                                    Err(e) => {
-                                        this.push_notification(format!("Import error: {e}"), true, cx);
-                                    }
+                    let conns = match res {
+                        Ok(c) => c,
+                        Err(e) => {
+                            cx_handle.update(|cx: &mut App| {
+                                if let Some(app) = view_weak.upgrade() {
+                                    app.update(cx, |this, cx| {
+                                        this.push_notification(e, true, cx);
+                                        cx.notify();
+                                    });
                                 }
-                                cx.notify();
                             });
+                            return;
+                        }
+                    };
+                    let (tx2, mut rx2) =
+                        tokio::sync::mpsc::unbounded_channel::<Result<ImportResult, String>>();
+                    TOKIO_RT.spawn(async move {
+                        match client.import_connections(&conns).await {
+                            Ok(r) => {
+                                let _ = tx2.send(Ok(r));
+                            }
+                            Err(e) => {
+                                let _ = tx2.send(Err(e.to_string()));
+                            }
                         }
                     });
+                    if let Some(res2) = rx2.recv().await {
+                        cx_handle.update(|cx: &mut App| {
+                            if let Some(app) = view_weak.upgrade() {
+                                app.update(cx, |this, cx| {
+                                    match res2 {
+                                        Ok(result) => {
+                                            this.push_notification(
+                                                format!(
+                                                    "Import finished: {} imported, {} skipped",
+                                                    result.imported, result.skipped
+                                                ),
+                                                false,
+                                                cx,
+                                            );
+                                            this.fetch_connections(cx);
+                                        }
+                                        Err(e) => {
+                                            this.push_notification(
+                                                format!("Import error: {e}"),
+                                                true,
+                                                cx,
+                                            );
+                                        }
+                                    }
+                                    cx.notify();
+                                });
+                            }
+                        });
+                    }
                 }
             }
         })
@@ -2829,11 +3042,31 @@ impl AppState {
 
     /// Close tab at given index and persist open sessions.
     pub fn close_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        // Connected tabs ask before disconnecting, matching the web client.
+        if let Some(tab) = self.session_manager.tabs().get(index) {
+            if matches!(tab.status, SessionStatus::Connected) {
+                self.pending_close_tab = Some(index);
+                cx.notify();
+                return;
+            }
+        }
+        self.confirm_close_tab(index, cx);
+    }
+
+    /// Actually close a tab (after confirmation, or immediately when idle).
+    pub fn confirm_close_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.pending_close_tab = None;
         self.session_manager.close_tab(index);
         if self.session_manager.tab_count() == 0 {
             self.show_hosts_catalog = true;
         }
         self.persist_open_sessions();
+        cx.notify();
+    }
+
+    /// Cancel the pending tab-close confirmation.
+    pub fn cancel_close_tab(&mut self, cx: &mut Context<Self>) {
+        self.pending_close_tab = None;
         cx.notify();
     }
 

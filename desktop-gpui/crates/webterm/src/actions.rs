@@ -5,6 +5,7 @@ use gpui::*;
 actions!(
     terminal_tabs,
     [
+        EscapeOverlays,
         NewTab,
         CloseTab,
         NextTab,
@@ -24,6 +25,7 @@ actions!(
 /// Register standard tab navigation keybindings.
 pub fn bind_tab_keys(cx: &mut App) {
     cx.bind_keys([
+        KeyBinding::new("escape", EscapeOverlays, None),
         KeyBinding::new("ctrl-t", NewTab, None),
         KeyBinding::new("ctrl-w", CloseTab, None),
         KeyBinding::new("ctrl-tab", NextTab, None),

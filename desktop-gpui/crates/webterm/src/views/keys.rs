@@ -303,7 +303,7 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                                         .text_color(muted_text),
                                                 )
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                    this.delete_ssh_key(&key_id_del, cx);
+                                                    this.open_delete_key_modal(&key_id_del, cx);
                                                 })),
                                         ),
                                 )

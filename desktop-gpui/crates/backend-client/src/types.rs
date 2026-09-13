@@ -74,6 +74,15 @@ pub struct CreateKeyRequest {
     pub key_base64: String,
 }
 
+/// Warning body returned by DELETE /api/keys/:id when the key is still
+/// referenced by connections (200 with JSON body instead of 204).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeyDeleteWarning {
+    pub warning: String,
+    #[serde(default)]
+    pub affected_connections: u32,
+}
+
 /// Request body for PUT /api/keys/:id. `key_base64` is optional; when absent
 /// the backend keeps the existing key material.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

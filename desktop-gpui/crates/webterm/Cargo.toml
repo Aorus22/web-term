@@ -23,6 +23,7 @@ webterm-settings = { workspace = true }
 webterm-backend-client = { workspace = true }
 webterm-terminal = { workspace = true }
 parking_lot = { workspace = true }
+rfd = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

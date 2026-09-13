@@ -1,7 +1,7 @@
 //! Navigation shell view: left sidebar and main content views.
 
 use crate::actions::{
-    CloseTab, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7, JumpTab8,
+    CloseTab, EscapeOverlays, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7, JumpTab8,
     JumpTab9, NewTab, NextTab, PrevTab,
 };
 use crate::app_state::{AppState, View};
@@ -35,12 +35,6 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
 
     let content_pane = render_content_pane(app, active_view, is_dark, cx);
 
-    let import_modal_overlay = if app.show_import_modal {
-        Some(crate::views::connection_modal::render_import_modal(app, cx))
-    } else {
-        None
-    };
-
     let sheet_slot = render_sheet_slot(app, cx);
 
     let passphrase_modal_overlay = if app.pending_passphrase_conn.is_some() {
@@ -50,6 +44,8 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     } else {
         None
     };
+
+    let confirm_modals_overlay = render_confirm_modals(app, cx);
 
     let delete_forward_modal_overlay = if app.delete_forward_target.is_some() {
         Some(crate::views::forwards::render_delete_forward_modal(app, cx))
@@ -123,6 +119,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .on_action(cx.listener(|this, _: &CloseTab, _window, cx| {
             let idx = this.session_manager.active_index();
             this.close_tab(idx, cx);
+        }))
+        .on_action(cx.listener(|this, _: &EscapeOverlays, window, cx| {
+            this.handle_escape(window, cx);
         }))
         .on_action(cx.listener(|this, _: &NextTab, _window, cx| {
             this.cycle_next_tab(cx);
@@ -370,8 +369,8 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         .child(render_tab_strip(app, cx)),
                 ),
         )
-        .children(import_modal_overlay)
         .children(passphrase_modal_overlay)
+        .children(confirm_modals_overlay)
         .children(delete_forward_modal_overlay)
         .children(sftp_context_menu_overlay)
         .children(sftp_modal_overlay)
@@ -490,4 +489,221 @@ fn render_content_pane(
             .child(crate::views::settings::render_settings_view(app, cx))
             .into_any_element(),
     }
+}
+
+
+/// Confirmation dialogs: close connected tab, delete connection, delete key
+/// (with the affected-connections warning step from the web client).
+pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> Option<AnyElement> {
+    let is_dark = app.is_dark();
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let tag_bg = app.muted_bg();
+    let destructive = app.destructive_color();
+    let _ = is_dark;
+
+    if let Some(idx) = app.pending_close_tab {
+        let title = app
+            .session_manager
+            .tabs()
+            .get(idx)
+            .map(|t| t.title.clone())
+            .unwrap_or_else(|| "this host".to_string());
+        return Some(
+            confirm_dialog_shell(app, cx, |this, _, cx| {
+                this.cancel_close_tab(cx);
+            })
+            .child(
+                div()
+                    .text_base()
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(text_color)
+                    .child("Disconnect from host"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(muted_text)
+                    .child(format!("Disconnect from {}? The tab will be closed.", title)),
+            )
+            .child(
+                confirm_dialog_buttons(
+                    app,
+                    cx,
+                    "Cancel",
+                    "Disconnect",
+                    |this, cx| this.cancel_close_tab(cx),
+                    move |this, _, cx| {
+                        // Backdrop dismiss must not close the tab; use idx.
+                        this.confirm_close_tab(idx, cx);
+                    },
+                ),
+            )
+            .into_any_element(),
+        );
+    }
+
+    if let Some(conn) = app.delete_connection_target.clone() {
+        return Some(
+            confirm_dialog_shell(app, cx, |this, _, cx| {
+                this.cancel_delete_connection_modal(cx);
+            })
+            .child(
+                div()
+                    .text_base()
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(text_color)
+                    .child("Delete Connection"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(muted_text)
+                    .child(format!(
+                        "Delete \"{}\"? This action cannot be undone.",
+                        conn.label
+                    )),
+            )
+            .child(confirm_dialog_buttons(
+                app,
+                cx,
+                "Cancel",
+                "Delete",
+                |this, cx| this.cancel_delete_connection_modal(cx),
+                move |this, _, cx| {
+                    this.delete_connection(&conn.id, cx);
+                    this.delete_connection_target = None;
+                },
+            ))
+            .into_any_element(),
+        );
+    }
+
+    if let Some(key) = app.delete_key_target.clone() {
+        let (title, body) = match &app.key_delete_warning {
+            Some((warning, count)) => (
+                "Key still in use",
+                format!(
+                    "{}\n\nDeleting \"{}\" will remove key-based auth from {} connection(s). Are you sure you want to proceed?",
+                    warning, key.name, count
+                ),
+            ),
+            None => (
+                "Delete SSH Key",
+                format!("Are you sure you want to delete \"{}\"? This action cannot be undone.", key.name),
+            ),
+        };
+        return Some(
+            confirm_dialog_shell(app, cx, move |this, _, cx| {
+                this.confirm_delete_key(cx);
+            })
+            .child(
+                div()
+                    .text_base()
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(text_color)
+                    .child(title),
+            )
+            .child(div().text_sm().text_color(muted_text).child(body))
+            .child(confirm_dialog_buttons(
+                app,
+                cx,
+                "Cancel",
+                "Delete",
+                |this, cx| this.cancel_delete_key_modal(cx),
+                |this, _, cx| this.confirm_delete_key(cx),
+            ))
+            .into_any_element(),
+        );
+    }
+
+    None
+}
+
+/// Shared centered dialog shell: dark backdrop, dismiss on backdrop click.
+fn confirm_dialog_shell(
+    app: &AppState,
+    cx: &mut Context<AppState>,
+    on_dismiss: impl Fn(&mut AppState, &mut Window, &mut Context<AppState>) + 'static,
+) -> Div {
+    div()
+        .absolute()
+        .inset_0()
+        .flex()
+        .items_center()
+        .justify_center()
+        .bg(rgba(0x00000088))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, _, window, cx| on_dismiss(this, window, cx)),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .w(px(420.0))
+                .rounded_xl()
+                .bg(app.card_bg())
+                .border_1()
+                .border_color(app.border_color())
+                .shadow_lg()
+                .p_6()
+                .gap_3()
+                .on_mouse_down(MouseButton::Left, |_, _, _| {}),
+        )
+}
+
+/// Right-aligned Cancel (neutral) + destructive action buttons.
+fn confirm_dialog_buttons(
+    app: &AppState,
+    cx: &mut Context<AppState>,
+    cancel_label: &'static str,
+    action_label: &'static str,
+    on_cancel: impl Fn(&mut AppState, &mut Context<AppState>) + 'static,
+    on_action: impl Fn(&mut AppState, &mut Window, &mut Context<AppState>) + 'static,
+) -> Div {
+    let tag_bg = app.muted_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    div()
+        .mt_2()
+        .flex()
+        .flex_row()
+        .justify_end()
+        .gap_2()
+        .child(
+            div()
+                .px_4()
+                .py_2()
+                .rounded_md()
+                .bg(tag_bg)
+                .hover(move |s| s.bg(border_color))
+                .cursor_pointer()
+                .text_sm()
+                .text_color(text_color)
+                .child(cancel_label)
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, _, _window, cx| on_cancel(this, cx)),
+                ),
+        )
+        .child(
+            div()
+                .px_4()
+                .py_2()
+                .rounded_md()
+                .bg(app.destructive_color())
+                .hover(|s| s.opacity(0.9))
+                .cursor_pointer()
+                .text_sm()
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(rgb(0xffffff))
+                .child(action_label)
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, _, window, cx| on_action(this, window, cx)),
+                ),
+        )
 }

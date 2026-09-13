@@ -1,6 +1,8 @@
 //! Hosts Catalog view: connection cards grid, tag filtering, and quick-connect matching web client.
 
 use gpui::*;
+use gpui_component::input::Input;
+use gpui_component::Sizable;
 use webterm_backend_client::Connection;
 use crate::icons::{ARROW_DOWN_SVG, ARROW_UP_SVG, PLUS_SVG};
 use crate::app_state::AppState;
@@ -59,6 +61,15 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .font_weight(FontWeight::BOLD)
                                 .text_color(text_color)
                                 .child("Hosts"),
+                        )
+                        // Search box (matches web TagFilter row)
+                        .child(
+                            div().w(px(220.0)).child(
+                                Input::new(&app.inputs().hosts_search)
+                                    .with_size(gpui_component::Size::Small)
+                                    .w_full()
+                                    .text_size(px(12.0)),
+                            ),
                         )
                         // Tags (if any exist)
                         .children(if !all_tags.is_empty() {
@@ -204,7 +215,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 )
                                 .child("Import")
                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.open_import_modal(cx);
+                                    this.import_connections_from_file(cx);
                                 })),
                         )
                         // + New Host button
@@ -493,7 +504,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                                 .text_color(muted_text),
                                                         )
                                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                            this.delete_connection(&conn_id_del, cx);
+                                                            this.open_delete_connection_modal(&conn_id_del, cx);
                                                         })),
                                                 ),
                                         )

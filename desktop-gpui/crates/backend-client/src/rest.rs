@@ -5,6 +5,7 @@ use crate::types::{
     Connection, CreateConnectionRequest, CreateForwardRequest, CreateKeyRequest,
     ForwardActionResponse, ImportResult, PortForward, SessionInfo, Settings, SftpFileInfo,
     SftpTransferStatus, SshKey, UpdateConnectionRequest, UpdateForwardRequest, UpdateKeyRequest,
+    KeyDeleteWarning,
 };
 use std::time::Duration;
 use thiserror::Error;
@@ -377,7 +378,10 @@ impl BackendClient {
     }
 
     /// Delete SSH key via DELETE /api/keys/:id.
-    pub async fn delete_key(&self, id: &str) -> Result<(), ClientError> {
+    /// Delete SSH key. A 204 means deleted; a 200 carries a warning body
+    /// (the key is referenced by connections) matching the web client's
+    /// two-step delete confirmation.
+    pub async fn delete_key(&self, id: &str) -> Result<Option<KeyDeleteWarning>, ClientError> {
         let url = format!("{}/api/keys/{}", self.base_url, id);
         let resp = self
             .http
@@ -395,7 +399,18 @@ impl BackendClient {
             return Err(ClientError::Status { url, status, body });
         }
 
-        Ok(())
+        if resp.status() == reqwest::StatusCode::NO_CONTENT {
+            return Ok(None);
+        }
+
+        let body = resp.text().await.unwrap_or_default();
+        if body.trim().is_empty() {
+            return Ok(None);
+        }
+        match serde_json::from_str::<KeyDeleteWarning>(&body) {
+            Ok(w) => Ok(Some(w)),
+            Err(_) => Ok(None),
+        }
     }
 
     /// Fetch active backend sessions from GET /api/sessions.
