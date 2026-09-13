@@ -141,6 +141,7 @@ fn test_pane_selection_and_clearing() {
 #[test]
 fn test_transfer_progress_calculation() {
     let item = SftpTransferItem {
+        delete_source_after: None,
         id: "tx-1".to_string(),
         name: "video.mp4".to_string(),
         from_source: "local".to_string(),
