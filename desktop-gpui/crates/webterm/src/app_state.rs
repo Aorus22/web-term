@@ -5487,10 +5487,10 @@ impl AppState {
 }
 
 impl Render for AppState {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let key_secret = self.settings.encryption_key.as_deref();
 
-        match self.backend_status {
+        let content: AnyElement = match self.backend_status {
             BackendStatus::Ready => render_nav_shell(self, cx),
             _ => {
                 let status = self.backend_status.clone();
@@ -5503,6 +5503,24 @@ impl Render for AppState {
                     cx,
                 )
             }
+        };
+
+        // Floating rounded frame for client-side decorations: a transparent
+        // margin lets the compositor draw shadow around rounded content.
+        // Square full-bleed when maximized.
+        if window.is_maximized() {
+            div().size_full().child(content)
+        } else {
+            div().size_full().p(px(6.0)).child(
+                div()
+                    .size_full()
+                    .overflow_hidden()
+                    .rounded_xl()
+                    .border_1()
+                    .border_color(self.border_color())
+                    .shadow_xl()
+                    .child(content),
+            )
         }
     }
 }

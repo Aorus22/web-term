@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=WebTerm (GPUI)
+GenericName=Terminal Emulator
+Comment=WebTerm native GPUI desktop client
+Exec=__BINDIR__/webterm
+Icon=webterm-gpui
+StartupWMClass=webterm-gpui
+Terminal=false
+Categories=Utility;TerminalEmulator;
+StartupNotify=false

@@ -269,11 +269,19 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 }),
         )
         // Center: Draggable Title Bar Area
+        // NOTE (linux): gpui-pre 0.3.3 ignores WindowControlArea hit-test on
+        // X11/Wayland (on_hit_test_window_control is a no-op), so the
+        // declarative Drag area alone never moves the window. The explicit
+        // start_window_move() below is what actually drags on Linux; it is a
+        // harmless duplicate on Windows/macOS.
         .child(
             div()
                 .flex_1()
                 .h_full()
-                .window_control_area(WindowControlArea::Drag),
+                .window_control_area(WindowControlArea::Drag)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_move();
+                }),
         )
         // Right: Custom Window Controls (Minimize, Maximize/Restore, Close)
         .child(

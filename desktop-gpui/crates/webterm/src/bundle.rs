@@ -18,25 +18,31 @@ pub fn resolve_backend_path_with_current_exe(
     }
 
     let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
-    let bin_name = format!("backend{}", exe_suffix);
+    let bin_names = [
+        format!("backend{}", exe_suffix),
+        format!("webterm-backend{}", exe_suffix),
+    ];
 
     // 1. Packaged bundle layout: adjacent to running executable
     if let Some(exe) = current_exe {
         if let Some(parent) = exe.parent() {
-            let adjacent = parent.join(&bin_name);
-            if adjacent.exists() {
-                return adjacent.canonicalize().unwrap_or(adjacent);
+            for bin_name in &bin_names {
+                let adjacent = parent.join(bin_name);
+                if adjacent.exists() {
+                    return adjacent.canonicalize().unwrap_or(adjacent);
+                }
             }
         }
     }
 
     // 2. Development resolution candidates
-    let candidates = [
-        PathBuf::from("test-support").join(&bin_name),
-        PathBuf::from("desktop-gpui/test-support").join(&bin_name),
-        PathBuf::from("../../desktop-gpui/test-support").join(&bin_name),
-        PathBuf::from("../test-support").join(&bin_name),
-    ];
+    let mut candidates = Vec::new();
+    for bin_name in &bin_names {
+        candidates.push(PathBuf::from("test-support").join(bin_name));
+        candidates.push(PathBuf::from("desktop-gpui/test-support").join(bin_name));
+        candidates.push(PathBuf::from("../../desktop-gpui/test-support").join(bin_name));
+        candidates.push(PathBuf::from("../test-support").join(bin_name));
+    }
 
     for c in candidates {
         if c.exists() {
@@ -45,7 +51,7 @@ pub fn resolve_backend_path_with_current_exe(
     }
 
     // Fallback path
-    PathBuf::from(format!("test-support/{}", bin_name))
+    PathBuf::from(format!("test-support/backend{}", exe_suffix))
 }
 
 /// Convenience wrapper resolving with standard `std::env::current_exe()`.

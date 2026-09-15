@@ -56,6 +56,15 @@ fn main() {
         let window_options = WindowOptions {
             window_bounds: Some(initial_bounds),
             window_min_size: Some(size(px(960.0), px(540.0))),
+            // Must match StartupWMClass/Icon in dist/webterm-gpui.desktop so
+            // docks (GNOME/KDE) group the window and show the app icon.
+            app_id: Some("webterm-gpui".to_string()),
+            // Transparent + client decorations: the root view draws its own
+            // rounded floating frame (see AppState::render), giving rounded
+            // corners and compositor shadow on Linux instead of a fused
+            // rectangle.
+            window_background: WindowBackgroundAppearance::Transparent,
+            window_decorations: Some(WindowDecorations::Client),
             titlebar: Some(TitlebarOptions {
                 title: Some("WebTerm Desktop".into()),
                 appears_transparent: true,
