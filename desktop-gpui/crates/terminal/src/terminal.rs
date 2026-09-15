@@ -209,3 +209,59 @@ impl Terminal {
         self.event_rx.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alacritty_terminal::grid::Dimensions;
+
+    fn feed_lines(term: &mut Terminal, count: usize) {
+        for i in 0..count {
+            let line = format!("line {i:03}\r\n");
+            term.process_bytes(line.as_bytes());
+        }
+    }
+
+    fn metrics(term: &Terminal) -> (usize, usize, usize) {
+        term.with_term(|t| {
+            let grid = t.grid();
+            (
+                grid.history_size(),
+                grid.display_offset(),
+                grid.screen_lines(),
+            )
+        })
+    }
+
+    #[test]
+    fn scrollback_accumulates_and_scroll_moves_offset() {
+        let mut term = Terminal::with_config(
+            80,
+            24,
+            TerminalConfig {
+                scrollback_limit: 1000,
+            },
+        );
+        feed_lines(&mut term, 100);
+
+        let (history, offset, visible) = metrics(&term);
+        assert_eq!(visible, 24);
+        assert!(history > 0, "expected scrollback history, got {history}");
+        assert_eq!(offset, 0);
+
+        // Scroll up 5 lines into history.
+        term.scroll_display(5);
+        let (_, offset, _) = metrics(&term);
+        assert_eq!(offset, 5);
+
+        // Scrolling past the top clamps.
+        term.scroll_display(10_000);
+        let (history, offset, _) = metrics(&term);
+        assert_eq!(offset, history);
+
+        // Back to bottom.
+        term.scroll_to_bottom();
+        let (_, offset, _) = metrics(&term);
+        assert_eq!(offset, 0);
+    }
+}

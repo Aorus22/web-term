@@ -1,6 +1,7 @@
 //! WebTerm terminal emulation engine (alacritty_terminal + GPUI).
 
 pub mod colors;
+pub mod debug_log;
 pub mod event;
 pub mod input;
 pub mod mouse;

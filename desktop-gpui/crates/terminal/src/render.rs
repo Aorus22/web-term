@@ -269,6 +269,10 @@ impl TerminalRenderer {
         let grid = term.grid();
         let num_lines = grid.screen_lines();
         let num_cols = grid.columns();
+        // display_offset > 0 means the user scrolled up into history: visible
+        // row i shows grid line (i - offset). Without this the viewport always
+        // shows live content and scrolling appears to do nothing.
+        let display_offset = grid.display_offset() as i32;
 
         // 1. Paint default background covering the full element bounds
         window.paint_quad(quad(
@@ -292,7 +296,7 @@ impl TerminalRenderer {
 
         // 2. Iterate visible lines
         for line_idx in 0..num_lines {
-            let line = Line(line_idx as i32);
+            let line = Line(line_idx as i32 - display_offset);
 
             let cells: Vec<(usize, Cell)> = (0..num_cols)
                 .map(|col_idx| {
@@ -444,14 +448,16 @@ impl TerminalRenderer {
             }
         }
 
-        // 3. Paint cursor
+        // 3. Paint cursor (cursor coords are live-screen relative; shift into
+        // the scrolled viewport, hiding it when it is outside the viewport).
         let cursor_point = grid.cursor.point;
         let vi_mode = term.mode().contains(TermMode::VI);
         let show_cursor = vi_mode || term.mode().contains(TermMode::SHOW_CURSOR);
+        let cursor_row = cursor_point.line.0 + display_offset;
 
-        if show_cursor && cursor_point.line.0 >= 0 && (cursor_point.line.0 as usize) < num_lines {
+        if show_cursor && cursor_row >= 0 && (cursor_row as usize) < num_lines {
             let cursor_x = origin.x + self.cell_width * (cursor_point.column.0 as f32);
-            let cursor_y = origin.y + self.cell_height * (cursor_point.line.0 as f32);
+            let cursor_y = origin.y + self.cell_height * (cursor_row as f32);
             let cursor_color = self.palette.cursor;
             let shape = self
                 .cursor_shape_override

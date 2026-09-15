@@ -524,63 +524,77 @@ pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> 
             .get(idx)
             .map(|t| t.title.clone())
             .unwrap_or_else(|| "this host".to_string());
+        let disconnect_buttons = confirm_dialog_buttons(
+            app,
+            cx,
+            "Cancel",
+            "Disconnect",
+            |this, cx| this.cancel_close_tab(cx),
+            move |this, _, cx| {
+                // Backdrop dismiss must not close the tab; use idx.
+                this.confirm_close_tab(idx, cx);
+            },
+        )
+        .into_any_element();
         return Some(
-            confirm_dialog_shell(app, cx, |this, _, cx| {
-                this.cancel_close_tab(cx);
-            })
-            .child(
-                div()
-                    .text_base()
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(text_color)
-                    .child("Disconnect from host"),
-            )
-            .child(div().text_sm().text_color(muted_text).child(format!(
-                "Disconnect from {}? The tab will be closed.",
-                title
-            )))
-            .child(confirm_dialog_buttons(
+            confirm_dialog_shell(
                 app,
                 cx,
-                "Cancel",
-                "Disconnect",
-                |this, cx| this.cancel_close_tab(cx),
-                move |this, _, cx| {
-                    // Backdrop dismiss must not close the tab; use idx.
-                    this.confirm_close_tab(idx, cx);
+                |this, _, cx| {
+                    this.cancel_close_tab(cx);
                 },
-            ))
+                vec![
+                    div()
+                        .text_base()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(text_color)
+                        .child("Disconnect from host")
+                        .into_any_element(),
+                    div().text_sm().text_color(muted_text).child(format!(
+                        "Disconnect from {}? The tab will be closed.",
+                        title
+                    )).into_any_element(),
+                    disconnect_buttons,
+                ],
+            )
             .into_any_element(),
         );
     }
 
     if let Some(conn) = app.delete_connection_target.clone() {
+        let delete_conn_buttons = confirm_dialog_buttons(
+            app,
+            cx,
+            "Cancel",
+            "Delete",
+            |this, cx| this.cancel_delete_connection_modal(cx),
+            move |this, _, cx| {
+                this.delete_connection(&conn.id, cx);
+                this.delete_connection_target = None;
+            },
+        )
+        .into_any_element();
         return Some(
-            confirm_dialog_shell(app, cx, |this, _, cx| {
-                this.cancel_delete_connection_modal(cx);
-            })
-            .child(
-                div()
-                    .text_base()
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(text_color)
-                    .child("Delete Connection"),
-            )
-            .child(div().text_sm().text_color(muted_text).child(format!(
-                "Delete \"{}\"? This action cannot be undone.",
-                conn.label
-            )))
-            .child(confirm_dialog_buttons(
+            confirm_dialog_shell(
                 app,
                 cx,
-                "Cancel",
-                "Delete",
-                |this, cx| this.cancel_delete_connection_modal(cx),
-                move |this, _, cx| {
-                    this.delete_connection(&conn.id, cx);
-                    this.delete_connection_target = None;
+                |this, _, cx| {
+                    this.cancel_delete_connection_modal(cx);
                 },
-            ))
+                vec![
+                    div()
+                        .text_base()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(text_color)
+                        .child("Delete Connection")
+                        .into_any_element(),
+                    div().text_sm().text_color(muted_text).child(format!(
+                        "Delete \"{}\"? This action cannot be undone.",
+                        conn.label
+                    )).into_any_element(),
+                    delete_conn_buttons,
+                ],
+            )
             .into_any_element(),
         );
     }
@@ -599,26 +613,33 @@ pub fn render_confirm_modals(app: &mut AppState, cx: &mut Context<AppState>) -> 
                 format!("Are you sure you want to delete \"{}\"? This action cannot be undone.", key.name),
             ),
         };
+        let delete_key_buttons = confirm_dialog_buttons(
+            app,
+            cx,
+            "Cancel",
+            "Delete",
+            |this, cx| this.cancel_delete_key_modal(cx),
+            |this, _, cx| this.confirm_delete_key(cx),
+        )
+        .into_any_element();
         return Some(
-            confirm_dialog_shell(app, cx, |this, _, cx| {
-                this.cancel_delete_key_modal(cx);
-            })
-            .child(
-                div()
-                    .text_base()
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(text_color)
-                    .child(title),
-            )
-            .child(div().text_sm().text_color(muted_text).child(body))
-            .child(confirm_dialog_buttons(
+            confirm_dialog_shell(
                 app,
                 cx,
-                "Cancel",
-                "Delete",
-                |this, cx| this.cancel_delete_key_modal(cx),
-                |this, _, cx| this.confirm_delete_key(cx),
-            ))
+                |this, _, cx| {
+                    this.cancel_delete_key_modal(cx);
+                },
+                vec![
+                    div()
+                        .text_base()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(text_color)
+                        .child(title)
+                        .into_any_element(),
+                    div().text_sm().text_color(muted_text).child(body).into_any_element(),
+                    delete_key_buttons,
+                ],
+            )
             .into_any_element(),
         );
     }
@@ -631,6 +652,7 @@ fn confirm_dialog_shell(
     app: &AppState,
     cx: &mut Context<AppState>,
     on_dismiss: impl Fn(&mut AppState, &mut Window, &mut Context<AppState>) + 'static,
+    content: Vec<AnyElement>,
 ) -> Div {
     div()
         .absolute()
@@ -655,7 +677,8 @@ fn confirm_dialog_shell(
                 .shadow_lg()
                 .p_6()
                 .gap_3()
-                .on_mouse_down(MouseButton::Left, |_, _, _| {}),
+                .on_mouse_down(MouseButton::Left, |_, _, _| {})
+                .children(content),
         )
 }
 

@@ -406,6 +406,30 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 cx.notify();
                                             }),
                                         ),
+                                )
+                                .child(
+                                    div()
+                                        .px_2()
+                                        .py_0p5()
+                                        .rounded_md()
+                                        .bg(tag_bg)
+                                        .hover(|s| {
+                                            s.bg(if is_dark {
+                                                rgb(0x52525b)
+                                            } else {
+                                                rgb(0xcbd5e1)
+                                            })
+                                        })
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .text_color(text_color)
+                                        .child("Browse File…")
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(|this, _, window, cx| {
+                                                this.browse_key_file_for_add(window, cx);
+                                            }),
+                                        ),
                                 ),
                         ),
                 ),
@@ -499,6 +523,30 @@ pub fn render_edit_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> 
                                                     cx,
                                                 );
                                                 cx.notify();
+                                            }),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .px_2()
+                                        .py_0p5()
+                                        .rounded_md()
+                                        .bg(tag_bg)
+                                        .hover(|s| {
+                                            s.bg(if is_dark {
+                                                rgb(0x52525b)
+                                            } else {
+                                                rgb(0xcbd5e1)
+                                            })
+                                        })
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .text_color(text_color)
+                                        .child("Browse File…")
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(|this, _, window, cx| {
+                                                this.browse_key_file_for_edit(window, cx);
                                             }),
                                         ),
                                 ),

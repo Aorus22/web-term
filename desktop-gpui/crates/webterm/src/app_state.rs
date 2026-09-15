@@ -375,6 +375,26 @@ impl ConnectionFormState {
     }
 }
 
+/// Pick a private key file with the native dialog (synchronous: the dialog is
+/// modal, so blocking the UI thread while it is open is correct).
+/// Returns (name-stem, trimmed content).
+fn pick_key_file() -> Option<(String, String)> {
+    let path = rfd::FileDialog::new()
+        .add_filter("Private key", &["pem", "key", "openssh", "ppk"])
+        .add_filter("All files", &["*"])
+        .pick_file()?;
+    let content = std::fs::read_to_string(&path).ok()?.trim().to_string();
+    if content.is_empty() {
+        return None;
+    }
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("key")
+        .to_string();
+    Some((stem, content))
+}
+
 /// Form state for Editing an existing SSH Key (rename / replace key material).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EditKeyFormState {
@@ -1619,6 +1639,34 @@ impl AppState {
         AppState::set_textarea_value(&inputs.new_key_pem, "", window, cx);
         self.add_key_error = None;
         cx.notify();
+    }
+
+    /// Open a native file picker and load the chosen private key file into the
+    /// Add-Key form. Name auto-fills from the file name (web client parity).
+    /// Synchronous: the native dialog is modal, so the UI thread blocks while
+    /// it is open and the entities update with a live Window — no fragile
+    /// cross-task window plumbing.
+    pub fn browse_key_file_for_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((stem, content)) = pick_key_file() {
+            let inputs = self.inputs();
+            AppState::set_input_value(&inputs.new_key_name, &stem, window, cx);
+            AppState::set_textarea_value(&inputs.new_key_pem, &content, window, cx);
+            self.add_key_error = None;
+            cx.notify();
+        }
+    }
+
+    /// Open a native file picker and load the chosen file into the Edit-Key
+    /// form as replacement key material.
+    pub fn browse_key_file_for_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((_stem, content)) = pick_key_file() {
+            let inputs = self.inputs();
+            AppState::set_textarea_value(&inputs.edit_key_pem, &content, window, cx);
+            if let Some(form) = self.edit_key_modal.as_mut() {
+                form.error_message = None;
+            }
+            cx.notify();
+        }
     }
 
     /// Play the Add SSH Key sheet's exit animation, then unmount it.
@@ -5505,22 +5553,25 @@ impl Render for AppState {
             }
         };
 
-        // Floating rounded frame for client-side decorations: a transparent
-        // margin lets the compositor draw shadow around rounded content.
-        // Square full-bleed when maximized.
-        if window.is_maximized() {
-            div().size_full().child(content)
+        // CSD window frame (gpui-component): shadow padding, 1px border, and
+        // edge/corner resize hit zones with proper cursors. Without this the
+        // window is neither resizable nor shadowed on Linux — the WM only
+        // resizes server-decorated windows. Inner content keeps rounded
+        // corners; square full-bleed when maximized or tiled.
+        let framed = !window.is_maximized()
+            && !matches!(
+                window.window_decorations(),
+                Decorations::Client { tiling } if tiling.is_tiled()
+            );
+        let inner = if framed {
+            div()
+                .size_full()
+                .overflow_hidden()
+                .rounded_xl()
+                .child(content)
         } else {
-            div().size_full().p(px(6.0)).child(
-                div()
-                    .size_full()
-                    .overflow_hidden()
-                    .rounded_xl()
-                    .border_1()
-                    .border_color(self.border_color())
-                    .shadow_xl()
-                    .child(content),
-            )
-        }
+            div().size_full().child(content)
+        };
+        gpui_component::window_border().child(inner.into_any_element())
     }
 }

@@ -23,6 +23,12 @@ pub type ResizeCallback = Arc<dyn Fn(usize, usize) + Send + Sync>;
 pub type TitleCallback = Arc<dyn Fn(&str, &mut App) + Send + Sync>;
 pub type BellCallback = Arc<dyn Fn() + Send + Sync>;
 
+/// In-progress scrollbar thumb drag: pointer Y (px) where the grab started
+/// plus the display offset at that moment.
+struct ScrollbarDrag {
+    start_y: f32,
+    start_offset: usize,
+}
 /// Core GPUI view wrapping the terminal emulator.
 pub struct TerminalView {
     terminal: Arc<Mutex<Terminal>>,
@@ -30,6 +36,11 @@ pub struct TerminalView {
     focus_handle: FocusHandle,
     padding: Edges<Pixels>,
     is_selecting: bool,
+    scrollbar_drag: Option<ScrollbarDrag>,
+    /// Fractional pixel remainder from smooth-scroll (touchpad) deltas that
+    /// were too small to form a whole line. Without this, sub-cell-height
+    /// deltas round to zero and scrolling feels dead.
+    scroll_remainder_px: f32,
     last_bounds: Arc<Mutex<Option<Bounds<Pixels>>>>,
     input_callback: Option<InputCallback>,
     resize_callback: Option<ResizeCallback>,
@@ -91,12 +102,25 @@ impl TerminalView {
         })
         .detach();
 
+        // Session context for field diagnostics (logged once per view).
+        crate::debug_log::debug_log(
+            "session",
+            format!(
+                "TerminalView created wayland={:?} xdg_session={:?} display={:?}",
+                std::env::var("WAYLAND_DISPLAY").ok(),
+                std::env::var("XDG_SESSION_TYPE").ok(),
+                std::env::var("DISPLAY").ok(),
+            ),
+        );
+
         Self {
             terminal: term_arc,
             renderer,
             focus_handle,
             padding: Edges::all(px(4.0)),
             is_selecting: false,
+            scrollbar_drag: None,
+            scroll_remainder_px: 0.0,
             last_bounds: Arc::new(Mutex::new(None)),
             input_callback: None,
             resize_callback: None,
@@ -274,6 +298,78 @@ impl TerminalView {
         cx.notify();
     }
 
+    /// (history_lines, display_offset, visible_lines) for the scrollbar.
+    /// display_offset 0 = bottom, history_lines = max offset.
+    fn scroll_metrics(&self) -> (usize, usize, usize) {
+        self.terminal.lock().with_term(|term| {
+            use alacritty_terminal::grid::Dimensions;
+            let grid = term.grid();
+            (
+                grid.history_size(),
+                grid.display_offset(),
+                grid.screen_lines(),
+            )
+        })
+    }
+
+    /// Begin dragging the scrollbar thumb.
+    fn on_scrollbar_thumb_down(
+        &mut self,
+        event: &MouseDownEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let (_, offset, _) = self.scroll_metrics();
+        crate::debug_log::debug_log(
+            "scroll",
+            format!("thumb grab y={} offset={offset}", f32::from(event.position.y)),
+        );
+        self.scrollbar_drag = Some(ScrollbarDrag {
+            start_y: event.position.y.into(),
+            start_offset: offset,
+        });
+        // Thumb is a sibling of the canvas, but stop here so the canvas
+        // selection handler further up the tree never sees this press.
+        cx.stop_propagation();
+        cx.notify();
+    }
+
+    /// Continue an in-progress thumb drag: map pointer travel to lines.
+    /// The track spans the same height as the canvas (row layout, both full
+    /// height), so canvas bounds give the track geometry.
+    fn on_scrollbar_drag_move(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+        let Some(drag) = &self.scrollbar_drag else {
+            return;
+        };
+        let (history, _, _) = self.scroll_metrics();
+        if history == 0 {
+            return;
+        }
+        let track_h: f32 = self
+            .last_bounds
+            .lock()
+            .map(|b| b.size.height.into())
+            .unwrap_or(0.0);
+        if track_h <= 0.0 {
+            return;
+        }
+        let dy: f32 = f32::from(event.position.y) - drag.start_y;
+        let lines_per_px = history as f32 / track_h;
+        let target = (drag.start_offset as f32 - dy * lines_per_px)
+            .round()
+            .clamp(0.0, history as f32) as usize;
+        let (_, current, _) = self.scroll_metrics();
+        let delta = target as i32 - current as i32;
+        if delta != 0 {
+            self.terminal.lock().scroll_display(delta);
+            crate::debug_log::debug_log(
+                "scroll",
+                format!("thumb drag dy={dy:.1}px target={target} current={current} delta={delta} history={history}"),
+            );
+            cx.notify();
+        }
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
         // Clipboard shortcuts:
         // Ctrl+Shift+C or Cmd+C -> Copy
@@ -358,6 +454,10 @@ impl TerminalView {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.scrollbar_drag.is_some() {
+            self.on_scrollbar_drag_move(event, cx);
+            return;
+        }
         let bounds = *self.last_bounds.lock();
         if let Some(bounds) = bounds {
             let origin = Point {
@@ -415,6 +515,7 @@ impl TerminalView {
 
         if event.button == MouseButton::Left {
             self.is_selecting = false;
+            self.scrollbar_drag = None;
         }
 
         cx.notify();
@@ -426,13 +527,23 @@ impl TerminalView {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let (history, offset, _) = self.scroll_metrics();
+        crate::debug_log::debug_log(
+            "scroll",
+            format!("wheel delta={:?} history={history} offset={offset}", event.delta),
+        );
         let delta_lines = match event.delta {
             ScrollDelta::Lines(delta) => delta.y.round() as i32,
             ScrollDelta::Pixels(delta) => {
                 let dy: f32 = delta.y.into();
                 let ch: f32 = self.renderer.cell_height.into();
                 if ch > 0.0 {
-                    (dy / ch).round() as i32
+                    // Accumulate sub-line remainders so smooth-scroll deltas
+                    // smaller than one cell still move after a few ticks.
+                    self.scroll_remainder_px += dy;
+                    let lines = (self.scroll_remainder_px / ch).trunc();
+                    self.scroll_remainder_px -= lines * ch;
+                    lines as i32
                 } else {
                     0
                 }
@@ -442,6 +553,9 @@ impl TerminalView {
         if delta_lines == 0 {
             return;
         }
+
+        // NOTE: GPUI reports wheel-up as positive Y on both X11 and Wayland,
+        // matching scroll_report/scroll_display (positive = up / history).
 
         let bounds = *self.last_bounds.lock();
         let pt = if let Some(bounds) = bounds {
@@ -466,10 +580,22 @@ impl TerminalView {
         let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
 
         if let Some(bytes) = scroll_report(delta_lines, pt, mouse_mods, mode) {
+            crate::debug_log::debug_log(
+                "scroll",
+                format!("forwarded to app as escape sequence bytes={}", bytes.len()),
+            );
             self.write_to_pty(&bytes);
         } else {
             let mut term = self.terminal.lock();
             term.scroll_display(delta_lines);
+            let new_offset = {
+                use alacritty_terminal::grid::Dimensions;
+                term.term_arc().lock().grid().display_offset()
+            };
+            crate::debug_log::debug_log(
+                "scroll",
+                format!("applied delta={delta_lines} offset {offset}->{new_offset}"),
+            );
         }
 
         cx.notify();
@@ -494,6 +620,8 @@ impl Render for TerminalView {
 
         div()
             .size_full()
+            .flex()
+            .flex_row()
             .track_focus(&focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
@@ -537,7 +665,45 @@ impl Render for TerminalView {
                         measured.paint(bounds, padding, &raw_term, is_focused, window, cx);
                     },
                 )
-                .size_full(),
+                .flex_1()
+                .min_w_0()
+                .h_full(),
             )
+            .child(self.render_scrollbar(cx))
+    }
+}
+
+impl TerminalView {
+    /// Visible scrollbar track + draggable thumb. Track width stays constant
+    /// (no layout shift); thumb appears once scrollback exists. Thumb position
+    /// uses flex spacers so no pixel geometry is needed at render time.
+    fn render_scrollbar(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let (history, offset, visible) = self.scroll_metrics();
+        let total = (history + visible).max(1);
+        let top_frac = (history - offset) as f32 / total as f32;
+        let thumb_frac = visible as f32 / total as f32;
+        let bottom_frac = offset as f32 / total as f32;
+
+        div()
+            .w(px(10.0))
+            .h_full()
+            .flex()
+            .flex_col()
+            .items_center()
+            .py_1()
+            .child(div().flex_grow(top_frac.max(0.0)).min_h_0())
+            .child(
+                div()
+                    .w(px(6.0))
+                    .flex_grow(thumb_frac.max(0.0))
+                    .min_h(if history > 0 { px(20.0) } else { px(0.0) })
+                    .rounded_full()
+                    .bg(rgb(0x71717a))
+                    .opacity(if history > 0 { 0.55 } else { 0.0 })
+                    .hover(|s| s.opacity(0.9))
+                    .cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, cx.listener(Self::on_scrollbar_thumb_down)),
+            )
+            .child(div().flex_grow(bottom_frac.max(0.0)).min_h_0())
     }
 }
