@@ -235,7 +235,7 @@ fn render_pane(
                         .px_2()
                         .py_1()
                         .rounded_md()
-                        .hover(|s| {
+                        .id("sftp-01").hover(|s| {
                             s.bg(if is_dark {
                                 rgb(0x27272a)
                             } else {
@@ -273,7 +273,7 @@ fn render_pane(
                         .px_2()
                         .py_1()
                         .rounded_md()
-                        .hover(|s| {
+                        .id("sftp-02").hover(|s| {
                             s.bg(if is_dark {
                                 rgb(0x27272a)
                             } else {
@@ -321,7 +321,7 @@ fn render_pane(
                             CursorStyle::Arrow
                         })
                         .opacity(if state.can_go_back() { 1.0 } else { 0.25 })
-                        .hover(|s| {
+                        .id("sftp-03").hover(|s| {
                             if state.can_go_back() {
                                 s.bg(if is_dark {
                                     rgb(0x27272a)
@@ -354,7 +354,7 @@ fn render_pane(
                             CursorStyle::Arrow
                         })
                         .opacity(if state.can_go_forward() { 1.0 } else { 0.25 })
-                        .hover(|s| {
+                        .id("sftp-04").hover(|s| {
                             if state.can_go_forward() {
                                 s.bg(if is_dark {
                                     rgb(0x27272a)
@@ -567,7 +567,7 @@ fn render_table_header(
                 .items_center()
                 .gap_1()
                 .cursor_pointer()
-                .hover(|s| s.text_color(text_color))
+                .id("sftp-05").hover(|s| s.text_color(text_color))
                 .text_color(if sort_column == SftpSortColumn::Name {
                     text_color
                 } else {
@@ -609,7 +609,7 @@ fn render_table_header(
                 .items_center()
                 .gap_1()
                 .cursor_pointer()
-                .hover(|s| s.text_color(text_color))
+                .id("sftp-06").hover(|s| s.text_color(text_color))
                 .text_color(if sort_column == SftpSortColumn::ModTime {
                     text_color
                 } else {
@@ -652,7 +652,7 @@ fn render_table_header(
                 .justify_center()
                 .gap_1()
                 .cursor_pointer()
-                .hover(|s| s.text_color(text_color))
+                .id("sftp-07").hover(|s| s.text_color(text_color))
                 .text_color(if sort_column == SftpSortColumn::Size {
                     text_color
                 } else {
@@ -744,7 +744,7 @@ fn render_file_rows(
                 } else {
                     CursorStyle::Arrow
                 })
-                .hover(|s| if is_interactive { s.bg(hover_bg) } else { s })
+                .id("sftp-08").hover(|s| if is_interactive { s.bg(hover_bg) } else { s })
                 .child(
                     div()
                         .flex_1()
@@ -1049,7 +1049,7 @@ fn render_breadcrumbs_segments(
                                 } else {
                                     rgba(0x00000000)
                                 })
-                                .hover(move |s| if is_open { s } else { s.bg(hover_bg) })
+                                .id("sftp-10").hover(move |s| if is_open { s } else { s.bg(hover_bg) })
                                 .child(
                                     div()
                                         .text_sm()
@@ -1089,7 +1089,7 @@ fn render_breadcrumbs_segments(
                         .px_1p5()
                         .py_0p5()
                         .rounded_sm()
-                        .hover(|s| s.bg(hover_bg))
+                        .id(ElementId::NamedInteger("sftp-crumb".into(), idx as u64)).hover(|s| s.bg(hover_bg))
                         .cursor_pointer()
                         .child(
                             svg()
@@ -1148,7 +1148,7 @@ fn render_breadcrumbs_segments(
                             } else {
                                 rgba(0x00000000)
                             })
-                            .hover(move |s| if is_open { s } else { s.bg(hover_bg) })
+                            .id("sftp-12").hover(move |s| if is_open { s } else { s.bg(hover_bg) })
                             .child(
                                 div()
                                     .text_sm()
@@ -1188,7 +1188,7 @@ fn render_breadcrumbs_segments(
                     .px_1p5()
                     .py_0p5()
                     .rounded_sm()
-                    .hover(|s| s.bg(hover_bg))
+                    .id("sftp-13").hover(|s| s.bg(hover_bg))
                     .cursor_pointer()
                     .child(
                         svg()
@@ -1231,7 +1231,7 @@ fn render_breadcrumbs_segments(
                 } else {
                     rgba(0x00000000)
                 })
-                .hover(move |s| if is_path_open { s } else { s.bg(hover_bg) })
+                .id("sftp-14").hover(move |s| if is_path_open { s } else { s.bg(hover_bg) })
                 .child(
                     div()
                         .text_xs()
@@ -1267,7 +1267,7 @@ fn render_breadcrumbs_segments(
                     .px_1p5()
                     .py_0p5()
                     .rounded_sm()
-                    .hover(|s| s.bg(hover_bg))
+                    .id("sftp-15").hover(|s| s.bg(hover_bg))
                     .cursor_pointer()
                     .child(
                         svg()
@@ -1343,7 +1343,7 @@ fn render_source_picker_dropdown(
             .py_1p5()
             .rounded_sm()
             .cursor_pointer()
-            .hover(|s| s.bg(hover_bg))
+            .id("sftp-16").hover(|s| s.bg(hover_bg))
             .text_xs()
             .text_color(text_color)
             .child(
@@ -1378,7 +1378,7 @@ fn render_source_picker_dropdown(
                 .py_1p5()
                 .rounded_sm()
                 .cursor_pointer()
-                .hover(|s| s.bg(hover_bg))
+                .id(ElementId::Name(format!("sftp-conn-{}", conn.id).into())).hover(|s| s.bg(hover_bg))
                 .text_xs()
                 .text_color(text_color)
                 .child(
@@ -1516,7 +1516,7 @@ fn render_actions_dropdown(
                         .py_1p5()
                         .rounded_sm()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("sftp-18").hover(|s| s.bg(hover_bg))
                         .text_xs()
                         .text_color(text_color)
                         .child(
@@ -1545,7 +1545,7 @@ fn render_actions_dropdown(
                         .py_1p5()
                         .rounded_sm()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("sftp-19").hover(|s| s.bg(hover_bg))
                         .text_xs()
                         .text_color(text_color)
                         .child(
@@ -1573,7 +1573,7 @@ fn render_actions_dropdown(
                         .py_1p5()
                         .rounded_sm()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("sftp-20").hover(|s| s.bg(hover_bg))
                         .text_xs()
                         .text_color(text_color)
                         .child(
@@ -1609,7 +1609,7 @@ fn render_actions_dropdown(
                             CursorStyle::Arrow
                         })
                         .opacity(if has_single_selection { 1.0 } else { 0.4 })
-                        .hover(|s| {
+                        .id("sftp-21").hover(|s| {
                             if has_single_selection {
                                 s.bg(hover_bg)
                             } else {
@@ -1651,7 +1651,7 @@ fn render_actions_dropdown(
                             CursorStyle::Arrow
                         })
                         .opacity(if has_selection { 1.0 } else { 0.4 })
-                        .hover(|s| if has_selection { s.bg(hover_bg) } else { s })
+                        .id("sftp-22").hover(|s| if has_selection { s.bg(hover_bg) } else { s })
                         .text_xs()
                         .text_color(destructive_text)
                         .child(
@@ -1684,7 +1684,7 @@ fn render_actions_dropdown(
                         .py_1p5()
                         .rounded_sm()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("sftp-23").hover(|s| s.bg(hover_bg))
                         .text_xs()
                         .text_color(text_color)
                         .child(
@@ -1717,7 +1717,7 @@ fn render_actions_dropdown(
                         .py_1p5()
                         .rounded_sm()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("sftp-24").hover(|s| s.bg(hover_bg))
                         .text_xs()
                         .text_color(text_color)
                         .child(
@@ -1819,7 +1819,7 @@ fn render_drive_picker_dropdown(
                         .py_1p5()
                         .rounded_sm()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id(ElementId::Name(format!("sftp-drive-{}", drive).into())).hover(|s| s.bg(hover_bg))
                         .text_xs()
                         .text_color(text_color)
                         .child(
@@ -1927,7 +1927,7 @@ fn render_path_picker_dropdown(
                         .py_1p5()
                         .rounded_sm()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("sftp-26").hover(|s| s.bg(hover_bg))
                         .text_xs()
                         .text_color(text_color)
                         .child(
@@ -2017,7 +2017,7 @@ fn render_transfers_drawer(
                             .cursor_pointer()
                             .text_xs()
                             .text_color(muted_text)
-                            .hover(|s| s.text_color(text_color))
+                            .id("sftp-27").hover(|s| s.text_color(text_color))
                             .child(
                                 svg()
                                     .data(crate::icons::ARROW_DOWN_SVG)
@@ -2041,7 +2041,7 @@ fn render_transfers_drawer(
                             .cursor_pointer()
                             .text_xs()
                             .text_color(muted_text)
-                            .hover(|s| s.text_color(text_color))
+                            .id("sftp-28").hover(|s| s.text_color(text_color))
                             .child("Clear History")
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -2243,7 +2243,7 @@ pub fn render_sftp_modal(
                                         } else {
                                             rgb(0xe2e8f0)
                                         })
-                                        .hover(|s| {
+                                        .id(ElementId::Name(format!("sftp-preset-{}", preset).into())).hover(|s| {
                                             s.bg(if is_dark {
                                                 rgb(0x52525b)
                                             } else {
@@ -2729,7 +2729,7 @@ pub fn render_sftp_modal(
                                             .py_1p5()
                                             .rounded_md()
                                             .bg(rgb(0xef4444))
-                                            .hover(|s| s.bg(rgb(0xdc2626)))
+                                            .id("sftp-30").hover(|s| s.bg(rgb(0xdc2626)))
                                             .cursor_pointer()
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
@@ -2859,7 +2859,7 @@ pub fn render_sftp_context_menu(
                             .py_1p5()
                             .rounded_md()
                             .cursor_pointer()
-                            .hover(|s| s.bg(hover_bg))
+                            .id("sftp-31").hover(|s| s.bg(hover_bg))
                             .text_xs()
                             .text_color(text_color)
                             .child(
@@ -2893,7 +2893,7 @@ pub fn render_sftp_context_menu(
                             .py_1p5()
                             .rounded_md()
                             .cursor_pointer()
-                            .hover(|s| s.bg(hover_bg))
+                            .id("sftp-32").hover(|s| s.bg(hover_bg))
                             .text_xs()
                             .text_color(text_color)
                             .child(
@@ -2927,7 +2927,7 @@ pub fn render_sftp_context_menu(
                             .py_1p5()
                             .rounded_md()
                             .cursor_pointer()
-                            .hover(|s| s.bg(hover_bg))
+                            .id("sftp-33").hover(|s| s.bg(hover_bg))
                             .text_xs()
                             .text_color(if is_dark {
                                 rgb(0xfca5a5)
@@ -2966,7 +2966,7 @@ pub fn render_sftp_context_menu(
                             .py_1p5()
                             .rounded_md()
                             .cursor_pointer()
-                            .hover(|s| s.bg(hover_bg))
+                            .id("sftp-34").hover(|s| s.bg(hover_bg))
                             .text_xs()
                             .text_color(text_color)
                             .child(
@@ -2995,7 +2995,7 @@ pub fn render_sftp_context_menu(
                             .py_1p5()
                             .rounded_md()
                             .cursor_pointer()
-                            .hover(|s| s.bg(hover_bg))
+                            .id("sftp-35").hover(|s| s.bg(hover_bg))
                             .text_xs()
                             .text_color(text_color)
                             .child(
@@ -3024,7 +3024,7 @@ pub fn render_sftp_context_menu(
                             .py_1p5()
                             .rounded_md()
                             .cursor_pointer()
-                            .hover(|s| s.bg(hover_bg))
+                            .id("sftp-36").hover(|s| s.bg(hover_bg))
                             .text_xs()
                             .text_color(if app.sftp_manager.clipboard.is_some() {
                                 text_color
@@ -3060,7 +3060,7 @@ pub fn render_sftp_context_menu(
                                 .py_1p5()
                                 .rounded_md()
                                 .cursor_pointer()
-                                .hover(|s| s.bg(hover_bg))
+                                .id("sftp-37").hover(|s| s.bg(hover_bg))
                                 .text_xs()
                                 .text_color(text_color)
                                 .child(
@@ -3092,7 +3092,7 @@ pub fn render_sftp_context_menu(
                             .py_1p5()
                             .rounded_md()
                             .cursor_pointer()
-                            .hover(|s| s.bg(hover_bg))
+                            .id("sftp-38").hover(|s| s.bg(hover_bg))
                             .text_xs()
                             .text_color(text_color)
                             .child(

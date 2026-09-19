@@ -2,7 +2,7 @@
 
 use crate::event::{GpuiEventProxy, TerminalEvent};
 use alacritty_terminal::grid::{Dimensions, Scroll};
-use alacritty_terminal::index::{Column, Point as AlacPoint};
+use alacritty_terminal::index::{Column, Point as AlacPoint, Side};
 use alacritty_terminal::selection::{Selection, SelectionType};
 use alacritty_terminal::term::{Config, Term, TermMode};
 use alacritty_terminal::vte::ansi::Processor;
@@ -133,6 +133,15 @@ impl Terminal {
         *self.term.lock().mode()
     }
 
+    /// Current scrollback display offset (0 = bottom / live view).
+    ///
+    /// Selection and mouse handlers must convert mouse pixels into grid
+    /// coordinates using `Line(row - display_offset)`, matching how the
+    /// renderer maps grid lines back to screen rows.
+    pub fn display_offset(&self) -> i32 {
+        self.term.lock().grid().display_offset() as i32
+    }
+
     /// Scroll display by delta lines (+delta scrolls up into history, -delta scrolls down).
     pub fn scroll_display(&mut self, delta: i32) {
         let mut term = self.term.lock();
@@ -152,20 +161,20 @@ impl Terminal {
     }
 
     /// Start a mouse text selection.
-    pub fn start_selection(&mut self, point: AlacPoint, selection_type: SelectionType) {
+    ///
+    /// `side` is the half of the cell under the pointer (see
+    /// `mouse::pixel_to_cell_with_side`); alacritty uses it to decide whether
+    /// the boundary cell is part of the selection.
+    pub fn start_selection(&mut self, point: AlacPoint, side: Side, selection_type: SelectionType) {
         let mut term = self.term.lock();
-        term.selection = Some(Selection::new(
-            selection_type,
-            point,
-            alacritty_terminal::index::Side::Left,
-        ));
+        term.selection = Some(Selection::new(selection_type, point, side));
     }
 
     /// Update an ongoing mouse text selection.
-    pub fn update_selection(&mut self, point: AlacPoint) {
+    pub fn update_selection(&mut self, point: AlacPoint, side: Side) {
         let mut term = self.term.lock();
         if let Some(selection) = term.selection.as_mut() {
-            selection.update(point, alacritty_terminal::index::Side::Right);
+            selection.update(point, side);
         }
     }
 

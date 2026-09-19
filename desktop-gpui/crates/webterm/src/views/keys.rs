@@ -74,7 +74,7 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         .py_1p5()
                         .rounded_lg()
                         .bg(primary_color)
-                        .hover(|s| s.opacity(0.9))
+                        .id("keys-01").hover(|s| s.opacity(0.9))
                         .text_xs()
                         .font_weight(FontWeight::BOLD)
                         .text_color(primary_fg)
@@ -138,7 +138,7 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                         .py_2()
                         .rounded_lg()
                         .bg(primary_color)
-                        .hover(|s| s.opacity(0.9))
+                        .id("keys-02").hover(|s| s.opacity(0.9))
                         .cursor_pointer()
                         .text_xs()
                         .font_weight(FontWeight::BOLD)
@@ -151,33 +151,26 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                 )
                 .into_any_element()
         } else {
-            // Chunk keys into rows of 3 to produce 1:1 grid-cols-3 layout matching Electron
-            let chunks: Vec<Vec<_>> = keys
-                .chunks(3)
-                .map(|c| c.to_vec())
-                .collect();
-
+            // Responsive wrapping grid (same fix as hosts view: fixed
+            // chunks-of-3 rows overflow on narrow windows).
             div()
                 .flex()
-                .flex_col()
+                .flex_row()
+                .flex_wrap()
                 .gap_4()
                 .w_full()
                 .pb_12()
-                .children(chunks.into_iter().map(|chunk| {
-                    let chunk_len = chunk.len();
+                .children(keys.into_iter().map(|key| {
+                    let key_id_del = key.id.clone();
+                    let key_id_edit = key.id.clone();
+
                     div()
+                        .flex_basis(px(300.0))
+                        .flex_grow_1()
+                        .flex_shrink_1()
+                        .min_w(px(240.0))
                         .flex()
                         .flex_row()
-                        .gap_4()
-                        .w_full()
-                        .children(chunk.into_iter().map(|key| {
-                            let key_id_del = key.id.clone();
-                            let key_id_edit = key.id.clone();
-
-                            div()
-                                .flex_1()
-                                .flex()
-                                .flex_row()
                                 .items_center()
                                 .justify_between()
                                 .py_4()
@@ -187,7 +180,7 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 .bg(card_bg)
                                 .border_1()
                                 .border_color(border_color)
-                                .hover(move |s| s.border_color(primary_color))
+                                .id(ElementId::Name(format!("key-card-{}", key.id).into())).hover(move |s| s.border_color(primary_color))
                                 // Left: Key icon box & info
                                 .child(
                                     div()
@@ -275,7 +268,7 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                                 .size(px(24.0))
                                                 .rounded_md()
                                                 .cursor_pointer()
-                                                .hover(move |s| s.bg(muted_bg))
+                                                .id("keys-04").hover(move |s| s.bg(muted_bg))
                                                 .child(
                                                     svg()
                                                         .data(crate::icons::EDIT_SVG)
@@ -295,7 +288,7 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                                 .size(px(24.0))
                                                 .rounded_md()
                                                 .cursor_pointer()
-                                                .hover(move |s| s.bg(muted_bg))
+                                                .id("keys-05").hover(move |s| s.bg(muted_bg))
                                                 .child(
                                                     svg()
                                                         .data(crate::icons::TRASH_SVG)
@@ -308,11 +301,6 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                         ),
                                 )
                         }))
-                        // Spacer cards for last row so cards stay 1/3 width
-                        .children((0..(3 - chunk_len)).map(|_| {
-                            div().flex_1()
-                        }))
-                }))
                 .into_any_element()
         })
         )
@@ -377,7 +365,7 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .py_0p5()
                                         .rounded_md()
                                         .bg(tag_bg)
-                                        .hover(|s| {
+                                        .id("keys-06").hover(|s| {
                                             s.bg(if is_dark {
                                                 rgb(0x52525b)
                                             } else {
@@ -413,7 +401,7 @@ pub fn render_add_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .py_0p5()
                                         .rounded_md()
                                         .bg(tag_bg)
-                                        .hover(|s| {
+                                        .id("keys-07").hover(|s| {
                                             s.bg(if is_dark {
                                                 rgb(0x52525b)
                                             } else {
@@ -502,7 +490,7 @@ pub fn render_edit_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> 
                                         .py_0p5()
                                         .rounded_md()
                                         .bg(tag_bg)
-                                        .hover(|s| {
+                                        .id("keys-08").hover(|s| {
                                             s.bg(if is_dark {
                                                 rgb(0x52525b)
                                             } else {
@@ -532,7 +520,7 @@ pub fn render_edit_key_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> 
                                         .py_0p5()
                                         .rounded_md()
                                         .bg(tag_bg)
-                                        .hover(|s| {
+                                        .id("keys-09").hover(|s| {
                                             s.bg(if is_dark {
                                                 rgb(0x52525b)
                                             } else {

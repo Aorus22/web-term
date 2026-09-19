@@ -5538,8 +5538,18 @@ impl Render for AppState {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let key_secret = self.settings.encryption_key.as_deref();
 
+        // CSD window frame (Zed-style): transparent shadow padding around the
+        // panel, edge/corner resize hit zones with proper cursors, and leaf
+        // rounding (see render_nav_shell). Without this the window is neither
+        // resizable nor shadowed on Linux — the WM only resizes
+        // server-decorated windows. Square full-bleed when maximized/tiled.
+        let framed = !window.is_maximized()
+            && !matches!(
+                window.window_decorations(),
+                Decorations::Client { tiling } if tiling.is_tiled()
+            );
         let content: AnyElement = match self.backend_status {
-            BackendStatus::Ready => render_nav_shell(self, cx),
+            BackendStatus::Ready => render_nav_shell(self, framed, cx),
             _ => {
                 let status = self.backend_status.clone();
                 render_status_page(
@@ -5553,25 +5563,173 @@ impl Render for AppState {
             }
         };
 
-        // CSD window frame (gpui-component): shadow padding, 1px border, and
-        // edge/corner resize hit zones with proper cursors. Without this the
-        // window is neither resizable nor shadowed on Linux — the WM only
-        // resizes server-decorated windows. Inner content keeps rounded
-        // corners; square full-bleed when maximized or tiled.
-        let framed = !window.is_maximized()
-            && !matches!(
-                window.window_decorations(),
-                Decorations::Client { tiling } if tiling.is_tiled()
-            );
-        let inner = if framed {
-            div()
-                .size_full()
-                .overflow_hidden()
-                .rounded_xl()
-                .child(content)
-        } else {
-            div().size_full().child(content)
+        if !framed {
+            return div().size_full().child(content);
+        }
+
+        let tiling = match window.window_decorations() {
+            Decorations::Client { tiling } => tiling,
+            _ => Tiling::default(),
         };
-        gpui_component::window_border().child(inner.into_any_element())
+        div().relative().size_full().child(
+            div()
+                .relative()
+                .size_full()
+                .p(SHADOW_PADDING)
+                .on_mouse_down(
+                    MouseButton::Left,
+                    move |_, window, _| {
+                        let size = window.window_bounds().get_bounds().size;
+                        let pos = window.mouse_position();
+                        // Field diagnostics: log presses near any edge so a
+                        // broken resize can be told apart from a dead handler.
+                        // Log file: ~/.local/share/webterm-gpui/debug.log
+                        let x: f32 = pos.x.into();
+                        let y: f32 = pos.y.into();
+                        let w: f32 = size.width.into();
+                        let h: f32 = size.height.into();
+                        const DIAG_BAND: f32 = 24.0;
+                        if x < DIAG_BAND
+                            || x > w - DIAG_BAND
+                            || y < DIAG_BAND
+                            || y > h - DIAG_BAND
+                        {
+                            let edge = resize_edge_at(pos, size, &tiling);
+                            webterm_terminal::debug_log::debug_log(
+                                "resize",
+                                format!(
+                                    "press at ({x:.0},{y:.0}) window {w:.0}x{h:.0} tiling l={} r={} t={} b={} edge={edge:?}",
+                                    tiling.left, tiling.right, tiling.top, tiling.bottom,
+                                ),
+                            );
+                            if let Some(edge) = edge {
+                                window.start_window_resize(edge);
+                            }
+                        }
+                    },
+                )
+                .child(
+                    div()
+                        .size_full()
+                        .shadow_xl()
+                        .child(content),
+                ),
+        )
+        // Resize zones attach to the outer window box (not the padded middle)
+        // so the bands sit on the true window edges. Painted last = on top.
+        .child(resize_hit_zones(&tiling))
     }
+}
+
+/// Transparent margin around the panel so the compositor/app shadow has room.
+const SHADOW_PADDING: Pixels = px(12.0);
+/// Width of the resize hit band at window edges (must stay within padding).
+const RESIZE_HIT: f32 = 6.0;
+/// Corner rounding for CSD leaves (mirrors Zed's 10px).
+pub const FRAME_ROUNDING: Pixels = px(10.0);
+
+/// Which window edge/corner the pointer is over, if any.
+fn resize_edge_at(pos: Point<Pixels>, size: Size<Pixels>, tiling: &Tiling) -> Option<ResizeEdge> {
+    let x: f32 = pos.x.into();
+    let y: f32 = pos.y.into();
+    let w: f32 = size.width.into();
+    let h: f32 = size.height.into();
+    let left = x < RESIZE_HIT && !tiling.left;
+    let right = x > w - RESIZE_HIT && !tiling.right;
+    let top = y < RESIZE_HIT && !tiling.top;
+    let bottom = y > h - RESIZE_HIT && !tiling.bottom;
+    match (top, bottom, left, right) {
+        (true, _, true, _) => Some(ResizeEdge::TopLeft),
+        (true, _, _, true) => Some(ResizeEdge::TopRight),
+        (_, true, true, _) => Some(ResizeEdge::BottomLeft),
+        (_, true, _, true) => Some(ResizeEdge::BottomRight),
+        (true, _, _, _) => Some(ResizeEdge::Top),
+        (_, true, _, _) => Some(ResizeEdge::Bottom),
+        (_, _, true, _) => Some(ResizeEdge::Left),
+        (_, _, _, true) => Some(ResizeEdge::Right),
+        _ => None,
+    }
+}
+
+fn cursor_for_edge(edge: ResizeEdge) -> CursorStyle {
+    match edge {
+        ResizeEdge::Top | ResizeEdge::Bottom => CursorStyle::ResizeUpDown,
+        ResizeEdge::Left | ResizeEdge::Right => CursorStyle::ResizeLeftRight,
+        ResizeEdge::TopLeft | ResizeEdge::BottomRight => CursorStyle::ResizeUpLeftDownRight,
+        ResizeEdge::TopRight | ResizeEdge::BottomLeft => CursorStyle::ResizeUpRightDownLeft,
+    }
+}
+
+/// Transparent overlay strips on untiled edges/corners. Each zone owns its
+/// edge: hover shows the resize cursor and press starts the resize. The
+/// mouse handler is what creates the hitbox — cursor style alone does not.
+/// Zones stay inside the shadow padding so content (e.g. the terminal
+/// scrollbar) stays clickable.
+fn resize_hit_zones(tiling: &Tiling) -> impl IntoElement {
+    let hit = px(RESIZE_HIT);
+    let mut zones: Vec<AnyElement> = Vec::new();
+    let mut edge_zone = |edge: ResizeEdge, el: Div| {
+        zones.push(
+            el.cursor(cursor_for_edge(edge))
+                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                    webterm_terminal::debug_log::debug_log(
+                        "resize",
+                        format!("zone press edge={edge:?}"),
+                    );
+                    window.start_window_resize(edge);
+                    // Zones live in the padding; nothing below needs the press.
+                    cx.stop_propagation();
+                })
+                .into_any_element(),
+        );
+    };
+    if !tiling.top {
+        edge_zone(
+            ResizeEdge::Top,
+            div().absolute().top_0().left_0().right_0().h(hit),
+        );
+        if !tiling.left {
+            edge_zone(
+                ResizeEdge::TopLeft,
+                div().absolute().top_0().left_0().w(hit).h(hit),
+            );
+        }
+        if !tiling.right {
+            edge_zone(
+                ResizeEdge::TopRight,
+                div().absolute().top_0().right_0().w(hit).h(hit),
+            );
+        }
+    }
+    if !tiling.bottom {
+        edge_zone(
+            ResizeEdge::Bottom,
+            div().absolute().bottom_0().left_0().right_0().h(hit),
+        );
+        if !tiling.left {
+            edge_zone(
+                ResizeEdge::BottomLeft,
+                div().absolute().bottom_0().left_0().w(hit).h(hit),
+            );
+        }
+        if !tiling.right {
+            edge_zone(
+                ResizeEdge::BottomRight,
+                div().absolute().bottom_0().right_0().w(hit).h(hit),
+            );
+        }
+    }
+    if !tiling.left {
+        edge_zone(
+            ResizeEdge::Left,
+            div().absolute().left_0().top_0().bottom_0().w(hit),
+        );
+    }
+    if !tiling.right {
+        edge_zone(
+            ResizeEdge::Right,
+            div().absolute().right_0().top_0().bottom_0().w(hit),
+        );
+    }
+    div().absolute().size_full().children(zones)
 }

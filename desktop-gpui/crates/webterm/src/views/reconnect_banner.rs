@@ -90,7 +90,7 @@ pub fn render_reconnect_banner(
                                     .py_1()
                                     .rounded_md()
                                     .bg(btn_bg)
-                                    .hover(|s| s.bg(btn_hover))
+                                    .id("reconnect_banner-01").hover(|s| s.bg(btn_hover))
                                     .cursor_pointer()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child("Reconnect Now")
@@ -111,7 +111,7 @@ pub fn render_reconnect_banner(
                                     } else {
                                         rgb(0xe2e8f0)
                                     })
-                                    .hover(|s| {
+                                    .id("reconnect_banner-02").hover(|s| {
                                         s.bg(if is_dark {
                                             rgb(0x3f3f46)
                                         } else {
@@ -207,7 +207,7 @@ pub fn render_reconnect_banner(
                                     .py_1()
                                     .rounded_md()
                                     .bg(btn_bg)
-                                    .hover(|s| s.bg(btn_hover))
+                                    .id("reconnect_banner-03").hover(|s| s.bg(btn_hover))
                                     .cursor_pointer()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child("Reconnect")
@@ -228,7 +228,7 @@ pub fn render_reconnect_banner(
                                     } else {
                                         rgb(0xe2e8f0)
                                     })
-                                    .hover(|s| {
+                                    .id("reconnect_banner-04").hover(|s| {
                                         s.bg(if is_dark {
                                             rgb(0x3f3f46)
                                         } else {

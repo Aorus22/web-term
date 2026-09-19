@@ -1,5 +1,5 @@
 use alacritty_terminal::grid::Dimensions;
-use alacritty_terminal::index::{Column, Line, Point};
+use alacritty_terminal::index::{Column, Line, Point, Side};
 use alacritty_terminal::selection::SelectionType;
 use alacritty_terminal::term::cell::Flags;
 use alacritty_terminal::vte::ansi::{Color, NamedColor, Rgb};
@@ -133,10 +133,10 @@ fn test_selection_text_extraction() {
     term.process_bytes(b"Selected Content Here");
 
     let start = Point::new(Line(0), Column(0));
-    term.start_selection(start, SelectionType::Simple);
+    term.start_selection(start, Side::Left, SelectionType::Simple);
 
     let end = Point::new(Line(0), Column(7));
-    term.update_selection(end);
+    term.update_selection(end, Side::Right);
 
     let selected = term.selection_text();
     assert!(selected.is_some());
@@ -144,6 +144,24 @@ fn test_selection_text_extraction() {
 
     term.clear_selection();
     assert_eq!(term.selection_text(), None);
+}
+
+#[test]
+fn test_upward_drag_includes_top_left_corner_cell() {
+    // Regression: starting and ending anchors used to hardcode Side::Left /
+    // Side::Right, so after alacritty normalized an up-left drag the cell
+    // under the cursor at the selection's start was always excluded.
+    let mut term = Terminal::new(80, 24);
+    term.process_bytes(b"hello world\r\nfoo bar baz");
+
+    // Drag from the middle of line 1 up to the start of line 0. The cursor
+    // lands in the LEFT half of cell (0, 0), which must select from the
+    // cell's left edge — i.e. include 'h' of "hello".
+    term.start_selection(Point::new(Line(1), Column(5)), Side::Right, SelectionType::Simple);
+    term.update_selection(Point::new(Line(0), Column(0)), Side::Left);
+
+    let selected = term.selection_text().expect("selection text");
+    assert!(selected.starts_with("hello"), "got: {selected:?}");
 }
 
 #[test]

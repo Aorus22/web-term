@@ -81,7 +81,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         .py_1p5()
                         .rounded_lg()
                         .bg(primary_color)
-                        .hover(|s| s.opacity(0.9))
+                        .id("forwards-01").hover(|s| s.opacity(0.9))
                         .text_xs()
                         .font_weight(FontWeight::BOLD)
                         .text_color(primary_fg)
@@ -150,7 +150,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .py_2()
                                 .rounded_lg()
                                 .bg(primary_color)
-                                .hover(|s| s.opacity(0.9))
+                                .id("forwards-02").hover(|s| s.opacity(0.9))
                                 .cursor_pointer()
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
@@ -197,7 +197,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 } else {
                                     border_color
                                 })
-                                .hover(move |s| s.border_color(primary_color))
+                                .id(ElementId::Name(format!("fwd-card-{}", forward.id).into())).hover(move |s| s.border_color(primary_color))
                                 // Left & Middle: Status Icon + Rule Info
                                 .child(
                                     div()
@@ -362,7 +362,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .size(px(26.0))
                                                 .rounded_md()
                                                 .cursor_pointer()
-                                                .hover(move |s| s.bg(muted_bg))
+                                                .id("forwards-04").hover(move |s| s.bg(muted_bg))
                                                 .child(svg().data(crate::icons::EDIT_SVG).size(px(14.0)).text_color(muted_text))
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                                                     this.open_edit_forward_modal(&id_edit, window, cx);
@@ -377,7 +377,7 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .size(px(26.0))
                                                 .rounded_md()
                                                 .cursor_pointer()
-                                                .hover(move |s| s.bg(muted_bg))
+                                                .id("forwards-05").hover(move |s| s.bg(muted_bg))
                                                 .child(svg().data(crate::icons::TRASH_SVG).size(px(14.0)).text_color(muted_text))
                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                     this.open_delete_forward_modal(forward_del.clone(), cx);
@@ -516,7 +516,7 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                         .py_0p5()
                                         .rounded_md()
                                         .bg(tag_bg)
-                                        .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
+                                        .id(ElementId::Name(format!("fwd-preset-{}", preset).into())).hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
                                         .cursor_pointer()
                                         .text_xs()
                                         .text_color(text_color)
@@ -630,7 +630,7 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .py_0p5()
                                                 .rounded_sm()
                                                 .bg(tag_bg)
-                                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
+                                                .id(ElementId::Name(format!("fwd-lport-{}", p).into())).hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
                                                 .cursor_pointer()
                                                 .text_xs()
                                                 .text_color(text_color)
@@ -667,7 +667,7 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .py_0p5()
                                                 .rounded_sm()
                                                 .bg(tag_bg)
-                                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
+                                                .id(ElementId::Name(format!("fwd-rport-{}", p).into())).hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
                                                 .cursor_pointer()
                                                 .text_xs()
                                                 .text_color(text_color)
@@ -758,7 +758,7 @@ pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState
                                 .py_2()
                                 .rounded_md()
                                 .bg(tag_bg)
-                                .hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
+                                .id("forwards-09").hover(|s| s.bg(if is_dark { rgb(0x52525b) } else { rgb(0xcbd5e1) }))
                                 .cursor_pointer()
                                 .text_sm()
                                 .text_color(text_color)
@@ -773,7 +773,7 @@ pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState
                                 .py_2()
                                 .rounded_md()
                                 .bg(rgb(0xef4444))
-                                .hover(|s| s.bg(rgb(0xdc2626)))
+                                .id("forwards-10").hover(|s| s.bg(rgb(0xdc2626)))
                                 .cursor_pointer()
                                 .text_sm()
                                 .font_weight(FontWeight::SEMIBOLD)

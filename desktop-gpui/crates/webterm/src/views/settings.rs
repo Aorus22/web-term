@@ -234,7 +234,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             .text_xs()
                                                             .text_color(if theme_mode == "all" { primary_color } else { text_color })
                                                             .cursor_pointer()
-                                                            .hover(|s| s.bg(tag_bg))
+                                                            .id("settings-01").hover(|s| s.bg(tag_bg))
                                                             .child("All themes")
                                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                                 this.set_theme_mode_filter("all", cx);
@@ -247,7 +247,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             .text_xs()
                                                             .text_color(if theme_mode == "dark" { primary_color } else { text_color })
                                                             .cursor_pointer()
-                                                            .hover(|s| s.bg(tag_bg))
+                                                            .id("settings-02").hover(|s| s.bg(tag_bg))
                                                             .child("Dark")
                                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                                 this.set_theme_mode_filter("dark", cx);
@@ -260,7 +260,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             .text_xs()
                                                             .text_color(if theme_mode == "light" { primary_color } else { text_color })
                                                             .cursor_pointer()
-                                                            .hover(|s| s.bg(tag_bg))
+                                                            .id("settings-03").hover(|s| s.bg(tag_bg))
                                                             .child("Light")
                                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                                 this.set_theme_mode_filter("light", cx);
@@ -338,7 +338,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             secondary_bg
                                                         })
                                                         .cursor_pointer()
-                                                        .hover(|s| s.border_color(rgb(0x71717a)))
+                                                        .id(ElementId::Name(format!("settings-preset-{}", preset.id).into())).hover(|s| s.border_color(rgb(0x71717a)))
                                                         // Mini preview swatch box (h-14 / 56px)
                                                         .child(
                                                             div()
@@ -475,7 +475,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .text_xs()
                                                 .text_color(text_color)
                                                 .cursor_pointer()
-                                                .hover(|s| s.bg(border_color))
+                                                .id("settings-05").hover(|s| s.bg(border_color))
                                                 .child(font_display)
                                                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                     this.font_dialog_family = this.terminal_font_family.clone();
@@ -572,7 +572,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             .text_xs()
                                                             .text_color(if cursor_style_val == "block" { primary_color } else { text_color })
                                                             .cursor_pointer()
-                                                            .hover(|s| s.bg(tag_bg))
+                                                            .id("settings-06").hover(|s| s.bg(tag_bg))
                                                             .child("Block (▮)")
                                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                                 this.set_cursor_style("block".to_string(), cx);
@@ -585,7 +585,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             .text_xs()
                                                             .text_color(if cursor_style_val == "underline" { primary_color } else { text_color })
                                                             .cursor_pointer()
-                                                            .hover(|s| s.bg(tag_bg))
+                                                            .id("settings-07").hover(|s| s.bg(tag_bg))
                                                             .child("Underline (_)")
                                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                                 this.set_cursor_style("underline".to_string(), cx);
@@ -598,7 +598,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             .text_xs()
                                                             .text_color(if cursor_style_val == "bar" { primary_color } else { text_color })
                                                             .cursor_pointer()
-                                                            .hover(|s| s.bg(tag_bg))
+                                                            .id("settings-08").hover(|s| s.bg(tag_bg))
                                                             .child("Bar (|)")
                                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                                 this.set_cursor_style("bar".to_string(), cx);
@@ -760,7 +760,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                             .text_xs()
                                                             .text_color(if is_selected { primary_color } else { text_color })
                                                             .cursor_pointer()
-                                                            .hover(|s| s.bg(tag_bg))
+                                                            .id("settings-09").hover(|s| s.bg(tag_bg))
                                                             .child(label)
                                                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                                 this.set_scrollback(val, cx);
@@ -828,7 +828,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .py_1p5()
                                 .rounded_md()
                                 .bg(accent_color)
-                                .hover(|s| s.opacity(0.9))
+                                .id("settings-10").hover(|s| s.opacity(0.9))
                                 .cursor_pointer()
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
@@ -845,7 +845,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .py_1p5()
                                 .rounded_md()
                                 .bg(tag_bg)
-                                .hover(|s| s.bg(border_color))
+                                .id("settings-11").hover(|s| s.bg(border_color))
                                 .cursor_pointer()
                                 .text_xs()
                                 .text_color(text_color)
@@ -966,7 +966,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 .text_xs()
                                                                 .text_color(if is_selected { primary_color } else { text_color })
                                                                 .cursor_pointer()
-                                                                .hover(|s| s.bg(tag_bg))
+                                                                .id(ElementId::Name(format!("settings-font-{}", f).into())).hover(|s| s.bg(tag_bg))
                                                                 .child(f)
                                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                                     this.font_dialog_family = f.to_string();
@@ -1080,7 +1080,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                             .font_weight(FontWeight::MEDIUM)
                                             .text_color(text_color)
                                             .cursor_pointer()
-                                            .hover(|s| s.bg(border_color))
+                                            .id("settings-13").hover(|s| s.bg(border_color))
                                             .child("Cancel")
                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                 this.show_font_dialog = false;
@@ -1097,7 +1097,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(app.primary_fg())
                                             .cursor_pointer()
-                                            .hover(|s| s.opacity(0.9))
+                                            .id("settings-14").hover(|s| s.opacity(0.9))
                                             .child("Save Changes")
                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                 let f = this.font_dialog_family.clone();

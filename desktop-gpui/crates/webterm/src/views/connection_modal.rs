@@ -252,7 +252,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                                 border_color
                                             })
                                             .bg(if is_selected { tag_bg } else { app.bg_color() })
-                                            .hover(|s| s.bg(tag_bg))
+                                            .id(ElementId::Name(format!("cm-key-{}", key.id).into())).hover(|s| s.bg(tag_bg))
                                             .flex()
                                             .flex_row()
                                             .items_center()
@@ -339,7 +339,7 @@ pub fn render_connection_sheet(app: &mut AppState, cx: &mut Context<AppState>) -
                                             .py_0p5()
                                             .rounded_md()
                                             .bg(tag_bg)
-                                            .hover(|s| s.bg(border_color))
+                                            .id(ElementId::Name(format!("cm-tag-{}", tag).into())).hover(|s| s.bg(border_color))
                                             .cursor_pointer()
                                             .text_xs()
                                             .text_color(text_color)

@@ -7,12 +7,12 @@ use crate::colors::ColorPalette;
 use crate::event::TerminalEvent;
 use crate::input::keystroke_to_bytes;
 use crate::mouse::{
-    modifiers_to_mouse_code, mouse_button_report, pixel_to_cell, scroll_report,
+    modifiers_to_mouse_code, mouse_button_report, pixel_to_cell_with_side, scroll_report,
     selection_type_from_clicks,
 };
 use crate::render::TerminalRenderer;
 use crate::terminal::Terminal;
-use alacritty_terminal::index::{Column, Line, Point as AlacPoint};
+use alacritty_terminal::index::{Column, Line, Point as AlacPoint, Side};
 use alacritty_terminal::vte::ansi::CursorShape;
 use gpui::*;
 use parking_lot::Mutex;
@@ -33,6 +33,11 @@ struct ScrollbarDrag {
 pub struct TerminalView {
     terminal: Arc<Mutex<Terminal>>,
     renderer: TerminalRenderer,
+    /// Whether font metrics in `renderer` have been measured from the text
+    /// system. Font measurement requires a `&mut Window`, which is only
+    /// available in `Render::render` — so measurement is deferred to the next
+    /// frame after construction or any `set_*` mutation.
+    renderer_needs_measure: bool,
     focus_handle: FocusHandle,
     padding: Edges<Pixels>,
     is_selecting: bool,
@@ -116,6 +121,7 @@ impl TerminalView {
         Self {
             terminal: term_arc,
             renderer,
+            renderer_needs_measure: true,
             focus_handle,
             padding: Edges::all(px(4.0)),
             is_selecting: false,
@@ -132,6 +138,7 @@ impl TerminalView {
     /// Attach custom terminal renderer.
     pub fn with_renderer(mut self, renderer: TerminalRenderer) -> Self {
         self.renderer = renderer;
+        self.renderer_needs_measure = true;
         self
     }
 
@@ -218,19 +225,29 @@ impl TerminalView {
     }
 
     /// Dynamically update the font size used by this terminal view.
+    ///
+    /// Cell dimensions are set to a rough estimate and re-measured from the
+    /// text system on the next render pass, so mouse hit-testing and painting
+    /// always share the same real metrics.
     pub fn set_font_size(&mut self, size: Pixels, cx: &mut Context<Self>) {
         self.renderer.font_size = size;
         self.renderer.cell_width = size * 0.6;
         self.renderer.cell_height = size * self.renderer.line_height_multiplier;
+        self.renderer_needs_measure = true;
         cx.notify();
     }
 
     /// Dynamically update font family and font size used by this terminal view.
+    ///
+    /// Cell dimensions are set to a rough estimate and re-measured from the
+    /// text system on the next render pass, so mouse hit-testing and painting
+    /// always share the same real metrics.
     pub fn set_font(&mut self, family: String, size: Pixels, cx: &mut Context<Self>) {
         self.renderer.font_family = family;
         self.renderer.font_size = size;
         self.renderer.cell_width = size * 0.6;
         self.renderer.cell_height = size * self.renderer.line_height_multiplier;
+        self.renderer_needs_measure = true;
         cx.notify();
     }
 
@@ -243,6 +260,55 @@ impl TerminalView {
     /// Focus handle for keyboard input routing.
     pub fn focus_handle(&self) -> &FocusHandle {
         &self.focus_handle
+    }
+
+    /// Convert a window pixel position into a terminal grid point.
+    ///
+    /// Lazily refreshes `self.renderer`'s font metrics,
+    /// then maps pixels to a screen row, then to a buffer `Line` by
+    /// subtracting the scrollback display offset — the exact inverse of how
+    /// the renderer positions grid lines on screen.
+    fn pixel_to_term_point(
+        &mut self,
+        position: Point<Pixels>,
+        window: &mut Window,
+    ) -> (AlacPoint, Side) {
+        if self.renderer_needs_measure {
+            self.renderer.measure_cell(window);
+            self.renderer_needs_measure = false;
+        }
+        self.pixel_to_term_point_measured(position)
+    }
+
+    /// Like [`Self::pixel_to_term_point`], but uses the renderer's current
+    /// metrics without re-measuring. Safe once at least one paint pass has
+    /// synced the measured metrics (the paint pass syncs them every frame).
+    fn pixel_to_term_point_measured(&self, position: Point<Pixels>) -> (AlacPoint, Side) {
+
+        let bounds = *self.last_bounds.lock();
+        let Some(bounds) = bounds else {
+            return (AlacPoint::new(Line(0), Column(0)), Side::Left);
+        };
+
+        let origin = Point {
+            x: bounds.origin.x + self.padding.left,
+            y: bounds.origin.y + self.padding.top,
+        };
+
+        let term = self.terminal.lock();
+        let (screen, side) = pixel_to_cell_with_side(
+            position,
+            origin,
+            self.renderer.cell_width,
+            self.renderer.cell_height,
+            term.cols(),
+            term.rows(),
+        );
+        let display_offset = term.display_offset();
+        (
+            AlacPoint::new(Line(screen.line.0 - display_offset), screen.column),
+            side,
+        )
     }
 
     /// Send input bytes to the backend or input callback.
@@ -415,23 +481,24 @@ impl TerminalView {
         cx: &mut Context<Self>,
     ) {
         window.focus(&self.focus_handle, cx);
-        let bounds = *self.last_bounds.lock();
 
-        if let Some(bounds) = bounds {
-            let origin = Point {
-                x: bounds.origin.x + self.padding.left,
-                y: bounds.origin.y + self.padding.top,
-            };
-            let mut term = self.terminal.lock();
-            let pt = pixel_to_cell(
-                event.position,
-                origin,
-                self.renderer.cell_width,
-                self.renderer.cell_height,
-                term.cols(),
-                term.rows(),
+        if self.last_bounds.lock().is_some() {
+            let (pt, side) = self.pixel_to_term_point(event.position, window);
+            crate::debug_log::debug_log(
+                "select",
+                format!(
+                    "mouse_down pos=({:.0},{:.0}) bounds={:?} cell=({},{}) side={side:?} btn={:?} clicks={}",
+                    f32::from(event.position.x),
+                    f32::from(event.position.y),
+                    *self.last_bounds.lock(),
+                    pt.line.0,
+                    pt.column.0,
+                    event.button,
+                    event.click_count,
+                ),
             );
 
+            let mut term = self.terminal.lock();
             let mode = term.mode();
             let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
 
@@ -440,7 +507,7 @@ impl TerminalView {
                 self.write_to_pty(&bytes);
             } else if event.button == MouseButton::Left {
                 let sel_type = selection_type_from_clicks(event.click_count);
-                term.start_selection(pt, sel_type);
+                term.start_selection(pt, side, sel_type);
                 self.is_selecting = true;
             }
         }
@@ -451,31 +518,19 @@ impl TerminalView {
     fn on_mouse_move(
         &mut self,
         event: &MouseMoveEvent,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         if self.scrollbar_drag.is_some() {
             self.on_scrollbar_drag_move(event, cx);
             return;
         }
-        let bounds = *self.last_bounds.lock();
-        if let Some(bounds) = bounds {
-            let origin = Point {
-                x: bounds.origin.x + self.padding.left,
-                y: bounds.origin.y + self.padding.top,
-            };
-            let mut term = self.terminal.lock();
-            let pt = pixel_to_cell(
-                event.position,
-                origin,
-                self.renderer.cell_width,
-                self.renderer.cell_height,
-                term.cols(),
-                term.rows(),
-            );
+        if self.last_bounds.lock().is_some() {
+            let (pt, side) = self.pixel_to_term_point(event.position, window);
 
+            let mut term = self.terminal.lock();
             if self.is_selecting {
-                term.update_selection(pt);
+                term.update_selection(pt, side);
                 cx.notify();
             } else if let Some(button) = event.pressed_button {
                 let mode = term.mode();
@@ -488,23 +543,11 @@ impl TerminalView {
         }
     }
 
-    fn on_mouse_up(&mut self, event: &MouseUpEvent, _window: &mut Window, cx: &mut Context<Self>) {
-        let bounds = *self.last_bounds.lock();
-        if let Some(bounds) = bounds {
-            let origin = Point {
-                x: bounds.origin.x + self.padding.left,
-                y: bounds.origin.y + self.padding.top,
-            };
-            let term = self.terminal.lock();
-            let pt = pixel_to_cell(
-                event.position,
-                origin,
-                self.renderer.cell_width,
-                self.renderer.cell_height,
-                term.cols(),
-                term.rows(),
-            );
+    fn on_mouse_up(&mut self, event: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.last_bounds.lock().is_some() {
+            let (pt, _) = self.pixel_to_term_point(event.position, window);
 
+            let term = self.terminal.lock();
             let mode = term.mode();
             let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
             if let Some(bytes) = mouse_button_report(event.button, false, pt, mouse_mods, mode) {
@@ -521,10 +564,41 @@ impl TerminalView {
         cx.notify();
     }
 
+    /// Window-level drag continuation for text selection and scrollbar drags.
+    ///
+    /// Registered from the canvas paint pass via `window.on_mouse_event` while
+    /// a drag is active, so pointer movement outside the terminal bounds (e.g.
+    /// over the sidebar) keeps updating the drag. X11 and Wayland both deliver
+    /// pointer events to the window during an implicit button-press grab —
+    /// including the release — so the drag always terminates on mouse up.
+    fn on_drag_mouse_move(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+        if self.scrollbar_drag.is_some() {
+            self.on_scrollbar_drag_move(event, cx);
+            return;
+        }
+        if self.is_selecting {
+            let (pt, side) = self.pixel_to_term_point_measured(event.position);
+            self.terminal.lock().update_selection(pt, side);
+            cx.notify();
+        }
+    }
+
+    /// Window-level counterpart of [`Self::on_drag_mouse_move`]: ends any
+    /// active drag no matter where the pointer was released.
+    fn on_drag_mouse_up(&mut self, event: &MouseUpEvent, cx: &mut Context<Self>) {
+        if event.button == MouseButton::Left
+            && (self.is_selecting || self.scrollbar_drag.is_some())
+        {
+            self.is_selecting = false;
+            self.scrollbar_drag = None;
+            cx.notify();
+        }
+    }
+
     fn on_scroll(
         &mut self,
         event: &ScrollWheelEvent,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let (history, offset, _) = self.scroll_metrics();
@@ -557,24 +631,7 @@ impl TerminalView {
         // NOTE: GPUI reports wheel-up as positive Y on both X11 and Wayland,
         // matching scroll_report/scroll_display (positive = up / history).
 
-        let bounds = *self.last_bounds.lock();
-        let pt = if let Some(bounds) = bounds {
-            let origin = Point {
-                x: bounds.origin.x + self.padding.left,
-                y: bounds.origin.y + self.padding.top,
-            };
-            let term = self.terminal.lock();
-            pixel_to_cell(
-                event.position,
-                origin,
-                self.renderer.cell_width,
-                self.renderer.cell_height,
-                term.cols(),
-                term.rows(),
-            )
-        } else {
-            AlacPoint::new(Line(0), Column(0))
-        };
+        let (pt, _) = self.pixel_to_term_point(event.position, window);
 
         let mode = self.terminal.lock().mode();
         let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
@@ -588,10 +645,7 @@ impl TerminalView {
         } else {
             let mut term = self.terminal.lock();
             term.scroll_display(delta_lines);
-            let new_offset = {
-                use alacritty_terminal::grid::Dimensions;
-                term.term_arc().lock().grid().display_offset()
-            };
+            let new_offset = term.display_offset();
             crate::debug_log::debug_log(
                 "scroll",
                 format!("applied delta={delta_lines} offset {offset}->{new_offset}"),
@@ -617,6 +671,8 @@ impl Render for TerminalView {
         let last_bounds = Arc::clone(&self.last_bounds);
         let padding = self.padding;
         let resize_cb = self.resize_callback.clone();
+        let view_handle = cx.entity().downgrade();
+        let drag_active = self.is_selecting || self.scrollbar_drag.is_some();
 
         div()
             .size_full()
@@ -641,6 +697,44 @@ impl Render for TerminalView {
                     move |bounds, _, window, cx| {
                         let mut measured = renderer.clone();
                         measured.measure_cell(window);
+
+                        // Keep the view's renderer in sync with the measured
+                        // cell metrics so mouse hit-testing uses exactly the
+                        // same geometry as this paint pass.
+                        let _ = view_handle.update(cx, |this, cx| {
+                            if this.renderer_needs_measure
+                                || this.renderer.cell_width != measured.cell_width
+                                || this.renderer.cell_height != measured.cell_height
+                            {
+                                this.renderer.cell_width = measured.cell_width;
+                                this.renderer.cell_height = measured.cell_height;
+                                this.renderer_needs_measure = false;
+                                cx.notify();
+                            }
+                        });
+
+                        // While a text-selection or scrollbar drag is active,
+                        // listen for mouse move/up at the window level so the
+                        // drag continues and terminates even when the pointer
+                        // leaves the terminal bounds (e.g. over the sidebar).
+                        if drag_active {
+                            let drag_view = view_handle.clone();
+                            window.on_mouse_event(
+                                move |event: &MouseMoveEvent, _phase, _window, cx| {
+                                    let _ = drag_view.update(cx, |this, cx| {
+                                        this.on_drag_mouse_move(event, cx);
+                                    });
+                                },
+                            );
+                            let drag_view = view_handle.clone();
+                            window.on_mouse_event(
+                                move |event: &MouseUpEvent, _phase, _window, cx| {
+                                    let _ = drag_view.update(cx, |this, cx| {
+                                        this.on_drag_mouse_up(event, cx);
+                                    });
+                                },
+                            );
+                        }
 
                         let avail_w: f32 =
                             (bounds.size.width - padding.left - padding.right).into();
@@ -700,7 +794,7 @@ impl TerminalView {
                     .rounded_full()
                     .bg(rgb(0x71717a))
                     .opacity(if history > 0 { 0.55 } else { 0.0 })
-                    .hover(|s| s.opacity(0.9))
+                    .id("view-01").hover(|s| s.opacity(0.9))
                     .cursor_pointer()
                     .on_mouse_down(MouseButton::Left, cx.listener(Self::on_scrollbar_thumb_down)),
             )

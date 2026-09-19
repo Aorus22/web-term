@@ -111,7 +111,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                     } else {
                                                         muted_text
                                                     })
-                                                    .hover(move |s| s.text_color(text_color))
+                                                    .id("hosts-01").hover(move |s| s.text_color(text_color))
                                                     .child("All")
                                                     .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
                                                         this.select_tag_filter(None, cx);
@@ -138,7 +138,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                     } else {
                                                         muted_text
                                                     })
-                                                    .hover(move |s| s.text_color(text_color))
+                                                    .id(ElementId::Name(format!("hosts-tag-{}", tag).into())).hover(move |s| s.text_color(text_color))
                                                     .child(tag)
                                                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                                         let next = if this.selected_tag.as_ref() == Some(&tag_clone) {
@@ -178,7 +178,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .text_xs()
                                 .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(move |s| s.bg(muted_bg).text_color(text_color))
+                                .id("hosts-03").hover(move |s| s.bg(muted_bg).text_color(text_color))
                                 .child(
                                     svg()
                                         .data(ARROW_DOWN_SVG)
@@ -206,7 +206,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .text_xs()
                                 .text_color(muted_text)
                                 .cursor_pointer()
-                                .hover(move |s| s.bg(muted_bg).text_color(text_color))
+                                .id("hosts-04").hover(move |s| s.bg(muted_bg).text_color(text_color))
                                 .child(
                                     svg()
                                         .data(ARROW_UP_SVG)
@@ -229,7 +229,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                 .py_1p5()
                                 .rounded_lg()
                                 .bg(primary_color)
-                                .hover(|s| s.opacity(0.9))
+                                .id("hosts-05").hover(|s| s.opacity(0.9))
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
                                 .text_color(primary_fg)
@@ -297,26 +297,18 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                         )
                         .into_any_element()
                 } else {
-                    // Chunk connections into rows of 3 to produce 1:1 grid-cols-3 layout matching Electron
-                    let chunks: Vec<Vec<Connection>> = filtered_connections
-                        .chunks(3)
-                        .map(|c| c.to_vec())
-                        .collect();
-
+                    // Responsive wrapping grid: cards grow from a 300px basis
+                    // and wrap to fewer columns on narrow windows. (The old
+                    // fixed chunks-of-3 rows overflowed because card
+                    // min-content exceeds a third of small viewports.)
                     div()
                         .flex()
-                        .flex_col()
+                        .flex_row()
+                        .flex_wrap()
                         .gap_4()
                         .w_full()
                         .pb_12()
-                        .children(chunks.into_iter().map(|chunk| {
-                            let chunk_len = chunk.len();
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap_4()
-                                .w_full()
-                                .children(chunk.into_iter().map(|conn| {
+                        .children(filtered_connections.into_iter().map(|conn| {
                                     let conn_id = conn.id.clone();
                                     let conn_id_click = conn.id.clone();
                                     let conn_id_del = conn.id.clone();
@@ -350,8 +342,10 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                     };
 
                                     div()
-                                        .flex_1()
-                                        .min_w_0()
+                                        .flex_basis(px(300.0))
+                                        .flex_grow_1()
+                                        .flex_shrink_1()
+                                        .min_w(px(240.0))
                                         .flex()
                                         .flex_row()
                                         .items_center()
@@ -364,7 +358,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                         .border_1()
                                         .border_color(card_border)
                                         .cursor_pointer()
-                                        .hover(move |s| s.border_color(primary_color))
+                                        .id(ElementId::Name(format!("host-card-{}", conn.id).into())).hover(move |s| s.border_color(primary_color))
                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
                                             this.connect_to_host(&conn_id_click, cx);
                                         }))
@@ -478,7 +472,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                         .justify_center()
                                                         .size(px(24.0))
                                                         .rounded_md()
-                                                        .hover(move |s| s.bg(muted_bg))
+                                                        .id("hosts-07").hover(move |s| s.bg(muted_bg))
                                                         .child(
                                                             svg()
                                                                 .data(crate::icons::COPY_SVG)
@@ -486,6 +480,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                                 .text_color(muted_text),
                                                         )
                                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                            cx.stop_propagation();
                                                             this.duplicate_connection(&conn_id_dup, cx);
                                                         })),
                                                 )
@@ -497,7 +492,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                         .justify_center()
                                                         .size(px(24.0))
                                                         .rounded_md()
-                                                        .hover(move |s| s.bg(muted_bg))
+                                                        .id("hosts-08").hover(move |s| s.bg(muted_bg))
                                                         .child(
                                                             svg()
                                                                 .data(crate::icons::EDIT_SVG)
@@ -505,6 +500,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                                 .text_color(muted_text),
                                                         )
                                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                                            cx.stop_propagation();
                                                             this.open_edit_connection_modal(&conn_id_edit, window, cx);
                                                         })),
                                                 )
@@ -516,7 +512,7 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                         .justify_center()
                                                         .size(px(24.0))
                                                         .rounded_md()
-                                                        .hover(move |s| s.bg(muted_bg))
+                                                        .id("hosts-09").hover(move |s| s.bg(muted_bg))
                                                         .child(
                                                             svg()
                                                                 .data(crate::icons::TRASH_SVG)
@@ -524,16 +520,12 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                                 .text_color(muted_text),
                                                         )
                                                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
+                                                            cx.stop_propagation();
                                                             this.open_delete_connection_modal(&conn_id_del, cx);
                                                         })),
                                                 ),
                                         )
                                 }))
-                                // Spacer cards for last row so cards stay 1/3 width
-                                .children((0..(3 - chunk_len)).map(|_| {
-                                    div().flex_1().min_w_0()
-                                }))
-                        }))
                         .into_any_element()
                 }),
         )

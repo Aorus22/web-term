@@ -133,7 +133,7 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                 .py_2()
                                 .rounded_lg()
                                 .cursor_pointer()
-                                .hover(|s| s.bg(muted_bg))
+                                .id("new_tab-01").hover(|s| s.bg(muted_bg))
                                 .child(svg().data(PLUS_SVG).size(px(14.0)).text_color(muted_text))
                                 .child(
                                     div()
@@ -186,7 +186,7 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                             .py_2()
                                             .rounded_lg()
                                             .cursor_pointer()
-                                            .hover(|s| s.bg(muted_bg))
+                                            .id(ElementId::Name(format!("nt-conn-{}", conn.id).into())).hover(|s| s.bg(muted_bg))
                                             .child(
                                                 svg()
                                                     .data(TERMINAL_SVG)
@@ -247,7 +247,7 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                     .border_color(primary_color)
                                     .bg(muted_bg)
                                     .cursor_pointer()
-                                    .hover(|s| s.border_color(primary_color).bg(border_color))
+                                    .id("new_tab-03").hover(|s| s.border_color(primary_color).bg(border_color))
                                     .child(
                                         div()
                                             .flex()
@@ -328,7 +328,7 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                         .border_1()
                                         .border_color(border_color)
                                         .bg(card_bg)
-                                        .hover(|s| s.bg(muted_bg))
+                                        .id("new_tab-04").hover(|s| s.bg(muted_bg))
                                         .cursor_pointer()
                                         .text_xs()
                                         .font_weight(FontWeight::SEMIBOLD)
@@ -408,7 +408,7 @@ pub fn render_new_tab_page(app: &mut AppState, cx: &mut Context<AppState>) -> An
                                                 })
                                                 .bg(card_bg)
                                                 .cursor_pointer()
-                                                .hover(|s| {
+                                                .id(ElementId::Name(format!("nt-conn-{}", conn.id).into())).hover(|s| {
                                                     s.border_color(primary_color).bg(muted_bg)
                                                 })
                                                 // Header: Title & Terminal icon

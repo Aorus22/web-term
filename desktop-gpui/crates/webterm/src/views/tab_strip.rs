@@ -5,10 +5,18 @@ use crate::icons::{
     COPY_SVG, MAXIMIZE_SVG, MINIMIZE_SVG, PANEL_LEFT_SVG, PLUS_SVG, RESTORE_SVG, X_SVG,
 };
 use crate::session::SessionStatus;
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 /// Renders the horizontal top bar containing sidebar toggle, open terminal tabs, draggable titlebar area, and custom window controls.
-pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl IntoElement {
+///
+/// `framed` rounds the top corners (Zed-style titlebar): this bar owns them
+/// since it floats over the full width, including above the sidebar.
+pub fn render_tab_strip(
+    app: &mut AppState,
+    framed: bool,
+    cx: &mut Context<AppState>,
+) -> impl IntoElement {
     let active_index = app.session_manager.active_index();
     let border_color = app.border_color();
     let bar_bg = app.bg_color();
@@ -29,6 +37,10 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
         .pl_2()
         .pr_0()
         .gap_2()
+        .when(framed, |d| {
+            d.rounded_tl(crate::app_state::FRAME_ROUNDING)
+                .rounded_tr(crate::app_state::FRAME_ROUNDING)
+        })
         // Left: Sidebar Toggle Button (PanelLeft)
         .child(
             div()
@@ -38,7 +50,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .size(px(28.0))
                 .rounded_md()
                 .cursor_pointer()
-                .hover(|s| s.bg(hover_bg))
+                .id("tab_strip-01").hover(|s| s.bg(hover_bg))
                 .child(
                     svg()
                         .data(PANEL_LEFT_SVG)
@@ -96,7 +108,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                 .border_1()
                 .border_color(tab_border)
                 .cursor_pointer()
-                .hover(|s| s.bg(if is_active { tab_bg } else { hover_bg }))
+                .id(ElementId::NamedInteger("tab".into(), idx as u64)).hover(|s| s.bg(if is_active { tab_bg } else { hover_bg }))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _, _window, cx| {
@@ -127,11 +139,12 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .justify_center()
                         .size(px(16.0))
                         .rounded_sm()
-                        .hover(|s| s.bg(border_color))
+                        .id("tab_strip-03").hover(|s| s.bg(border_color))
                         .child(svg().data(X_SVG).size(px(10.0)).text_color(muted_text))
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(move |this, _, _window, cx| {
+                                cx.stop_propagation();
                                 this.close_tab(idx, cx);
                             }),
                         ),
@@ -149,7 +162,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .size(px(28.0))
                         .rounded_md()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("tab_strip-04").hover(|s| s.bg(hover_bg))
                         .child(svg().data(PLUS_SVG).size(px(14.0)).text_color(muted_text))
                         .on_mouse_down(
                             MouseButton::Left,
@@ -194,7 +207,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                     .py_2()
                                     .rounded_lg()
                                     .cursor_pointer()
-                                    .hover(|s| s.bg(hover_bg))
+                                    .id("tab_strip-05").hover(|s| s.bg(hover_bg))
                                     .child(
                                         svg().data(COPY_SVG).size(px(16.0)).text_color(muted_text),
                                     )
@@ -234,7 +247,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                                     .py_2()
                                     .rounded_lg()
                                     .cursor_pointer()
-                                    .hover(|s| s.bg(hover_bg))
+                                    .id("tab_strip-06").hover(|s| s.bg(hover_bg))
                                     .child(
                                         svg().data(PLUS_SVG).size(px(16.0)).text_color(muted_text),
                                     )
@@ -299,7 +312,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .w(px(44.0))
                         .h_full()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("tab_strip-07").hover(|s| s.bg(hover_bg))
                         .child(
                             svg()
                                 .data(MINIMIZE_SVG)
@@ -319,7 +332,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .w(px(44.0))
                         .h_full()
                         .cursor_pointer()
-                        .hover(|s| s.bg(hover_bg))
+                        .id("tab_strip-08").hover(|s| s.bg(hover_bg))
                         .child(
                             svg()
                                 .data(if app.is_maximized {
@@ -348,7 +361,7 @@ pub fn render_tab_strip(app: &mut AppState, cx: &mut Context<AppState>) -> impl 
                         .w(px(46.0))
                         .h_full()
                         .cursor_pointer()
-                        .hover(|s| s.bg(rgb(0xe81123)).text_color(rgb(0xffffff)))
+                        .id("tab_strip-09").hover(|s| s.bg(rgb(0xe81123)).text_color(rgb(0xffffff)))
                         .child(svg().data(X_SVG).size(px(13.0)).text_color(muted_text))
                         .on_mouse_down(MouseButton::Left, |_, window, _| {
                             window.remove_window();

@@ -4,14 +4,23 @@ use crate::actions::{
     CloseTab, EscapeOverlays, JumpTab1, JumpTab2, JumpTab3, JumpTab4, JumpTab5, JumpTab6, JumpTab7,
     JumpTab8, JumpTab9, NewTab, NextTab, PrevTab,
 };
-use crate::app_state::{AppState, View};
+use crate::app_state::{AppState, View, FRAME_ROUNDING};
 use crate::views::hosts::render_hosts_view;
 use crate::views::reconnect_banner::render_reconnect_banner;
 use crate::views::tab_strip::render_tab_strip;
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 /// Render the left navigation sidebar and active content pane.
-pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
+///
+/// `framed` enables CSD leaf rounding (Zed-style): the sidebar owns the left
+/// corners, the tab strip the top-right, content the bottom-right. Skipped
+/// when maximized/tiled so edges stay flush.
+pub fn render_nav_shell(
+    app: &mut AppState,
+    framed: bool,
+    cx: &mut Context<AppState>,
+) -> AnyElement {
     let active_view = app.active_view;
 
     // Sidebar items matching web client (Lucide SVGs)
@@ -27,7 +36,6 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     ];
 
     let is_dark = app.is_dark();
-    let bg_color = app.bg_color();
     let sidebar_bg = app.bg_color();
     let text_color = app.text_color();
     let _muted_text = app.muted_text();
@@ -95,7 +103,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                     .cursor_pointer()
                     .text_xs()
                     .text_color(app.muted_text())
-                    .hover(|s| s.text_color(text_color))
+                    .id("nav-01").hover(|s| s.text_color(text_color))
                     .child(
                         svg()
                             .data(crate::icons::X_SVG)
@@ -116,7 +124,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .relative()
         .flex()
         .size_full()
-        .bg(bg_color)
+        // NOTE: no .bg here — the root must stay transparent so CSD rounded
+        // corners (tab strip / sidebar / content leaves) show real
+        // transparency instead of a square opaque backdrop.
         .text_color(text_color)
         // Tab shortcuts
         .on_action(cx.listener(|this, _: &NewTab, window, cx| {
@@ -162,7 +172,9 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         .on_action(cx.listener(|this, _: &JumpTab9, _window, cx| {
             this.jump_to_tab(8, cx);
         }))
-        // Left Sidebar (collapsible)
+        // Left Sidebar (collapsible): transparent shell + 40px spacer so the
+        // floating tab strip's top-left corner stays transparent; bg lives on
+        // the body below which owns only the bottom-left corner.
         .children(if app.sidebar_open {
             Some(
                 div()
@@ -170,12 +182,20 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                     .flex_col()
                     .w(px(200.0))
                     .h_full()
-                    .bg(sidebar_bg)
-                    .border_r_1()
-                    .border_color(border_color)
-                    .px_3()
-                    .py_4()
-                    .justify_between()
+                    .child(div().h(px(40.0)).flex_none())
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_h_0()
+                            .bg(sidebar_bg)
+                            .border_r_1()
+                            .border_color(border_color)
+                            .px_3()
+                            .py_4()
+                            .justify_between()
+                            .when(framed, |d| d.rounded_bl(FRAME_ROUNDING))
                     // Top header & items
                     .child(
                         div()
@@ -221,7 +241,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                     .py_2()
                                     .rounded_lg()
                                     .bg(item_bg)
-                                    .hover(move |s| s.bg(item_hover))
+                                    .id("nav-02").hover(move |s| s.bg(item_hover))
                                     .cursor_pointer()
                                     .child(svg().data(icon).size(px(16.0)).text_color(icon_color))
                                     .child(
@@ -279,7 +299,7 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                             .py_2()
                             .rounded_lg()
                             .bg(item_bg)
-                            .hover(move |s| s.bg(item_hover))
+                            .id("nav-03").hover(move |s| s.bg(item_hover))
                             .cursor_pointer()
                             .child(
                                 svg()
@@ -308,72 +328,96 @@ pub fn render_nav_shell(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 }),
                             )
                     })),
+                    ),
             )
         } else {
             None
         })
-        // Main Content Area
-        .child(
-            div()
+        // Main Content Area: transparent shell + 40px spacer (tab strip floats
+        // above it) so rounded corners stay transparent; bg lives on the body.
+        // Tree: shell > spacer, body > pane > row; tab strip + popover
+        // backdrop attach to the shell AFTER the body (paint on top).
+        .child({
+            let mut shell = div()
                 .relative()
                 .flex_1()
+                .flex()
+                .flex_col()
                 .h_full()
+                .child(div().h(px(40.0)).flex_none());
+            let mut body = div()
+                .relative()
+                .flex_1()
+                .min_h_0()
+                .w_full()
                 .overflow_hidden()
-                // Content Pane (occupies full height with 40px top padding for tab strip)
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .size_full()
-                        .pt(px(40.0))
-                        .overflow_hidden()
-                        // Reconnection banner (when active tab is reconnecting or disconnected and viewing terminal)
-                        .children(if active_view == View::Hosts && !app.show_hosts_catalog {
-                            render_reconnect_banner(app, cx)
-                        } else {
-                            None
-                        })
-                        .child(
-                            // Row: active view content + right-side sheet that pushes it aside
-                            div()
-                                .flex()
-                                .flex_row()
-                                .flex_1()
-                                .w_full()
-                                .min_h_0()
-                                .overflow_hidden()
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .overflow_hidden()
-                                        .child(content_pane),
-                                )
-                                .children(sheet_slot),
-                        ),
-                )
-                // Backdrop when popover is open to dismiss on click outside
-                .children(if app.show_new_tab_popover {
-                    Some(div().absolute().inset_0().on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|this, _, _window, cx| {
-                            this.show_new_tab_popover = false;
-                            cx.notify();
-                        }),
-                    ))
+                // Own bg + gutters on all sides: views paint full-bleed and
+                // would cover the rounded corners, so the body provides the
+                // rounded backdrop and insets content from the corners. The
+                // left/top insets also keep the terminal grid out of the
+                // window-edge resize zones and the floating tab strip's
+                // hitbox, so selecting text near the top-left corner works.
+                .bg(sidebar_bg)
+                .p(FRAME_ROUNDING);
+            if framed {
+                body = body.rounded_br(FRAME_ROUNDING);
+                if !app.sidebar_open {
+                    body = body.rounded_bl(FRAME_ROUNDING);
+                }
+            }
+            let pane = div()
+                .flex()
+                .flex_col()
+                .size_full()
+                .overflow_hidden()
+                .children(if active_view == View::Hosts && !app.show_hosts_catalog {
+                    render_reconnect_banner(app, cx)
                 } else {
                     None
                 })
-                // Top Tab Strip across all views (rendered AFTER content_pane so it and its popovers float on top!)
                 .child(
+                    // Row: active view content + right-side sheet that pushes it aside
                     div()
-                        .absolute()
-                        .top_0()
-                        .left_0()
-                        .right_0()
-                        .h(px(40.0))
-                        .child(render_tab_strip(app, cx)),
-                ),
+                        .flex()
+                        .flex_row()
+                        .flex_1()
+                        .w_full()
+                        .min_h_0()
+                        .overflow_hidden()
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .overflow_hidden()
+                                .child(content_pane),
+                        )
+                        .children(sheet_slot),
+                );
+            body = body.child(pane);
+            shell = shell.child(body);
+            // Backdrop when popover is open to dismiss on click outside
+            if app.show_new_tab_popover {
+                shell = shell.child(div().absolute().inset_0().on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _window, cx| {
+                        this.show_new_tab_popover = false;
+                        cx.notify();
+                    }),
+                ));
+            }
+            shell
+        })
+        // Top Tab Strip: full window width (including above the sidebar),
+        // floating above the transparent spacers. Owns both top corners.
+        // Painted after content so it and its popovers stay on top!
+        .child(
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .right_0()
+                .h(px(40.0))
+                .child(render_tab_strip(app, framed, cx)),
         )
         .children(passphrase_modal_overlay)
         .children(confirm_modals_overlay)
@@ -706,7 +750,7 @@ fn confirm_dialog_buttons(
                 .py_2()
                 .rounded_md()
                 .bg(tag_bg)
-                .hover(move |s| s.bg(border_color))
+                .id("nav-04").hover(move |s| s.bg(border_color))
                 .cursor_pointer()
                 .text_sm()
                 .text_color(text_color)
@@ -722,7 +766,7 @@ fn confirm_dialog_buttons(
                 .py_2()
                 .rounded_md()
                 .bg(app.destructive_color())
-                .hover(|s| s.opacity(0.9))
+                .id("nav-05").hover(|s| s.opacity(0.9))
                 .cursor_pointer()
                 .text_sm()
                 .font_weight(FontWeight::SEMIBOLD)
@@ -935,7 +979,7 @@ fn context_menu_row(
     muted_text: Rgba,
     hover_bg: Rgba,
     on_click: impl Fn(&MouseDownEvent, &mut Window, &mut App) + 'static,
-) -> Div {
+) -> Stateful<Div> {
     let _ = is_dark;
     div()
         .flex()
@@ -946,7 +990,7 @@ fn context_menu_row(
         .py_1p5()
         .rounded_md()
         .cursor_pointer()
-        .hover(move |s| s.bg(hover_bg))
+        .id("nav-06").hover(move |s| s.bg(hover_bg))
         .text_xs()
         .text_color(text_color)
         .child(svg().data(icon).size(px(12.0)).text_color(muted_text))
@@ -1024,7 +1068,7 @@ pub fn render_save_connection_banner(
                             .py_1p5()
                             .rounded_md()
                             .bg(primary_color)
-                            .hover(|s| s.opacity(0.9))
+                            .id("nav-07").hover(|s| s.opacity(0.9))
                             .cursor_pointer()
                             .text_xs()
                             .font_weight(FontWeight::BOLD)
@@ -1045,7 +1089,7 @@ pub fn render_save_connection_banner(
                             .text_xs()
                             .text_color(muted_text)
                             .cursor_pointer()
-                            .hover(move |s| s.text_color(text_color))
+                            .id("nav-08").hover(move |s| s.text_color(text_color))
                             .child("Dismiss")
                             .on_mouse_down(
                                 MouseButton::Left,
