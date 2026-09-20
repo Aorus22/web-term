@@ -6,6 +6,7 @@
 //! next to the other modals keeps the backdrop fixed over the whole window.
 
 use crate::app_state::AppState;
+use crate::glass::{Elevation, GlassTier};
 use gpui::*;
 
 const MONO_FONTS: &[&str] = &[
@@ -36,6 +37,7 @@ pub fn render_font_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
     let temp_font = app.font_dialog_family.clone();
     let temp_size = app.font_dialog_size;
     let show_font_picker = app.show_font_dialog_picker;
+    let dialog_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Xxl);
 
     div()
         .absolute()
@@ -55,10 +57,10 @@ pub fn render_font_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                 .max_w(px(520.0))
                 .rounded_xl()
                 .border_1()
-                .border_color(border_color)
-                .bg(card_bg)
+                .border_color(dialog_glass.border)
+                .bg(dialog_glass.fill)
                 .p_6()
-                .shadow_2xl()
+                .shadow(dialog_glass.shadows)
                 .flex()
                 .flex_col()
                 .gap_5()

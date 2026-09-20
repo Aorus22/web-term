@@ -1,6 +1,7 @@
 //! Port Forwarding rules management view: rule cards, toggle, create/edit sheet, and deletion modal.
 
 use crate::app_state::{AppState, ForwardModalMode};
+use crate::glass::{Elevation, GlassTier};
 use crate::views::sheet::{
     sheet_body, sheet_error_banner, sheet_footer, sheet_header, sheet_input_row, sheet_panel,
 };
@@ -706,10 +707,11 @@ pub fn render_forward_sheet(app: &mut AppState, cx: &mut Context<AppState>) -> A
 pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let is_dark = app.is_dark();
     let card_bg = app.card_bg();
-    let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let tag_bg = app.muted_bg();
+
+    let dialog_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Lg);
 
     let target = match &app.delete_forward_target {
         Some(t) => t.clone(),
@@ -734,10 +736,10 @@ pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState
                 .flex_col()
                 .w(px(440.0))
                 .rounded_xl()
-                .bg(card_bg)
+                .bg(dialog_glass.fill)
                 .border_1()
-                .border_color(border_color)
-                .shadow_lg()
+                .border_color(dialog_glass.border)
+                .shadow(dialog_glass.shadows)
                 .p_6()
                 .gap_4()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {})

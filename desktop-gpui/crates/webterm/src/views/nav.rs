@@ -5,6 +5,7 @@ use crate::actions::{
     JumpTab8, JumpTab9, NewTab, NextTab, PrevTab,
 };
 use crate::app_state::{AppState, View, FRAME_ROUNDING};
+use crate::glass::{Elevation, GlassTier};
 use crate::views::hosts::render_hosts_view;
 use crate::views::reconnect_banner::render_reconnect_banner;
 use crate::views::tab_strip::render_tab_strip;
@@ -39,7 +40,11 @@ pub fn render_nav_shell(
     ];
 
     let is_dark = app.is_dark();
+    // `sidebar_bg` stays the opaque theme colour: the content body below paints
+    // it and must not become see-through. The sidebar leaf paints the glass
+    // instead, because the desktop is what is actually behind it.
     let sidebar_bg = app.bg_color();
+    let sidebar_glass = app.glass_style(sidebar_bg, GlassTier::Chrome, Elevation::None);
     let text_color = app.text_color();
     let _muted_text = app.muted_text();
     let border_color = app.border_color();
@@ -99,6 +104,7 @@ pub fn render_nav_shell(
     };
 
     let notification_toast = app.notification.clone().map(|msg| {
+        let toast_glass = app.glass_style(app.card_bg(), GlassTier::Overlay, Elevation::Lg);
         div()
             .absolute()
             .top(px(16.0))
@@ -110,10 +116,12 @@ pub fn render_nav_shell(
             .px_4()
             .py_2()
             .rounded_lg()
-            .bg(app.card_bg())
+            .bg(toast_glass.fill)
             .border_1()
+            // The toast keeps its primary-accent border rather than the glass
+            // hairline: it is the surface that has to catch the eye.
             .border_color(app.primary_color())
-            .shadow_lg()
+            .shadow(toast_glass.shadows)
             .text_sm()
             .text_color(text_color)
             .child(msg)
@@ -235,9 +243,10 @@ pub fn render_nav_shell(
                             .flex_col()
                             .flex_1()
                             .min_h_0()
-                            .bg(sidebar_bg)
+                            .bg(sidebar_glass.fill)
                             .border_r_1()
-                            .border_color(border_color)
+                            .border_color(sidebar_glass.border)
+                            .shadow(sidebar_glass.shadows.clone())
                             .px_3()
                             .py_4()
                             .justify_between()
@@ -264,7 +273,15 @@ pub fn render_nav_shell(
                                     && (view != View::Hosts || app.show_hosts_catalog);
                                 let accent_color = app.accent_color();
                                 let accent_fg = app.accent_fg();
-                                let item_bg = if is_active { accent_color } else { sidebar_bg };
+                                // Inactive rows paint nothing: an opaque fill
+                                // equal to the parent only reads as invisible
+                                // while the parent is opaque, and would double
+                                // up over a translucent glass sidebar.
+                                let item_bg = if is_active {
+                                    accent_color
+                                } else {
+                                    rgba(0x00000000)
+                                };
                                 let item_hover = if is_active {
                                     accent_color
                                 } else {
@@ -326,7 +343,11 @@ pub fn render_nav_shell(
                         let is_active = active_view == View::Settings;
                         let accent_color = app.accent_color();
                         let accent_fg = app.accent_fg();
-                        let item_bg = if is_active { accent_color } else { sidebar_bg };
+                        let item_bg = if is_active {
+                            accent_color
+                        } else {
+                            rgba(0x00000000)
+                        };
                         let item_hover = if is_active {
                             accent_color
                         } else {
@@ -763,6 +784,7 @@ fn confirm_dialog_shell(
     on_dismiss: impl Fn(&mut AppState, &mut Window, &mut Context<AppState>) + 'static,
     content: Vec<AnyElement>,
 ) -> Div {
+    let panel_glass = app.glass_style(app.card_bg(), GlassTier::Overlay, Elevation::Lg);
     div()
         .absolute()
         .inset_0()
@@ -782,10 +804,10 @@ fn confirm_dialog_shell(
                 .flex_col()
                 .w(px(420.0))
                 .rounded_xl()
-                .bg(app.card_bg())
+                .bg(panel_glass.fill)
                 .border_1()
-                .border_color(app.border_color())
-                .shadow_lg()
+                .border_color(panel_glass.border)
+                .shadow(panel_glass.shadows)
                 .p_6()
                 .gap_3()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {})
@@ -877,15 +899,15 @@ pub fn render_terminal_context_menu(
     }
 
     let border_color = app.border_color();
-    let card_bg = app.card_bg();
+    let menu_glass = app.glass_style(app.card_bg(), GlassTier::Overlay, Elevation::Lg);
 
     let menu = div()
         .w(px(190.0))
         .rounded_md()
         .border_1()
-        .border_color(border_color)
-        .bg(card_bg)
-        .shadow_lg()
+        .border_color(menu_glass.border)
+        .bg(menu_glass.fill)
+        .shadow(menu_glass.shadows)
         .py_1()
         .on_mouse_down(MouseButton::Left, |_, _, _| {})
         .child(context_menu_row(

@@ -10,6 +10,7 @@ use crate::app_state::{
     format_file_size, join_path, split_breadcrumbs, AppState, SftpActivePane, SftpDraggedItem,
     SftpModalState, SftpSortColumn, SftpSortOrder,
 };
+use crate::glass::{Elevation, GlassTier};
 
 /// Drag preview element displayed under mouse during drag-and-drop.
 #[derive(Clone)]
@@ -1460,10 +1461,10 @@ fn render_source_picker_dropdown(
     cx: &mut Context<AppState>,
 ) -> AnyElement {
     let card_bg = app.card_bg();
-    let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let hover_bg = app.muted_bg();
+    let menu_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Xl);
 
     let mut items = Vec::new();
 
@@ -1561,11 +1562,11 @@ fn render_source_picker_dropdown(
                 .absolute()
                 .top(px(38.0))
                 .left(px(12.0))
-                .bg(card_bg)
+                .bg(menu_glass.fill)
                 .border_1()
-                .border_color(border_color)
+                .border_color(menu_glass.border)
                 .rounded_md()
-                .shadow_xl()
+                .shadow(menu_glass.shadows)
                 .p_1()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {})
                 .children(items),
@@ -1586,6 +1587,7 @@ fn render_actions_dropdown(
     let muted_text = app.muted_text();
     let hover_bg = app.muted_bg();
     let destructive_text = app.destructive_color();
+    let menu_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Xl);
 
     let state = app.sftp_pane(pane);
     let has_selection = !state.selected.is_empty();
@@ -1613,11 +1615,11 @@ fn render_actions_dropdown(
                 .absolute()
                 .top(px(38.0))
                 .right(px(12.0))
-                .bg(card_bg)
+                .bg(menu_glass.fill)
                 .border_1()
-                .border_color(border_color)
+                .border_color(menu_glass.border)
                 .rounded_md()
-                .shadow_xl()
+                .shadow(menu_glass.shadows)
                 .p_1()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {})
                 // 1. Refresh
@@ -1862,10 +1864,10 @@ fn render_drive_picker_dropdown(
     cx: &mut Context<AppState>,
 ) -> AnyElement {
     let card_bg = app.card_bg();
-    let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let hover_bg = app.muted_bg();
+    let menu_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Xl);
 
     let drives = crate::app_state::get_available_drives();
 
@@ -1889,11 +1891,11 @@ fn render_drive_picker_dropdown(
                 .absolute()
                 .top(px(72.0))
                 .left(px(54.0))
-                .bg(card_bg)
+                .bg(menu_glass.fill)
                 .border_1()
-                .border_color(border_color)
+                .border_color(menu_glass.border)
                 .rounded_lg()
-                .shadow_xl()
+                .shadow(menu_glass.shadows)
                 .p_1()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {})
                 .child(
@@ -1946,10 +1948,10 @@ fn render_path_picker_dropdown(
     cx: &mut Context<AppState>,
 ) -> AnyElement {
     let card_bg = app.card_bg();
-    let border_color = app.border_color();
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let hover_bg = app.muted_bg();
+    let menu_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Xl);
 
     let state = app.sftp_pane(pane);
     let segments = split_breadcrumbs(&state.current_path);
@@ -1980,11 +1982,11 @@ fn render_path_picker_dropdown(
                 .absolute()
                 .top(px(72.0))
                 .left(px(96.0))
-                .bg(card_bg)
+                .bg(menu_glass.fill)
                 .border_1()
-                .border_color(border_color)
+                .border_color(menu_glass.border)
                 .rounded_lg()
-                .shadow_xl()
+                .shadow(menu_glass.shadows)
                 .p_1()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {})
                 .child(
@@ -2237,11 +2239,6 @@ pub fn render_sftp_modal(
     } else {
         rgb(0xffffff)
     };
-    let border_color = if is_dark {
-        rgb(0x3f3f46)
-    } else {
-        rgb(0xe2e8f0)
-    };
     let text_color = if is_dark {
         rgb(0xf4f4f5)
     } else {
@@ -2252,6 +2249,7 @@ pub fn render_sftp_modal(
     } else {
         rgb(0x64748b)
     };
+    let modal_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Lg);
     let input_bg = if is_dark {
         rgb(0x18181b)
     } else {
@@ -2290,9 +2288,9 @@ pub fn render_sftp_modal(
                             .flex_col()
                             .w(px(400.0))
                             .rounded_xl()
-                            .bg(card_bg)
+                            .bg(modal_glass.fill)
                             .border_1()
-                            .border_color(border_color)
+                            .border_color(modal_glass.border)
                             .p_6()
                             .gap_4()
                             .on_mouse_down(MouseButton::Left, |_, _, _| {})
@@ -2467,9 +2465,9 @@ pub fn render_sftp_modal(
                             .flex_col()
                             .w(px(400.0))
                             .rounded_xl()
-                            .bg(card_bg)
+                            .bg(modal_glass.fill)
                             .border_1()
-                            .border_color(border_color)
+                            .border_color(modal_glass.border)
                             .p_6()
                             .gap_4()
                             .on_mouse_down(MouseButton::Left, |_, _, _| {})
@@ -2614,9 +2612,9 @@ pub fn render_sftp_modal(
                             .flex_col()
                             .w(px(420.0))
                             .rounded_xl()
-                            .bg(card_bg)
+                            .bg(modal_glass.fill)
                             .border_1()
-                            .border_color(border_color)
+                            .border_color(modal_glass.border)
                             .p_6()
                             .gap_3()
                             .on_mouse_down(MouseButton::Left, |_, _, _| {})
@@ -2739,9 +2737,9 @@ pub fn render_sftp_modal(
                             .flex_col()
                             .w(px(400.0))
                             .rounded_xl()
-                            .bg(card_bg)
+                            .bg(modal_glass.fill)
                             .border_1()
-                            .border_color(border_color)
+                            .border_color(modal_glass.border)
                             .p_6()
                             .gap_4()
                             .on_mouse_down(MouseButton::Left, |_, _, _| {})
@@ -2857,6 +2855,7 @@ pub fn render_sftp_context_menu(
     let muted_text = app.muted_text();
     let hover_bg = app.muted_bg();
     let destructive_color = app.destructive_color();
+    let menu_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Xl);
 
     let menu_w = 220.0;
     let menu_h = 160.0;
@@ -2912,10 +2911,10 @@ pub fn render_sftp_context_menu(
                     .left(px(x))
                     .w(px(menu_w))
                     .rounded_lg()
-                    .bg(card_bg)
+                    .bg(menu_glass.fill)
                     .border_1()
-                    .border_color(border_color)
-                    .shadow_xl()
+                    .border_color(menu_glass.border)
+                    .shadow(menu_glass.shadows)
                     .p_1()
                     .flex()
                     .flex_col()

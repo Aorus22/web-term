@@ -7,6 +7,7 @@ use std::sync::Arc;
 use webterm::actions;
 use webterm::app_state::AppState;
 use webterm::bundle::resolve_backend_path;
+use webterm::glass;
 use webterm::theme;
 use webterm::window_state;
 use webterm_settings::DesktopSettings;
@@ -97,6 +98,11 @@ fn main() {
                     }
                 }
             }
+
+            // Liquid Glass: keep the transparent backdrop the CSD frame relies
+            // on, upgraded to a real frost where the compositor implements one
+            // (KWin/Hyprland on Wayland). A no-op everywhere else.
+            glass::apply_backdrop_material(window, settings.glass_enabled);
 
             window_state::observe(window, settings_for_observe, cx);
 

@@ -78,6 +78,18 @@ fn default_scrollback() -> u32 {
     1000
 }
 
+fn default_glass_enabled() -> bool {
+    true
+}
+
+/// Alpha of the Liquid Glass fill on overlay surfaces (sheets, dialogs,
+/// toasts, menus). Higher is more opaque and reads as less glassy; the chrome
+/// tier derives a more transparent value from it. Clamped again at use site —
+/// a hand-edited settings file must not be able to make text unreadable.
+fn default_glass_opacity() -> f32 {
+    0.85
+}
+
 /// Desktop settings store holding UI preferences and encryption key custody.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DesktopSettings {
@@ -101,6 +113,12 @@ pub struct DesktopSettings {
     pub cursor_blink: bool,
     #[serde(default = "default_scrollback")]
     pub scrollback: u32,
+    /// Liquid Glass window chrome. Fields carry serde defaults so settings
+    /// files written before the material existed keep loading.
+    #[serde(default = "default_glass_enabled")]
+    pub glass_enabled: bool,
+    #[serde(default = "default_glass_opacity")]
+    pub glass_opacity: f32,
     #[serde(default)]
     pub window_state: Option<WindowState>,
     #[serde(default)]
@@ -125,6 +143,8 @@ impl Default for DesktopSettings {
             cursor_style: default_cursor_style(),
             cursor_blink: default_cursor_blink(),
             scrollback: default_scrollback(),
+            glass_enabled: default_glass_enabled(),
+            glass_opacity: default_glass_opacity(),
             window_state: None,
             last_backend_url: None,
             open_sessions: Vec::new(),

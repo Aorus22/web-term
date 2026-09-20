@@ -1283,6 +1283,60 @@ impl AppState {
         self.current_theme().is_dark
     }
 
+    /// Liquid Glass style for one surface: translucent `base` fill, polarity
+    /// hairline border, and `base`'s elevation plus the inset rim.
+    ///
+    /// `base` is the colour the leaf paints today (`bg_color()` for the
+    /// sidebar, `card_bg()` for the tab strip, sheets and dialogs) and `tier`
+    /// says what is behind it — see [`crate::glass::GlassTier`]. With the
+    /// setting off this returns the theme's own opaque values.
+    pub fn glass_style(
+        &self,
+        base: Rgba,
+        tier: crate::glass::GlassTier,
+        elevation: crate::glass::Elevation,
+    ) -> crate::glass::GlassStyle {
+        crate::glass::style_for(
+            &self.settings,
+            base,
+            self.border_color(),
+            self.is_dark(),
+            tier,
+            elevation,
+        )
+    }
+
+    pub fn glass_enabled(&self) -> bool {
+        self.settings.glass_enabled
+    }
+
+    /// The persisted glass fill alpha, clamped to the readable window.
+    pub fn glass_opacity(&self) -> f32 {
+        crate::glass::clamp_opacity(self.settings.glass_opacity)
+    }
+
+    /// Toggle the Liquid Glass material and re-apply the window backdrop, so a
+    /// compositor that supports real backdrop blur (KWin/Hyprland) starts or
+    /// stops blurring with it.
+    pub fn set_glass_enabled(
+        &mut self,
+        enabled: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.settings.glass_enabled = enabled;
+        let _ = self.settings.save();
+        crate::glass::apply_backdrop_material(window, enabled);
+        cx.notify();
+    }
+
+    /// Set the glass fill alpha; see [`crate::glass::clamp_opacity`].
+    pub fn set_glass_opacity(&mut self, opacity: f32, cx: &mut Context<Self>) {
+        self.settings.glass_opacity = crate::glass::clamp_opacity(opacity);
+        let _ = self.settings.save();
+        cx.notify();
+    }
+
     /// Escape closes the topmost overlay (popover > menus > dialogs >
     /// sheets), matching the web client's dismissal behavior.
     pub fn handle_escape(&mut self, window: &mut Window, cx: &mut Context<Self>) {

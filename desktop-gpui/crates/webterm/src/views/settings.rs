@@ -5,6 +5,9 @@
 //! - APPEARANCE section:
 //!   - Theme Mode filter dropdown ("All themes", "Dark", "Light") with auto-matching.
 //!   - Color Theme cards grid (3 columns) with live preview box (3 dots, 2 bars), active checkmark.
+//! - WINDOW section:
+//!   - Liquid Glass switch (translucent window chrome).
+//!   - Glass Intensity presets (Subtle / Medium / Bold).
 //! - TERMINAL section (omitting web-only terminal type & engine):
 //!   - Font pill button opening Terminal Font dialog.
 //!   - Cursor Style dropdown ("block", "underline", "bar").
@@ -15,6 +18,7 @@
 //!   pinned instead of scrolling with this page.
 
 use crate::app_state::AppState;
+use crate::glass::INTENSITY_STEPS;
 use gpui::*;
 use gpui_component::input::Input;
 use gpui_component::scroll::{Scrollbar, ScrollbarMode};
@@ -39,6 +43,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let muted_text = app.muted_text();
     let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
+    let primary_fg = app.primary_fg();
     let accent_color = app.accent_color();
     let accent_fg = app.accent_fg();
     let theme_mode = app.theme_mode_filter.clone();
@@ -86,6 +91,8 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     };
 
     let cursor_blink_active = app.cursor_blink;
+    let glass_active = app.glass_enabled();
+    let glass_opacity = app.glass_opacity();
     let font_display = format!(
         "{} {:.0}px",
         app.terminal_font_family, app.terminal_font_size
@@ -570,7 +577,170 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                         ),
                 )
                 // ====================================================
-                // 2. TERMINAL SECTION (Excluding terminal type & engine)
+                // 2. WINDOW SECTION: Liquid Glass window chrome
+                // ====================================================
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(16.0))
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(muted_text)
+                                .child("WINDOW"),
+                        )
+                        .child(
+                            div()
+                                .rounded_lg()
+                                .border_1()
+                                .border_color(border_color)
+                                // The card stays opaque like every other row of
+                                // this page: the material applies to the window
+                                // chrome, never to content.
+                                .bg(card_bg)
+                                .overflow_hidden()
+                                // Row 1: Liquid Glass switch
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .justify_between()
+                                        .px_4()
+                                        .py_3()
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_3()
+                                                .child(
+                                                    div()
+                                                        .size(px(6.0))
+                                                        .rounded_full()
+                                                        .bg(if glass_active { primary_color } else { muted_text }),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .flex()
+                                                        .flex_col()
+                                                        .child(
+                                                            div()
+                                                                .text_sm()
+                                                                .font_weight(FontWeight::MEDIUM)
+                                                                .text_color(text_color)
+                                                                .child("Liquid Glass"),
+                                                        )
+                                                        .child(
+                                                            div()
+                                                                .text_xs()
+                                                                .text_color(muted_text)
+                                                                .child("Translucent sidebar, tab bar, sheets and dialogs"),
+                                                        ),
+                                                ),
+                                        )
+                                        // Switch Toggle Button
+                                        .child(
+                                            div()
+                                                .w(px(36.0))
+                                                .h(px(20.0))
+                                                .rounded_full()
+                                                .p_0p5()
+                                                .cursor_pointer()
+                                                .bg(if glass_active {
+                                                    primary_color
+                                                } else {
+                                                    border_color
+                                                })
+                                                .flex()
+                                                .items_center()
+                                                .child(
+                                                    div()
+                                                        .size(px(16.0))
+                                                        .rounded_full()
+                                                        .bg(rgb(0xffffff))
+                                                        .ml(if glass_active { px(16.0) } else { px(1.0) }),
+                                                )
+                                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                                    let enabled = !this.glass_enabled();
+                                                    this.set_glass_enabled(enabled, window, cx);
+                                                })),
+                                        ),
+                                )
+                                // Divider
+                                .child(div().h(px(1.0)).bg(border_color).w_full())
+                                // Row 2: Glass Intensity presets
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .justify_between()
+                                        .px_4()
+                                        .py_3()
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_col()
+                                                .child(
+                                                    div()
+                                                        .text_sm()
+                                                        .font_weight(FontWeight::MEDIUM)
+                                                        .text_color(text_color)
+                                                        .child("Glass Intensity"),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(muted_text)
+                                                        .child("Higher keeps more of the window opaque"),
+                                                ),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_1()
+                                                .children(INTENSITY_STEPS.iter().map(
+                                                    |(label, opacity)| {
+                                                        let opacity = *opacity;
+                                                        let active =
+                                                            (opacity - glass_opacity).abs() < 0.001;
+                                                        div()
+                                                            .px_3()
+                                                            .py_1p5()
+                                                            .rounded_md()
+                                                            .bg(if active { primary_color } else { tag_bg })
+                                                            .text_xs()
+                                                            .font_weight(FontWeight::MEDIUM)
+                                                            .text_color(if active {
+                                                                primary_fg
+                                                            } else {
+                                                                text_color
+                                                            })
+                                                            .cursor_pointer()
+                                                            .id(ElementId::Name(
+                                                                format!("settings-glass-{label}").into(),
+                                                            ))
+                                                            .hover(|s| s.opacity(0.9))
+                                                            .child(*label)
+                                                            .on_mouse_down(
+                                                                MouseButton::Left,
+                                                                cx.listener(move |this, _, _window, cx| {
+                                                                    this.set_glass_opacity(opacity, cx);
+                                                                }),
+                                                            )
+                                                    },
+                                                )),
+                                        ),
+                                ),
+                        ),
+                )
+                // ====================================================
+                // 3. TERMINAL SECTION (Excluding terminal type & engine)
                 // ====================================================
                 .child(
                     div()

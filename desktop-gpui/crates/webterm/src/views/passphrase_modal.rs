@@ -5,6 +5,7 @@ use gpui_component::input::Input;
 use gpui_component::Sizable;
 
 use crate::app_state::AppState;
+use crate::glass::{Elevation, GlassTier};
 
 /// Render the passphrase prompt dialog overlay for an encrypted SSH key.
 pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
@@ -16,6 +17,7 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
     let tag_bg = app.muted_bg();
     let primary_color = app.primary_color();
     let primary_fg = app.primary_fg();
+    let dialog_glass = app.glass_style(card_bg, GlassTier::Overlay, Elevation::Lg);
 
     div()
         .absolute()
@@ -37,10 +39,10 @@ pub fn render_passphrase_modal(app: &mut AppState, cx: &mut Context<AppState>) -
                 .flex_col()
                 .w(px(460.0))
                 .rounded_xl()
-                .bg(card_bg)
+                .bg(dialog_glass.fill)
                 .border_1()
-                .border_color(border_color)
-                .shadow_lg()
+                .border_color(dialog_glass.border)
+                .shadow(dialog_glass.shadows)
                 .p_6()
                 .gap_4()
                 .on_mouse_down(MouseButton::Left, |_, _, _| {}) // stop propagation

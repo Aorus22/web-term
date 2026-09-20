@@ -10,6 +10,7 @@ use gpui_component::input::{Input, InputState, Textarea, TextareaState};
 use gpui_component::Sizable;
 
 use crate::app_state::{AppState, FRAME_ROUNDING};
+use crate::glass::{Elevation, GlassTier};
 
 pub const SHEET_WIDTH: f32 = 540.0;
 pub const SHEET_ANIM_MS: u64 = 240;
@@ -85,8 +86,9 @@ pub fn animated_sheet(
         .into_any_element()
 }
 
-/// Fixed-width sheet panel body: full height, card background, left border.
+/// Fixed-width sheet panel body: full height, glass fill, left border.
 pub fn sheet_panel(app: &AppState) -> Div {
+    let glass = app.glass_style(app.card_bg(), GlassTier::Chrome, Elevation::None);
     div()
         .flex()
         .flex_col()
@@ -96,9 +98,10 @@ pub fn sheet_panel(app: &AppState) -> Div {
         .h_full()
         .flex_shrink_0()
         .overflow_hidden()
-        .bg(app.card_bg())
+        .bg(glass.fill)
         .border_l_1()
-        .border_color(app.border_color())
+        .border_color(glass.border)
+        .shadow(glass.shadows)
 }
 
 /// Sheet header: title + description on the left, X close button on the right.

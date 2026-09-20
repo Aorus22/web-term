@@ -1,6 +1,7 @@
 //! Terminal Tab Strip UI component: frameless titlebar with sidebar toggle, active session tabs, new tab button, draggable region, and custom window controls.
 
 use crate::app_state::{AppState, View};
+use crate::glass::{Elevation, GlassTier};
 use crate::icons::{
     COPY_SVG, MAXIMIZE_SVG, MINIMIZE_SVG, PANEL_LEFT_SVG, PLUS_SVG, RESTORE_SVG, X_SVG,
 };
@@ -19,7 +20,11 @@ pub fn render_tab_strip(
 ) -> impl IntoElement {
     let active_index = app.session_manager.active_index();
     let border_color = app.border_color();
-    let bar_bg = app.bg_color();
+    // The bar floats over the desktop (the window background is transparent),
+    // so it paints glass; the active tab gets the denser overlay tier so the
+    // selected pill still separates from the bar it sits on.
+    let bar_glass = app.glass_style(app.bg_color(), GlassTier::Chrome, Elevation::None);
+    let tab_glass = app.glass_style(app.card_bg(), GlassTier::Overlay, Elevation::None);
     let muted_text = app.muted_text();
 
     let tabs_len = app.session_manager.tab_count();
@@ -31,9 +36,10 @@ pub fn render_tab_strip(
         .items_center()
         .w_full()
         .h(px(40.0))
-        .bg(bar_bg)
+        .bg(bar_glass.fill)
         .border_b_1()
-        .border_color(border_color)
+        .border_color(bar_glass.border)
+        .shadow(bar_glass.shadows)
         .pl_2()
         .pr_0()
         .gap_2()
@@ -91,13 +97,13 @@ pub fn render_tab_strip(
             };
 
             let tab_bg = if is_active {
-                app.card_bg()
+                tab_glass.fill
             } else {
                 rgba(0x00000000)
             };
 
             let tab_border = if is_active {
-                app.border_color()
+                tab_glass.border
             } else {
                 rgba(0x00000000)
             };
@@ -198,6 +204,8 @@ pub fn render_tab_strip(
                 )
                 // Popover dropdown menu
                 .children(if app.show_new_tab_popover {
+                    let popover_glass =
+                        app.glass_style(app.card_bg(), GlassTier::Overlay, Elevation::Lg);
                     Some(
                         div()
                             .absolute()
@@ -206,10 +214,10 @@ pub fn render_tab_strip(
                             .w(px(220.0))
                             .p_1p5()
                             .rounded_xl()
-                            .bg(app.card_bg())
+                            .bg(popover_glass.fill)
                             .border_1()
-                            .border_color(border_color)
-                            .shadow_lg()
+                            .border_color(popover_glass.border)
+                            .shadow(popover_glass.shadows)
                             .gap_1()
                             .flex()
                             .flex_col()
