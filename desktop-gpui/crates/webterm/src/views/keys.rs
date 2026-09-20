@@ -23,6 +23,13 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
     let is_loading = app.is_loading_keys;
     let keys = app.ssh_keys.clone();
 
+    // The key sheets squeeze the toolbar; hiding the action button keeps it
+    // from clipping behind the sheet edge.
+    let sheet_open = app.show_add_key_modal
+        || app.add_key_sheet_closing
+        || app.edit_key_modal.is_some()
+        || app.edit_key_sheet_closing;
+
     div()
         .flex()
         .flex_col()
@@ -63,28 +70,34 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                 .child("SECURE STORAGE"),
                         ),
                 )
-                // Right: Action button (+ Upload Key)
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_1p5()
-                        .px_3p5()
-                        .py_1p5()
-                        .rounded_lg()
-                        .bg(primary_color)
-                        .id("keys-01").hover(|s| s.opacity(0.9))
-                        .text_xs()
-                        .font_weight(FontWeight::BOLD)
-                        .text_color(primary_fg)
-                        .cursor_pointer()
-                        .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
-                        .child("Upload Key")
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                            this.open_add_key_modal(window, cx);
-                        })),
-                ),
+                // Right: Action button (+ Upload Key, hidden while a sheet is open)
+                .children(if sheet_open {
+                    None
+                } else {
+                    Some(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_1p5()
+                            .px_3p5()
+                            .py_1p5()
+                            .rounded_lg()
+                            .bg(primary_color)
+                            .id("keys-01")
+                            .hover(|s| s.opacity(0.9))
+                            .text_xs()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(primary_fg)
+                            .cursor_pointer()
+                            .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
+                            .child("Upload Key")
+                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                this.open_add_key_modal(window, cx);
+                            }))
+                            .into_any_element(),
+                    )
+                }),
         )
         // Main Content Area: Key Cards Grid or Empty State
         .child(
@@ -153,6 +166,9 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
         } else {
             // Responsive wrapping grid (same fix as hosts view: fixed
             // chunks-of-3 rows overflow on narrow windows).
+            // NOTE: invisible fillers below share the card flex sizing so
+            // an orphan card on the last row keeps the same width instead
+            // of stretching full-width via flex_grow_1.
             div()
                 .flex()
                 .flex_row()
@@ -301,6 +317,27 @@ pub fn render_keys_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyEl
                                         ),
                                 )
                         }))
+                        // Invisible fillers: same flex sizing as cards, zero
+                        // height, so they only absorb leftover grow space on
+                        // the last row (covers 2-col and 3-col orphan cases).
+                        .child(
+                            div()
+                                .flex_basis(px(300.0))
+                                .flex_grow_1()
+                                .flex_shrink_1()
+                                .min_w(px(240.0))
+                                .h(px(0.0))
+                                .overflow_hidden(),
+                        )
+                        .child(
+                            div()
+                                .flex_basis(px(300.0))
+                                .flex_grow_1()
+                                .flex_shrink_1()
+                                .min_w(px(240.0))
+                                .h(px(0.0))
+                                .overflow_hidden(),
+                        )
                 .into_any_element()
         })
         )

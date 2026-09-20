@@ -23,6 +23,10 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let count = forwards.len();
     let is_loading = app.is_loading_forwards;
 
+    // The forward sheet squeezes the toolbar; hiding the action button keeps
+    // it from clipping behind the sheet edge.
+    let sheet_open = app.forward_modal.is_some() || app.forward_sheet_closing;
+
     // Create connection label lookup map
     let mut conn_map = std::collections::HashMap::new();
     for c in &app.connections {
@@ -70,28 +74,34 @@ pub fn render_forwards_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .child("SSH TUNNELING"),
                         ),
                 )
-                // Right: Action (+ Create Forward)
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_1p5()
-                        .px_3p5()
-                        .py_1p5()
-                        .rounded_lg()
-                        .bg(primary_color)
-                        .id("forwards-01").hover(|s| s.opacity(0.9))
-                        .text_xs()
-                        .font_weight(FontWeight::BOLD)
-                        .text_color(primary_fg)
-                        .cursor_pointer()
-                        .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
-                        .child("Create Forward")
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                            this.open_create_forward_modal(window, cx);
-                        })),
-                ),
+                // Right: Action (+ Create Forward, hidden while a sheet is open)
+                .children(if sheet_open {
+                    None
+                } else {
+                    Some(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_1p5()
+                            .px_3p5()
+                            .py_1p5()
+                            .rounded_lg()
+                            .bg(primary_color)
+                            .id("forwards-01")
+                            .hover(|s| s.opacity(0.9))
+                            .text_xs()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(primary_fg)
+                            .cursor_pointer()
+                            .child(svg().data(crate::icons::PLUS_SVG).size(px(13.0)).text_color(primary_fg))
+                            .child("Create Forward")
+                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                this.open_create_forward_modal(window, cx);
+                            }))
+                            .into_any_element(),
+                    )
+                }),
         )
         // Main Content Area
         .child(

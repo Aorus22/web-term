@@ -7,6 +7,129 @@ use gpui_component::input::Input;
 use gpui_component::Sizable;
 use webterm_backend_client::Connection;
 
+/// Export + Import + New Host toolbar buttons for the Hosts view.
+///
+/// Returns `None` while the connection sheet is open: the sheet squeezes the
+/// toolbar and the buttons would clip behind its edge.
+fn hosts_toolbar_actions(
+    sheet_open: bool,
+    card_bg: Rgba,
+    border_color: Rgba,
+    text_color: Rgba,
+    muted_text: Rgba,
+    muted_bg: Rgba,
+    primary_color: Rgba,
+    primary_fg: Rgba,
+    cx: &mut Context<AppState>,
+) -> Option<AnyElement> {
+    if sheet_open {
+        return None;
+    }
+    Some(
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap_2()
+            // Export button
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_1p5()
+                    .px_3()
+                    .py_1p5()
+                    .rounded_lg()
+                    .bg(card_bg)
+                    .border_1()
+                    .border_color(border_color)
+                    .text_xs()
+                    .text_color(muted_text)
+                    .cursor_pointer()
+                    .id("hosts-03")
+                    .hover(move |s| s.bg(muted_bg).text_color(text_color))
+                    .child(
+                        svg()
+                            .data(ARROW_DOWN_SVG)
+                            .size(px(12.0))
+                            .text_color(muted_text),
+                    )
+                    .child("Export")
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _window, cx| {
+                            this.export_connections_to_disk(cx);
+                        }),
+                    ),
+            )
+            // Import button
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_1p5()
+                    .px_3()
+                    .py_1p5()
+                    .rounded_lg()
+                    .bg(card_bg)
+                    .border_1()
+                    .border_color(border_color)
+                    .text_xs()
+                    .text_color(muted_text)
+                    .cursor_pointer()
+                    .id("hosts-04")
+                    .hover(move |s| s.bg(muted_bg).text_color(text_color))
+                    .child(
+                        svg()
+                            .data(ARROW_UP_SVG)
+                            .size(px(12.0))
+                            .text_color(muted_text),
+                    )
+                    .child("Import")
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _window, cx| {
+                            this.import_connections_from_file(cx);
+                        }),
+                    ),
+            )
+            // + New Host button
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_1p5()
+                    .px_3p5()
+                    .py_1p5()
+                    .rounded_lg()
+                    .bg(primary_color)
+                    .id("hosts-05")
+                    .hover(|s| s.opacity(0.9))
+                    .text_xs()
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(primary_fg)
+                    .cursor_pointer()
+                    .child(
+                        svg()
+                            .data(PLUS_SVG)
+                            .size(px(13.0))
+                            .text_color(primary_fg),
+                    )
+                    .child("New Host")
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, window, cx| {
+                            this.open_create_connection_modal(window, cx);
+                        }),
+                    ),
+            )
+            .into_any_element(),
+    )
+}
+
 /// Renders the host connection catalog view matching fe/src/features/hosts/components/HostsPage.tsx.
 pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let bg_color = app.bg_color();
@@ -28,6 +151,10 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
     );
 
     let count = filtered_connections.len();
+
+    // While the connection sheet is open it squeezes the toolbar; hiding
+    // the action buttons keeps them from clipping behind the sheet edge.
+    let sheet_open = app.connection_modal.is_some() || app.connection_sheet_closing;
 
     div()
         .flex()
@@ -155,96 +282,26 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                             None
                         }),
                 )
-                // Right: Action buttons (Export, Import, + New Host)
+                // Right: Action buttons. The whole row hides while the
+                // connection sheet is open: the sheet squeezes the toolbar
+                // and the buttons would clip behind its edge.
                 .child(
                     div()
                         .flex()
                         .flex_row()
                         .items_center()
                         .gap_2()
-                        // Export button
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_1p5()
-                                .rounded_lg()
-                                .bg(card_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_xs()
-                                .text_color(muted_text)
-                                .cursor_pointer()
-                                .id("hosts-03").hover(move |s| s.bg(muted_bg).text_color(text_color))
-                                .child(
-                                    svg()
-                                        .data(ARROW_DOWN_SVG)
-                                        .size(px(12.0))
-                                        .text_color(muted_text),
-                                )
-                                .child("Export")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.export_connections_to_disk(cx);
-                                })),
-                        )
-                        // Import button
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3()
-                                .py_1p5()
-                                .rounded_lg()
-                                .bg(card_bg)
-                                .border_1()
-                                .border_color(border_color)
-                                .text_xs()
-                                .text_color(muted_text)
-                                .cursor_pointer()
-                                .id("hosts-04").hover(move |s| s.bg(muted_bg).text_color(text_color))
-                                .child(
-                                    svg()
-                                        .data(ARROW_UP_SVG)
-                                        .size(px(12.0))
-                                        .text_color(muted_text),
-                                )
-                                .child("Import")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _window, cx| {
-                                    this.import_connections_from_file(cx);
-                                })),
-                        )
-                        // + New Host button
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .items_center()
-                                .gap_1p5()
-                                .px_3p5()
-                                .py_1p5()
-                                .rounded_lg()
-                                .bg(primary_color)
-                                .id("hosts-05").hover(|s| s.opacity(0.9))
-                                .text_xs()
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(primary_fg)
-                                .cursor_pointer()
-                                .child(
-                                    svg()
-                                        .data(PLUS_SVG)
-                                        .size(px(13.0))
-                                        .text_color(primary_fg),
-                                )
-                                .child("New Host")
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                                    this.open_create_connection_modal(window, cx);
-                                })),
-                        ),
+                        .children(hosts_toolbar_actions(
+                            sheet_open,
+                            card_bg,
+                            border_color,
+                            text_color,
+                            muted_text,
+                            muted_bg,
+                            primary_color,
+                            primary_fg,
+                            cx,
+                        ))
                 ),
         )
         // Main Catalog Content: Scrollable 3-Column Responsive Cards Grid
@@ -255,6 +312,15 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                 .w_full()
                 .overflow_y_scroll()
                 .p_6()
+                // Clicking the background/cards releases the search box focus
+                // (plain divs don't take focus in GPUI, so without this the
+                // search input would keep eating keyboard input).
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|_, _, window, cx| {
+                        window.blur(cx);
+                    }),
+                )
                 .child(if count == 0 {
                     div()
                         .flex()
@@ -301,6 +367,11 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                     // and wrap to fewer columns on narrow windows. (The old
                     // fixed chunks-of-3 rows overflowed because card
                     // min-content exceeds a third of small viewports.)
+                    // NOTE: the two invisible fillers below share the card
+                    // flex sizing so an orphan card on the last row keeps
+                    // the same width instead of stretching full-width via
+                    // flex_grow_1 (web parity: grid-cols-2/3 orphan stays
+                    // half-width, e.g. 3 hosts = 2 + 1, not 2 + full).
                     div()
                         .flex()
                         .flex_row()
@@ -526,6 +597,28 @@ pub fn render_hosts_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyE
                                                 ),
                                         )
                                 }))
+                        // Invisible fillers: same flex sizing as cards, zero
+                        // height, so they only absorb leftover grow space on
+                        // the last row. Two fillers cover both 2-col (needs
+                        // max 1) and 3-col (needs max 2) orphan cases.
+                        .child(
+                            div()
+                                .flex_basis(px(300.0))
+                                .flex_grow_1()
+                                .flex_shrink_1()
+                                .min_w(px(240.0))
+                                .h(px(0.0))
+                                .overflow_hidden(),
+                        )
+                        .child(
+                            div()
+                                .flex_basis(px(300.0))
+                                .flex_grow_1()
+                                .flex_shrink_1()
+                                .min_w(px(240.0))
+                                .h(px(0.0))
+                                .overflow_hidden(),
+                        )
                         .into_any_element()
                 }),
         )

@@ -11,6 +11,9 @@ use crate::views::tab_strip::render_tab_strip;
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
+/// Fixed sidebar width, matching the 200px used in `toggle_sidebar` layout math.
+pub const SIDEBAR_WIDTH: f32 = 200.0;
+
 /// Render the left navigation sidebar and active content pane.
 ///
 /// `framed` enables CSD leaf rounding (Zed-style): the sidebar owns the left
@@ -43,7 +46,7 @@ pub fn render_nav_shell(
 
     let content_pane = render_content_pane(app, active_view, is_dark, cx);
 
-    let sheet_slot = render_sheet_slot(app, cx);
+    let sheet_slot = render_sheet_slot(app, framed, cx);
 
     let passphrase_modal_overlay = if app.pending_passphrase_conn.is_some() {
         Some(crate::views::passphrase_modal::render_passphrase_modal(
@@ -175,13 +178,40 @@ pub fn render_nav_shell(
         // Left Sidebar (collapsible): transparent shell + 40px spacer so the
         // floating tab strip's top-left corner stays transparent; bg lives on
         // the body below which owns only the bottom-left corner.
-        .children(if app.sidebar_open {
+        // The slot's width animates (same pattern as right-side sheets) while
+        // the inner panel keeps its full 200px and is clipped, so open/close
+        // slides smoothly instead of snapping.
+        .children(if app.sidebar_open || app.sidebar_closing {
+            let closing = app.sidebar_closing;
+            let animation = crate::views::sheet::sheet_animation();
+            let (slot_id, width_fn): (ElementId, fn(f32) -> f32) = if closing {
+                (
+                    ElementId::Name("sidebar-out".into()),
+                    |delta| SIDEBAR_WIDTH * (1.0 - delta).clamp(0.0, 1.0),
+                )
+            } else {
+                (
+                    ElementId::Name("sidebar-in".into()),
+                    |delta| SIDEBAR_WIDTH * delta.clamp(0.0, 1.0),
+                )
+            };
             Some(
                 div()
+                    .h_full()
+                    .flex_shrink_0()
+                    .w(px(SIDEBAR_WIDTH))
+                    .overflow_hidden()
+                    .with_animation(slot_id, animation, move |el, delta| {
+                        el.w(px(width_fn(delta)))
+                    })
+                    .child(
+                        div()
                     .flex()
                     .flex_col()
-                    .w(px(200.0))
+                    .w(px(SIDEBAR_WIDTH))
+                    .min_w(px(SIDEBAR_WIDTH))
                     .h_full()
+                    .flex_shrink_0()
                     .child(div().h(px(40.0)).flex_none())
                     .child(
                         div()
@@ -259,6 +289,9 @@ pub fn render_nav_shell(
                                         MouseButton::Left,
                                         cx.listener(move |this, _, _window, cx| {
                                             this.show_new_tab_popover = false;
+                                            // Sheets belong to their own page; navigating
+                                            // away unmounts them (web client parity).
+                                            this.close_all_sheets_instant();
                                             if view == View::Sftp {
                                                 this.navigate_to_sftp(cx);
                                             } else {
@@ -322,6 +355,7 @@ pub fn render_nav_shell(
                                 MouseButton::Left,
                                 cx.listener(|this, _, _window, cx| {
                                     this.show_new_tab_popover = false;
+                                    this.close_all_sheets_instant();
                                     this.active_view = View::Settings;
                                     this.show_hosts_catalog = false;
                                     cx.notify();
@@ -329,6 +363,7 @@ pub fn render_nav_shell(
                             )
                     })),
                     ),
+                ),
             )
         } else {
             None
@@ -341,6 +376,8 @@ pub fn render_nav_shell(
             let mut shell = div()
                 .relative()
                 .flex_1()
+                .min_w_0()
+                .overflow_hidden()
                 .flex()
                 .flex_col()
                 .h_full()
@@ -348,6 +385,7 @@ pub fn render_nav_shell(
             let mut body = div()
                 .relative()
                 .flex_1()
+                .min_w_0()
                 .min_h_0()
                 .w_full()
                 .overflow_hidden()
@@ -361,7 +399,7 @@ pub fn render_nav_shell(
                 .p(FRAME_ROUNDING);
             if framed {
                 body = body.rounded_br(FRAME_ROUNDING);
-                if !app.sidebar_open {
+                if !app.sidebar_open && !app.sidebar_closing {
                     body = body.rounded_bl(FRAME_ROUNDING);
                 }
             }
@@ -369,6 +407,7 @@ pub fn render_nav_shell(
                 .flex()
                 .flex_col()
                 .size_full()
+                .min_w_0()
                 .overflow_hidden()
                 .children(if active_view == View::Hosts && !app.show_hosts_catalog {
                     render_reconnect_banner(app, cx)
@@ -376,12 +415,15 @@ pub fn render_nav_shell(
                     None
                 })
                 .child(
-                    // Row: active view content + right-side sheet that pushes it aside
+                    // Row: active view content + right-side sheet that pushes it aside.
+                    // min_w_0 lets the fixed-width sheet squeeze the content
+                    // instead of pushing the whole window wider than the viewport.
                     div()
                         .flex()
                         .flex_row()
                         .flex_1()
                         .w_full()
+                        .min_w_0()
                         .min_h_0()
                         .overflow_hidden()
                         .child(
@@ -432,7 +474,7 @@ pub fn render_nav_shell(
 
 /// Pick the currently open (or exiting) sheet and wrap it in the shared
 /// push-aside animation. Only one sheet is open at a time.
-fn render_sheet_slot(app: &mut AppState, cx: &mut Context<AppState>) -> Option<AnyElement> {
+fn render_sheet_slot(app: &mut AppState, framed: bool, cx: &mut Context<AppState>) -> Option<AnyElement> {
     use crate::views::sheet::animated_sheet;
 
     if app.connection_modal.is_some() || app.connection_sheet_closing {
@@ -441,6 +483,7 @@ fn render_sheet_slot(app: &mut AppState, cx: &mut Context<AppState>) -> Option<A
             "connection-sheet-in",
             "connection-sheet-out",
             app.connection_sheet_closing,
+            framed,
             sheet,
         ));
     }
@@ -450,6 +493,7 @@ fn render_sheet_slot(app: &mut AppState, cx: &mut Context<AppState>) -> Option<A
             "edit-key-sheet-in",
             "edit-key-sheet-out",
             app.edit_key_sheet_closing,
+            framed,
             sheet,
         ));
     }
@@ -459,6 +503,7 @@ fn render_sheet_slot(app: &mut AppState, cx: &mut Context<AppState>) -> Option<A
             "add-key-sheet-in",
             "add-key-sheet-out",
             app.add_key_sheet_closing,
+            framed,
             sheet,
         ));
     }
@@ -468,6 +513,7 @@ fn render_sheet_slot(app: &mut AppState, cx: &mut Context<AppState>) -> Option<A
             "forward-sheet-in",
             "forward-sheet-out",
             app.forward_sheet_closing,
+            framed,
             sheet,
         ));
     }
@@ -498,6 +544,8 @@ fn render_content_pane(
             } else if let Some(term_view) = active_tab_view {
                 div()
                     .size_full()
+                    .min_w_0()
+                    .overflow_hidden()
                     .bg(bg)
                     .on_mouse_down(
                         MouseButton::Right,

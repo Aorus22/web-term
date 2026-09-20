@@ -64,8 +64,20 @@ pub fn render_tab_strip(
                     }),
                 ),
         )
-        // Tabs container
-        .children((0..tabs_len).map(|idx| {
+        // Tabs container: shrinkable scroll strip so many tabs never push
+        // the window controls. Each tab is a fixed 160px (title truncated)
+        // so all tabs render identically regardless of title length.
+        .child(
+            div()
+                .id("tab-strip-tabs")
+                .flex()
+                .flex_row()
+                .items_center()
+                .flex_shrink_1()
+                .min_w_0()
+                .overflow_x_scroll()
+                .gap_1p5()
+                .children((0..tabs_len).map(|idx| {
             let is_active =
                 !app.show_hosts_catalog && app.active_view == View::Hosts && idx == active_index;
             let tab = &app.session_manager.tabs()[idx];
@@ -101,6 +113,8 @@ pub fn render_tab_strip(
                 .flex_row()
                 .items_center()
                 .h(px(28.0))
+                .w(px(160.0))
+                .flex_shrink_0()
                 .px_2p5()
                 .gap_2()
                 .rounded_md()
@@ -118,10 +132,13 @@ pub fn render_tab_strip(
                     }),
                 )
                 // Status dot
-                .child(div().size(px(6.0)).rounded_full().bg(dot_color))
-                // Tab title
+                .child(div().size(px(6.0)).flex_shrink_0().rounded_full().bg(dot_color))
+                // Tab title (truncated: fixed-width tabs stay identical)
                 .child(
                     div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
                         .text_xs()
                         .font_weight(if is_active {
                             FontWeight::SEMIBOLD
@@ -138,6 +155,7 @@ pub fn render_tab_strip(
                         .items_center()
                         .justify_center()
                         .size(px(16.0))
+                        .flex_shrink_0()
                         .rounded_sm()
                         .id("tab_strip-03").hover(|s| s.bg(border_color))
                         .child(svg().data(X_SVG).size(px(10.0)).text_color(muted_text))
@@ -149,7 +167,7 @@ pub fn render_tab_strip(
                             }),
                         ),
                 )
-        }))
+        })))
         // '+' New Tab button with Popover
         .child(
             div()

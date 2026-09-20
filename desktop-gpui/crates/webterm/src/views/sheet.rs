@@ -5,10 +5,11 @@
 //! narrows smoothly instead of being covered by an overlay.
 
 use gpui::*;
+use gpui::prelude::FluentBuilder as _;
 use gpui_component::input::{Input, InputState, Textarea, TextareaState};
 use gpui_component::Sizable;
 
-use crate::app_state::AppState;
+use crate::app_state::{AppState, FRAME_ROUNDING};
 
 pub const SHEET_WIDTH: f32 = 540.0;
 pub const SHEET_ANIM_MS: u64 = 240;
@@ -26,29 +27,62 @@ pub fn sheet_animation() -> Animation {
 /// The open and close ids differ so mounting the closing element restarts the
 /// animation at 0, which the exit reads as "still fully open" before shrinking
 /// it away.
+///
+/// The inner panel additionally fades (opacity 0<->1 over the same duration),
+/// giving the slide+fade feel of the web client. `framed` rounds the sheet's
+/// outer corners so it never pokes past the window's CSD rounding. The slot
+/// keeps an explicit base width so the layout stays 540px even if the
+/// animation is skipped (e.g. reduce-motion renders the end state).
 pub fn animated_sheet(
     open_id: &'static str,
     close_id: &'static str,
     closing: bool,
+    framed: bool,
     sheet: AnyElement,
 ) -> AnyElement {
     let animation = sheet_animation();
-    let slot = div()
+    let fade_animation = sheet_animation();
+    let (slot_id, fade_id, width_fn, opacity_fn): (
+        ElementId,
+        ElementId,
+        fn(f32) -> f32,
+        fn(f32) -> f32,
+    ) = if closing {
+        (
+            ElementId::Name(close_id.into()),
+            ElementId::Name(format!("{close_id}-fade").into()),
+            |delta| SHEET_WIDTH * (1.0 - delta).clamp(0.0, 1.0),
+            |delta| (1.0 - delta).clamp(0.0, 1.0),
+        )
+    } else {
+        (
+            ElementId::Name(open_id.into()),
+            ElementId::Name(format!("{open_id}-fade").into()),
+            |delta| SHEET_WIDTH * delta.clamp(0.0, 1.0),
+            |delta| delta.clamp(0.0, 1.0),
+        )
+    };
+    div()
         .h_full()
         .flex_shrink_0()
+        .w(px(SHEET_WIDTH))
         .overflow_hidden()
-        .child(sheet);
-    if closing {
-        slot.with_animation(close_id, animation, |el, delta| {
-            el.w(px(SHEET_WIDTH * (1.0 - delta).clamp(0.0, 1.0)))
+        .when(framed, |d| {
+            d.rounded_tr(FRAME_ROUNDING).rounded_br(FRAME_ROUNDING)
         })
-        .into_any_element()
-    } else {
-        slot.with_animation(open_id, animation, |el, delta| {
-            el.w(px(SHEET_WIDTH * delta.clamp(0.0, 1.0)))
+        .with_animation(slot_id, animation, move |el, delta| {
+            el.w(px(width_fn(delta)))
         })
+        .child(
+            div()
+                .size_full()
+                .overflow_hidden()
+                .with_animation(fade_id, fade_animation, move |el, delta| {
+                    el.opacity(opacity_fn(delta))
+                })
+                .child(sheet),
+        )
         .into_any_element()
-    }
 }
 
 /// Fixed-width sheet panel body: full height, card background, left border.

@@ -1086,6 +1086,15 @@ pub struct AppState {
     pub is_maximized: bool,
     pub backend_path_input: String,
     pub sidebar_open: bool,
+    /// True while the sidebar plays its width exit animation (unmounts after,
+    /// mirroring the `*_sheet_closing` flags for right-side sheets).
+    pub sidebar_closing: bool,
+    /// Persistent scroll state for the Settings page, driving its visual
+    /// scrollbar overlay (same pattern as WA-Bot's chat list).
+    pub settings_scroll: ScrollHandle,
+    /// Virtualized scroll state for the Settings theme-preset grid
+    /// (uniform_list only renders visible rows).
+    pub settings_themes_scroll: UniformListScrollHandle,
     /// Editable form inputs, initialized once the window exists (see
     /// `init_form_inputs`, called from main.rs right after the window opens).
     pub form_inputs: Option<FormInputs>,
@@ -1176,6 +1185,9 @@ impl AppState {
             is_maximized,
             backend_path_input,
             sidebar_open: true,
+            sidebar_closing: false,
+            settings_scroll: ScrollHandle::default(),
+            settings_themes_scroll: UniformListScrollHandle::new(),
             form_inputs: None,
         }
     }
@@ -1625,6 +1637,7 @@ impl AppState {
 
     /// Open Add SSH Key sheet (right-side push-aside panel).
     pub fn open_add_key_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        window.blur(cx);
         self.show_add_key_modal = true;
         self.add_key_sheet_closing = false;
         // Only one sheet open at a time; force-close the others instantly.
@@ -1687,6 +1700,7 @@ impl AppState {
 
     /// Open Edit SSH Key sheet (rename / replace key material).
     pub fn open_edit_key_modal(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        window.blur(cx);
         let Some(key) = self.ssh_keys.iter().find(|k| k.id == id) else {
             return;
         };
@@ -2062,9 +2076,23 @@ impl AppState {
         cx.notify();
     }
 
-    /// Toggle left navigation sidebar visibility.
+    /// Toggle left navigation sidebar visibility. Closing plays the width
+    /// exit animation first (then unmounts); toggling mid-close cancels it.
     pub fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
-        self.sidebar_open = !self.sidebar_open;
+        if self.sidebar_closing {
+            // Re-open mid-close: cancel the pending unmount.
+            self.sidebar_closing = false;
+        } else if self.sidebar_open {
+            self.sidebar_closing = true;
+            Self::after_sheet_exit(cx, |this| {
+                if this.sidebar_closing {
+                    this.sidebar_open = false;
+                    this.sidebar_closing = false;
+                }
+            });
+        } else {
+            self.sidebar_open = true;
+        }
         cx.notify();
     }
 
@@ -2133,6 +2161,9 @@ impl AppState {
 
     /// Open create connection modal.
     pub fn open_create_connection_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Release whatever had focus (e.g. the hosts search box) so keyboard
+        // input doesn't keep going there behind the sheet.
+        window.blur(cx);
         self.connection_modal = Some(ConnectionFormState::new_create());
         self.connection_sheet_closing = false;
         self.close_other_sheets_for("connection");
@@ -2154,6 +2185,7 @@ impl AppState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        window.blur(cx);
         if let Some(conn) = self.connections.iter().find(|c| c.id == id).cloned() {
             self.connection_modal = Some(ConnectionFormState::new_edit(&conn));
             self.connection_sheet_closing = false;
@@ -2250,6 +2282,16 @@ impl AppState {
             self.forward_modal = None;
             self.forward_sheet_closing = false;
         }
+    }
+
+    /// Instantly dismiss every right-side sheet (no exit animation).
+    ///
+    /// Used when switching sidebar views: a sheet belongs to its own page,
+    /// so navigating away unmounts it — mirroring the web client. Pending
+    /// `after_sheet_exit` timers stay harmless since their callbacks check
+    /// the `*_closing` flags first.
+    pub fn close_all_sheets_instant(&mut self) {
+        self.close_other_sheets_for("none");
     }
 
     /// Save connection form (Create or Update).
@@ -3937,6 +3979,7 @@ impl AppState {
 
     /// Switch active view to SFTP Manager and load directory if needed.
     pub fn navigate_to_sftp(&mut self, cx: &mut Context<Self>) {
+        self.close_all_sheets_instant();
         self.active_view = View::Sftp;
         if self.sftp_manager.left_pane.files.is_empty() && !self.sftp_manager.left_pane.is_loading {
             self.sftp_load_pane(SftpActivePane::Left, cx);
@@ -5177,6 +5220,7 @@ impl AppState {
 
     /// Open create port forward modal.
     pub fn open_create_forward_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        window.blur(cx);
         let default_conn_id = self.connections.first().map(|c| c.id.clone());
         self.forward_modal = Some(ForwardFormState::new_create(default_conn_id));
         self.forward_sheet_closing = false;
@@ -5195,6 +5239,7 @@ impl AppState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        window.blur(cx);
         if let Some(forward) = self.forwards.iter().find(|f| f.id == id).cloned() {
             self.forward_modal = Some(ForwardFormState::new_edit(&forward));
             self.forward_sheet_closing = false;

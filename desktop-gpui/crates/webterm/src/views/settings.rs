@@ -15,6 +15,7 @@
 use crate::app_state::AppState;
 use gpui::*;
 use gpui_component::input::Input;
+use gpui_component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_component::Sizable;
 
 const MONO_FONTS: &[&str] = &[
@@ -32,6 +33,17 @@ const MONO_FONTS: &[&str] = &[
     "monospace",
 ];
 
+/// Theme grid layout: fixed-width columns and fixed-height rows so every row
+/// measures identically for uniform_list virtualization (chat-list pattern
+/// from WA-Bot — only visible rows are built, no matter the preset count).
+const THEME_GRID_COLS: usize = 3;
+const THEME_CARD_W: f32 = 204.0;
+const THEME_CARD_H: f32 = 100.0;
+/// Card height + 12px row gap.
+const THEME_ROW_H: f32 = 112.0;
+/// Four rows visible; the rest scrolls inside the grid region.
+const THEME_GRID_H: f32 = 448.0;
+
 /// Render the settings page matching Electron 1:1.
 pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let card_bg = app.card_bg();
@@ -43,7 +55,6 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let accent_color = app.accent_color();
     let accent_fg = app.accent_fg();
     let secondary_bg = app.secondary_bg();
-    let active_preset_id = app.settings.theme_preset.clone();
     let theme_mode = app.theme_mode_filter.clone();
 
     // Filter presets according to theme mode
@@ -55,6 +66,12 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
             _ => true,
         })
         .collect();
+
+    let theme_row_count =
+        (filtered_presets.len() + THEME_GRID_COLS - 1) / THEME_GRID_COLS;
+
+    // Cloned up front: handles are shared into builders below.
+    let themes_handle = app.settings_themes_scroll.clone();
 
     let show_theme_picker = app.show_theme_mode_picker;
     let show_cursor_picker = app.show_cursor_style_picker;
@@ -89,18 +106,29 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
         app.terminal_font_family, app.terminal_font_size
     );
 
+    // Persistent scroll state driving the visual scrollbar overlay below.
+    let scroll_handle = app.settings_scroll.clone();
+
+    // Outer relative container: scroll area + floating scrollbar overlay
+    // (same pattern as WA-Bot's chat list).
     div()
-        .id("settings-scroll-area")
-        .flex()
-        .flex_col()
-        .items_center()
-        .justify_start()
+        .relative()
         .size_full()
-        .overflow_y_scroll()
-        .pt(px(48.0))
-        .pb(px(48.0))
-        .px_4()
+        .overflow_hidden()
         .child(
+            div()
+                .id("settings-scroll-area")
+                .flex()
+                .flex_col()
+                .items_center()
+                .justify_start()
+                .size_full()
+                .overflow_y_scroll()
+                .track_scroll(&scroll_handle)
+                .pt(px(48.0))
+                .pb(px(48.0))
+                .px_4()
+                .child(
             div()
                 .w_full()
                 .max_w(px(672.0))
@@ -300,115 +328,228 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                         .child(format!("{} themes available", filtered_presets.len())),
                                                 ),
                                         )
-                                        // 3 Columns Grid
+                                        // Virtualized theme grid: presets are chunked into
+                                        // fixed-height rows of 3 rendered through uniform_list,
+                                        // so only visible rows are built no matter how many
+                                        // presets exist (chat-list pattern from WA-Bot).
                                         .child(
                                             div()
-                                                .flex()
-                                                .flex_row()
-                                                .flex_wrap()
-                                                .gap(px(12.0))
-                                                .children(filtered_presets.into_iter().map(|preset| {
-                                                    let is_active = preset.id == active_preset_id;
-                                                    let preset_id = preset.id;
-                                                    let p_bg = rgb(preset.background);
-                                                    let p_primary = rgb(preset.primary);
-                                                    let p_accent = rgb(preset.accent);
-                                                    let p_destructive = rgb(preset.destructive);
-                                                    let p_fg = rgb(preset.foreground);
-                                                    let p_muted_fg = rgb(preset.muted_foreground);
-                                                    let clean_label = preset
-                                                        .label
-                                                        .trim_end_matches(" Dark")
-                                                        .trim_end_matches(" Light");
-
-                                                    div()
-                                                        .relative()
-                                                        .w(px(204.0))
-                                                        .p_2()
-                                                        .rounded_lg()
-                                                        .border_2()
-                                                        .border_color(if is_active {
-                                                            primary_color
-                                                        } else {
-                                                            border_color
-                                                        })
-                                                        .bg(if is_active {
-                                                            tag_bg
-                                                        } else {
-                                                            secondary_bg
-                                                        })
-                                                        .cursor_pointer()
-                                                        .id(ElementId::Name(format!("settings-preset-{}", preset.id).into())).hover(|s| s.border_color(rgb(0x71717a)))
-                                                        // Mini preview swatch box (h-14 / 56px)
-                                                        .child(
-                                                            div()
-                                                                .h(px(56.0))
-                                                                .w_full()
-                                                                .rounded_md()
-                                                                .p_2()
-                                                                .flex()
-                                                                .flex_col()
-                                                                .justify_between()
-                                                                .bg(p_bg)
-                                                                // Top-left 3 colored dots
-                                                                .child(
+                                                .relative()
+                                                .w_full()
+                                                .h(px(THEME_GRID_H))
+                                                .overflow_hidden()
+                                                .child(
+                                                    uniform_list(
+                                                        "settings-theme-grid",
+                                                        theme_row_count,
+                                                        cx.processor(
+                                                            |this: &mut AppState,
+                                                             range: std::ops::Range<usize>,
+                                                             _window: &mut Window,
+                                                             cx: &mut Context<AppState>| {
+                                                            let active = this.settings.theme_preset.clone();
+                                                            let mode = this.theme_mode_filter.clone();
+                                                            let presets: Vec<&'static crate::theme::ThemePreset> =
+                                                                crate::theme::THEME_PRESETS
+                                                                    .iter()
+                                                                    .filter(|p| match mode.as_str() {
+                                                                        "dark" => p.is_dark,
+                                                                        "light" => !p.is_dark,
+                                                                        _ => true,
+                                                                    })
+                                                                    .collect();
+                                                            let rows: Vec<&[&'static crate::theme::ThemePreset]> =
+                                                                presets.chunks(THEME_GRID_COLS).collect();
+                                                            let card_bg = this.card_bg();
+                                                            let border_color = this.border_color();
+                                                            let text_color = this.text_color();
+                                                            let muted_text = this.muted_text();
+                                                            let tag_bg = this.muted_bg();
+                                                            let secondary_bg = this.secondary_bg();
+                                                            let primary_color = this.primary_color();
+                                                            range
+                                                                .map(|row_ix| {
+                                                                    let row: &[&'static crate::theme::ThemePreset] =
+                                                                        rows.get(row_ix).copied().unwrap_or(&[]);
                                                                     div()
+                                                                        .h(px(THEME_ROW_H))
                                                                         .flex()
                                                                         .flex_row()
-                                                                        .gap_1()
-                                                                        .child(div().size(px(8.0)).rounded_full().bg(p_primary))
-                                                                        .child(div().size(px(8.0)).rounded_full().bg(p_accent))
-                                                                        .child(div().size(px(8.0)).rounded_full().bg(p_destructive)),
-                                                                )
-                                                                // Bottom-left 2 bar lines
-                                                                .child(
-                                                                    div()
-                                                                        .flex()
-                                                                        .flex_row()
-                                                                        .items_end()
-                                                                        .gap_1()
-                                                                        .child(div().w(px(110.0)).h(px(4.0)).rounded_sm().bg(p_fg))
-                                                                        .child(div().w(px(40.0)).h(px(4.0)).rounded_sm().bg(p_muted_fg)),
-                                                                ),
+                                                                        .gap(px(12.0))
+                                                                        .children(row.iter().enumerate().map(
+                                                                            |(col_ix, preset)| {
+                                                                                let is_active =
+                                                                                    preset.id == active;
+                                                                                let preset_id = preset.id;
+                                                                                let global_ix =
+                                                                                    row_ix * THEME_GRID_COLS + col_ix;
+                                                                                let p_bg = rgb(preset.background);
+                                                                                let p_primary =
+                                                                                    rgb(preset.primary);
+                                                                                let p_accent =
+                                                                                    rgb(preset.accent);
+                                                                                let p_destructive =
+                                                                                    rgb(preset.destructive);
+                                                                                let p_fg =
+                                                                                    rgb(preset.foreground);
+                                                                                let p_muted_fg =
+                                                                                    rgb(preset.muted_foreground);
+                                                                                let clean_label = preset
+                                                                                    .label
+                                                                                    .trim_end_matches(" Dark")
+                                                                                    .trim_end_matches(" Light");
+                                                                                div()
+                                                                                    .relative()
+                                                                                    .w(px(THEME_CARD_W))
+                                                                                    .h(px(THEME_CARD_H))
+                                                                                    .overflow_hidden()
+                                                                                    .flex()
+                                                                                    .flex_col()
+                                                                                    .p_2()
+                                                                                    .rounded_lg()
+                                                                                    .border_2()
+                                                                                    .border_color(if is_active {
+                                                                                        primary_color
+                                                                                    } else {
+                                                                                        border_color
+                                                                                    })
+                                                                                    .bg(if is_active {
+                                                                                        tag_bg
+                                                                                    } else {
+                                                                                        secondary_bg
+                                                                                    })
+                                                                                    .cursor_pointer()
+                                                                                    .id(ElementId::NamedInteger(
+                                                                                        "settings-preset".into(),
+                                                                                        global_ix as u64,
+                                                                                    ))
+                                                                                    .hover(|s| {
+                                                                                        s.border_color(rgb(0x71717a))
+                                                                                    })
+                                                                                    // Mini preview swatch box (h-14 / 56px)
+                                                                                    .child(
+                                                                                        div()
+                                                                                            .h(px(56.0))
+                                                                                            .w_full()
+                                                                                            .flex_shrink_0()
+                                                                                            .rounded_md()
+                                                                                            .p_2()
+                                                                                            .flex()
+                                                                                            .flex_col()
+                                                                                            .justify_between()
+                                                                                            .bg(p_bg)
+                                                                                            // Top-left 3 colored dots
+                                                                                            .child(
+                                                                                                div()
+                                                                                                    .flex()
+                                                                                                    .flex_row()
+                                                                                                    .gap_1()
+                                                                                                    .child(div().size(px(8.0)).rounded_full().bg(p_primary))
+                                                                                                    .child(div().size(px(8.0)).rounded_full().bg(p_accent))
+                                                                                                    .child(div().size(px(8.0)).rounded_full().bg(p_destructive)),
+                                                                                            )
+                                                                                            // Bottom-left 2 bar lines
+                                                                                            .child(
+                                                                                                div()
+                                                                                                    .flex()
+                                                                                                    .flex_row()
+                                                                                                    .items_end()
+                                                                                                    .gap_1()
+                                                                                                    .child(div().w(px(110.0)).h(px(4.0)).rounded_sm().bg(p_fg))
+                                                                                                    .child(div().w(px(40.0)).h(px(4.0)).rounded_sm().bg(p_muted_fg)),
+                                                                                            ),
+                                                                                    )
+                                                                                    // Bottom Theme Label (single line: keeps rows uniform)
+                                                                                    .child(
+                                                                                        div()
+                                                                                            .mt_1p5()
+                                                                                            .px_1()
+                                                                                            .flex_1()
+                                                                                            .min_h_0()
+                                                                                            .overflow_hidden()
+                                                                                            .flex()
+                                                                                            .flex_row()
+                                                                                            .items_center()
+                                                                                            .justify_between()
+                                                                                            .child(
+                                                                                                div()
+                                                                                                    .flex_1()
+                                                                                                    .min_w_0()
+                                                                                                    .truncate()
+                                                                                                    .text_xs()
+                                                                                                    .font_weight(FontWeight::MEDIUM)
+                                                                                                    .text_color(if is_active {
+                                                                                                        text_color
+                                                                                                    } else {
+                                                                                                        muted_text
+                                                                                                    })
+                                                                                                    .child(clean_label),
+                                                                                            ),
+                                                                                    )
+                                                                                    // Active Checkmark (top-right absolute)
+                                                                                    .children(if is_active {
+                                                                                        Some(
+                                                                                            div()
+                                                                                                .absolute()
+                                                                                                .top(px(8.0))
+                                                                                                .right(px(8.0))
+                                                                                                .child(
+                                                                                                    svg()
+                                                                                                        .data(crate::icons::CHECK_SVG)
+                                                                                                        .size(px(14.0))
+                                                                                                        .text_color(primary_color),
+                                                                                                ),
+                                                                                        )
+                                                                                    } else {
+                                                                                        None
+                                                                                    })
+                                                                                    .on_mouse_down(
+                                                                                        MouseButton::Left,
+                                                                                        cx.listener(move |this, _, _window, cx| {
+                                                                                            this.set_theme_preset(preset_id, cx);
+                                                                                        }),
+                                                                                    )
+                                                                            },
+                                                                        ))
+                                                                        // Fillers keep a short last row aligned.
+                                                                        .children(
+                                                                            (row.len()..THEME_GRID_COLS).map(|_| {
+                                                                                div()
+                                                                                    .w(px(THEME_CARD_W))
+                                                                                    .h(px(THEME_CARD_H))
+                                                                            }),
+                                                                        )
+                                                                })
+                                                                .collect()
+                                                            }
                                                         )
-                                                        // Bottom Theme Label
-                                                        .child(
-                                                            div()
-                                                                .mt_1p5()
-                                                                .px_1()
-                                                                .flex()
-                                                                .flex_row()
-                                                                .items_center()
-                                                                .justify_between()
-                                                                .child(
-                                                                    div()
-                                                                        .text_xs()
-                                                                        .font_weight(FontWeight::MEDIUM)
-                                                                        .text_color(if is_active { text_color } else { muted_text })
-                                                                        .child(clean_label),
-                                                                ),
-                                                        )
-                                                        // Active Checkmark (top-right absolute)
-                                                        .children(if is_active {
-                                                            Some(
-                                                                div()
-                                                                    .absolute()
-                                                                    .top(px(8.0))
-                                                                    .right(px(8.0))
-                                                                    .child(
-                                                                        svg()
-                                                                            .data(crate::icons::CHECK_SVG)
-                                                                            .size(px(14.0))
-                                                                            .text_color(primary_color),
-                                                                    ),
-                                                            )
-                                                        } else {
-                                                            None
-                                                        })
-                                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _window, cx| {
-                                                            this.set_theme_preset(preset_id, cx);
-                                                        }))
-                                                })),
+                                                    )
+                                                    .w_full()
+                                                    .h_full()
+                                                    .track_scroll(&themes_handle)
+                                                )
+                                                .child(
+                                                    Scrollbar::vertical(&themes_handle)
+                                                        .mode(ScrollbarMode::Hover)
+                                                        .styles(|s| {
+                                                            s.track(|t| t.bg(Hsla::from(rgba(0x00000000))))
+                                                                .thumb(|th| {
+                                                                    th.bg(Hsla::from(muted_text.opacity(0.35)))
+                                                                        .radius(px(3.0))
+                                                                        .width(px(6.0))
+                                                                })
+                                                                .thumb_hover(|th| {
+                                                                    th.bg(Hsla::from(muted_text.opacity(0.65)))
+                                                                        .radius(px(4.0))
+                                                                        .width(px(8.0))
+                                                                })
+                                                                .thumb_active(|th| {
+                                                                    th.bg(Hsla::from(primary_color.opacity(0.8)))
+                                                                        .radius(px(4.0))
+                                                                        .width(px(8.0))
+                                                                })
+                                                        }),
+                                                ),
                                         ),
                                 ),
                         ),
@@ -1113,5 +1254,28 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
         } else {
             None
         })
+        )
+        .child(
+            Scrollbar::vertical(&scroll_handle)
+                .mode(ScrollbarMode::Always)
+                .styles(|s| {
+                    s.track(|t| t.bg(Hsla::from(rgba(0x00000000))))
+                        .thumb(|th| {
+                            th.bg(Hsla::from(muted_text.opacity(0.35)))
+                                .radius(px(3.0))
+                                .width(px(6.0))
+                        })
+                        .thumb_hover(|th| {
+                            th.bg(Hsla::from(muted_text.opacity(0.65)))
+                                .radius(px(4.0))
+                                .width(px(8.0))
+                        })
+                        .thumb_active(|th| {
+                            th.bg(Hsla::from(primary_color.opacity(0.8)))
+                                .radius(px(4.0))
+                                .width(px(8.0))
+                        })
+                }),
+        )
         .into_any_element()
 }
