@@ -257,12 +257,19 @@ fn render_pane(
                                 .size(px(12.0))
                                 .text_color(muted_text),
                         )
-                        .on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(move |this, _, _window, cx| {
+                        // Toggle in capture phase + stop propagation: this runs
+                        // before the backdrop's bubble handler, so a trigger
+                        // click never reaches the backdrop (which would close
+                        // the menu first and make the toggle reopen it).
+                        .capture_any_mouse_down(cx.listener(
+                            move |this, ev: &MouseDownEvent, _window, cx| {
+                                if ev.button != MouseButton::Left {
+                                    return;
+                                }
+                                cx.stop_propagation();
                                 this.sftp_toggle_source_picker(pane, cx);
-                            }),
-                        ),
+                            },
+                        )),
                 )
                 .child(
                     // Actions dropdown trigger (Actions v)
@@ -289,12 +296,15 @@ fn render_pane(
                                 .size(px(12.0))
                                 .text_color(muted_text),
                         )
-                        .on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(move |this, _, _window, cx| {
+                        .capture_any_mouse_down(cx.listener(
+                            move |this, ev: &MouseDownEvent, _window, cx| {
+                                if ev.button != MouseButton::Left {
+                                    return;
+                                }
+                                cx.stop_propagation();
                                 this.sftp_toggle_actions_menu(pane, cx);
-                            }),
-                        ),
+                            },
+                        )),
                 ),
         )
         // 2. Breadcrumbs Bar
@@ -499,7 +509,7 @@ fn render_pane(
                     cx,
                 ))
                 .children(if !state.is_loading && state.error.is_none() {
-                    Some(render_file_rows(app, pane, is_dark, cx))
+                    Some(render_file_rows(app, pane, cx))
                 } else {
                     None
                 }),
@@ -989,7 +999,6 @@ fn render_sftp_row(
 fn render_file_rows(
     app: &AppState,
     pane: SftpActivePane,
-    is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
     let pane_u64 = match pane {
@@ -1207,12 +1216,15 @@ fn render_breadcrumbs_segments(
                                             muted_text
                                         }),
                                 )
-                                .on_mouse_down(
-                                    MouseButton::Left,
-                                    cx.listener(move |this, _, _window, cx| {
+                                .capture_any_mouse_down(cx.listener(
+                                    move |this, ev: &MouseDownEvent, _window, cx| {
+                                        if ev.button != MouseButton::Left {
+                                            return;
+                                        }
+                                        cx.stop_propagation();
                                         this.sftp_toggle_drive_picker(pane, cx);
-                                    }),
-                                ),
+                                    },
+                                )),
                         )
                         .into_any_element(),
                 );
@@ -1294,7 +1306,7 @@ fn render_breadcrumbs_segments(
                                     } else {
                                         text_color
                                     })
-                                    .child(head_name),
+                                            .child(head_name),
                             )
                             .child(
                                 svg()
@@ -1306,12 +1318,15 @@ fn render_breadcrumbs_segments(
                                         muted_text
                                     }),
                             )
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(move |this, _, _window, cx| {
+                            .capture_any_mouse_down(cx.listener(
+                                move |this, ev: &MouseDownEvent, _window, cx| {
+                                    if ev.button != MouseButton::Left {
+                                        return;
+                                    }
+                                    cx.stop_propagation();
                                     this.sftp_toggle_drive_picker(pane, cx);
-                                }),
-                            ),
+                                },
+                            )),
                     )
                     .into_any_element(),
             );
@@ -1380,12 +1395,15 @@ fn render_breadcrumbs_segments(
                         })
                         .child("..."),
                 )
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, _, _window, cx| {
+                .capture_any_mouse_down(cx.listener(
+                    move |this, ev: &MouseDownEvent, _window, cx| {
+                        if ev.button != MouseButton::Left {
+                            return;
+                        }
+                        cx.stop_propagation();
                         this.sftp_toggle_path_picker(pane, cx);
-                    }),
-                )
+                    },
+                ))
                 .into_any_element(),
         );
 
@@ -1438,34 +1456,14 @@ fn render_breadcrumbs_segments(
 fn render_source_picker_dropdown(
     app: &AppState,
     pane: SftpActivePane,
-    is_dark: bool,
+    _is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let card_bg = if is_dark {
-        rgb(0x18181b)
-    } else {
-        rgb(0xffffff)
-    };
-    let border_color = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xe2e8f0)
-    };
-    let text_color = if is_dark {
-        rgb(0xf4f4f5)
-    } else {
-        rgb(0x0f172a)
-    };
-    let muted_text = if is_dark {
-        rgb(0xa1a1aa)
-    } else {
-        rgb(0x64748b)
-    };
-    let hover_bg = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xf1f5f9)
-    };
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let hover_bg = app.muted_bg();
 
     let mut items = Vec::new();
 
@@ -1577,39 +1575,15 @@ fn render_source_picker_dropdown(
 fn render_actions_dropdown(
     app: &AppState,
     pane: SftpActivePane,
-    is_dark: bool,
+    _is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let card_bg = if is_dark {
-        rgb(0x18181b)
-    } else {
-        rgb(0xffffff)
-    };
-    let border_color = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xe2e8f0)
-    };
-    let text_color = if is_dark {
-        rgb(0xf4f4f5)
-    } else {
-        rgb(0x0f172a)
-    };
-    let muted_text = if is_dark {
-        rgb(0xa1a1aa)
-    } else {
-        rgb(0x64748b)
-    };
-    let hover_bg = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xf1f5f9)
-    };
-    let destructive_text = if is_dark {
-        rgb(0xf87171)
-    } else {
-        rgb(0xef4444)
-    };
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let hover_bg = app.muted_bg();
+    let destructive_text = app.destructive_color();
 
     let state = app.sftp_pane(pane);
     let has_selection = !state.selected.is_empty();
@@ -1878,36 +1852,16 @@ fn render_actions_dropdown(
 
 /// Render Windows drive volumes dropdown picker.
 fn render_drive_picker_dropdown(
-    _app: &AppState,
+    app: &AppState,
     pane: SftpActivePane,
-    is_dark: bool,
+    _is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let card_bg = if is_dark {
-        rgb(0x18181b)
-    } else {
-        rgb(0xffffff)
-    };
-    let border_color = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xe2e8f0)
-    };
-    let text_color = if is_dark {
-        rgb(0xf4f4f5)
-    } else {
-        rgb(0x0f172a)
-    };
-    let muted_text = if is_dark {
-        rgb(0xa1a1aa)
-    } else {
-        rgb(0x64748b)
-    };
-    let hover_bg = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xf1f5f9)
-    };
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let hover_bg = app.muted_bg();
 
     let drives = crate::app_state::get_available_drives();
 
@@ -1982,34 +1936,14 @@ fn render_drive_picker_dropdown(
 fn render_path_picker_dropdown(
     app: &AppState,
     pane: SftpActivePane,
-    is_dark: bool,
+    _is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> AnyElement {
-    let card_bg = if is_dark {
-        rgb(0x18181b)
-    } else {
-        rgb(0xffffff)
-    };
-    let border_color = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xe2e8f0)
-    };
-    let text_color = if is_dark {
-        rgb(0xf4f4f5)
-    } else {
-        rgb(0x0f172a)
-    };
-    let muted_text = if is_dark {
-        rgb(0xa1a1aa)
-    } else {
-        rgb(0x64748b)
-    };
-    let hover_bg = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xf1f5f9)
-    };
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let hover_bg = app.muted_bg();
 
     let state = app.sftp_pane(pane);
     let segments = split_breadcrumbs(&state.current_path);
@@ -2886,7 +2820,7 @@ pub fn render_sftp_modal(
 /// Render SFTP right-click context menu overlay.
 pub fn render_sftp_context_menu(
     app: &AppState,
-    is_dark: bool,
+    _is_dark: bool,
     cx: &mut Context<AppState>,
 ) -> Option<AnyElement> {
     let menu = app.sftp_manager.context_menu.as_ref()?;
@@ -2901,31 +2835,12 @@ pub fn render_sftp_context_menu(
         SftpActivePane::Right => "Right Pane",
     };
 
-    let card_bg = if is_dark {
-        rgb(0x27272a)
-    } else {
-        rgb(0xffffff)
-    };
-    let border_color = if is_dark {
-        rgb(0x3f3f46)
-    } else {
-        rgb(0xe2e8f0)
-    };
-    let text_color = if is_dark {
-        rgb(0xf4f4f5)
-    } else {
-        rgb(0x0f172a)
-    };
-    let muted_text = if is_dark {
-        rgb(0xa1a1aa)
-    } else {
-        rgb(0x64748b)
-    };
-    let hover_bg = if is_dark {
-        rgb(0x3f3f46)
-    } else {
-        rgb(0xf1f5f9)
-    };
+    let card_bg = app.card_bg();
+    let border_color = app.border_color();
+    let text_color = app.text_color();
+    let muted_text = app.muted_text();
+    let hover_bg = app.muted_bg();
+    let destructive_color = app.destructive_color();
 
     let menu_w = 220.0;
     let menu_h = 160.0;
@@ -3066,20 +2981,12 @@ pub fn render_sftp_context_menu(
                             .cursor_pointer()
                             .id("sftp-33").hover(|s| s.bg(hover_bg))
                             .text_xs()
-                            .text_color(if is_dark {
-                                rgb(0xfca5a5)
-                            } else {
-                                rgb(0xb91c1c)
-                            })
+                            .text_color(destructive_color)
                             .child(
                                 svg()
                                     .data(crate::icons::TRASH_SVG)
                                     .size(px(12.0))
-                                    .text_color(if is_dark {
-                                        rgb(0xfca5a5)
-                                    } else {
-                                        rgb(0xb91c1c)
-                                    }),
+                                    .text_color(destructive_color),
                             )
                             .child("Delete")
                             .on_mouse_down(
