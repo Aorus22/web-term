@@ -719,6 +719,8 @@ pub fn render_delete_forward_modal(app: &mut AppState, cx: &mut Context<AppState
     div()
         .absolute()
         .inset_0()
+        // BlockMouse: keeps clicks/hovers/scroll from reaching the page behind.
+        .occlude()
         .flex()
         .items_center()
         .justify_center()

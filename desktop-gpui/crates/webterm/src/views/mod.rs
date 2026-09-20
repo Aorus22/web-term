@@ -1,4 +1,5 @@
 pub mod connection_modal;
+pub mod font_modal;
 pub mod forwards;
 pub mod hosts;
 pub mod keys;

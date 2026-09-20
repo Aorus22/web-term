@@ -1544,6 +1544,8 @@ fn render_source_picker_dropdown(
     div()
         .absolute()
         .inset_0()
+        // BlockMouse: keeps clicks/hovers/scroll from reaching the pane behind.
+        .occlude()
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, _, _window, cx| {
@@ -1594,6 +1596,8 @@ fn render_actions_dropdown(
     div()
         .absolute()
         .inset_0()
+        // BlockMouse: keeps clicks/hovers/scroll from reaching the pane behind.
+        .occlude()
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, _, _window, cx| {
@@ -1868,6 +1872,8 @@ fn render_drive_picker_dropdown(
     div()
         .absolute()
         .inset_0()
+        // BlockMouse: keeps clicks/hovers/scroll from reaching the pane behind.
+        .occlude()
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, _, _window, cx| {
@@ -1957,6 +1963,8 @@ fn render_path_picker_dropdown(
     div()
         .absolute()
         .inset_0()
+        // BlockMouse: keeps clicks/hovers/scroll from reaching the pane behind.
+        .occlude()
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, _, _window, cx| {
@@ -2264,6 +2272,8 @@ pub fn render_sftp_modal(
                 div()
                     .absolute()
                     .inset_0()
+                    // BlockMouse: keeps clicks/hovers/scroll from reaching the page behind.
+                    .occlude()
                     .flex()
                     .items_center()
                     .justify_center()
@@ -2439,6 +2449,8 @@ pub fn render_sftp_modal(
                 div()
                     .absolute()
                     .inset_0()
+                    // BlockMouse: keeps clicks/hovers/scroll from reaching the page behind.
+                    .occlude()
                     .flex()
                     .items_center()
                     .justify_center()
@@ -2584,6 +2596,8 @@ pub fn render_sftp_modal(
                 div()
                     .absolute()
                     .inset_0()
+                    // BlockMouse: keeps clicks/hovers/scroll from reaching the page behind.
+                    .occlude()
                     .flex()
                     .items_center()
                     .justify_center()
@@ -2710,6 +2724,8 @@ pub fn render_sftp_modal(
                 div()
                     .absolute()
                     .inset_0()
+                    // BlockMouse: keeps clicks/hovers/scroll from reaching the page behind.
+                    .occlude()
                     .flex()
                     .items_center()
                     .justify_center()
@@ -2874,6 +2890,9 @@ pub fn render_sftp_context_menu(
         div()
             .absolute()
             .inset_0()
+            // BlockMouse: the menu is a child, so it still receives clicks
+            // while everything underneath stays inert.
+            .occlude()
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, _window, cx| {

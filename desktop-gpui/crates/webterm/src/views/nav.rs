@@ -82,6 +82,22 @@ pub fn render_nav_shell(
         None
     };
 
+    // Terminal Font dialog. Mounted here (outside the Settings scroll
+    // container) so the backdrop covers the whole window and stays pinned
+    // while the page scrolls. Leaving Settings drops the dialog state, the way
+    // unmounting SettingsPage unmounts FontDialog on the web client.
+    let font_modal_overlay = if app.show_font_dialog {
+        if app.active_view == View::Settings {
+            Some(crate::views::font_modal::render_font_modal(app, cx))
+        } else {
+            app.show_font_dialog = false;
+            app.show_font_dialog_picker = false;
+            None
+        }
+    } else {
+        None
+    };
+
     let notification_toast = app.notification.clone().map(|msg| {
         div()
             .absolute()
@@ -439,7 +455,7 @@ pub fn render_nav_shell(
             shell = shell.child(body);
             // Backdrop when popover is open to dismiss on click outside
             if app.show_new_tab_popover {
-                shell = shell.child(div().absolute().inset_0().on_mouse_down(
+                shell = shell.child(div().absolute().inset_0().occlude().on_mouse_down(
                     MouseButton::Left,
                     cx.listener(|this, _, _window, cx| {
                         this.show_new_tab_popover = false;
@@ -463,6 +479,7 @@ pub fn render_nav_shell(
         )
         .children(passphrase_modal_overlay)
         .children(confirm_modals_overlay)
+        .children(font_modal_overlay)
         .children(save_banner_overlay)
         .children(terminal_menu_overlay)
         .children(delete_forward_modal_overlay)
@@ -749,6 +766,8 @@ fn confirm_dialog_shell(
     div()
         .absolute()
         .inset_0()
+        // BlockMouse: keeps clicks/hovers/scroll from reaching the page behind.
+        .occlude()
         .flex()
         .items_center()
         .justify_center()
@@ -1021,6 +1040,9 @@ pub fn render_terminal_context_menu(
         div()
             .absolute()
             .inset_0()
+            // BlockMouse: the menu is a child, so it still receives clicks
+            // while everything underneath stays inert.
+            .occlude()
             .on_mouse_down(MouseButton::Left, dismiss)
             .child(div().absolute().left(px(x)).top(px(y)).child(menu))
             .into_any_element(),
