@@ -241,9 +241,10 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                     cx.notify();
                                                 })),
                                         )
-                                        // Dropdown Popover Menu
+                                        // Dropdown Popover Menu (deferred: paints above the
+                                        // rows below, which would otherwise cover it)
                                         .children(if show_theme_picker {
-                                            Some(
+                                            Some(deferred(
                                                 div()
                                                     .absolute()
                                                     .top(px(46.0))
@@ -294,7 +295,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 this.set_theme_mode_filter("light", cx);
                                                             })),
                                                     ),
-                                            )
+                                            ))
                                         } else {
                                             None
                                         }),
@@ -575,7 +576,9 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                 .border_1()
                                 .border_color(border_color)
                                 .bg(card_bg)
-                                .overflow_hidden()
+                                // No overflow_hidden here (unlike the APPEARANCE
+                                // card): the rows are transparent and the open
+                                // dropdown must not be clipped by the card edge.
                                 // Row 1: Font
                                 .child(
                                     div()
@@ -692,9 +695,10 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                     cx.notify();
                                                 })),
                                         )
-                                        // Cursor Style Dropdown Popover
+                                        // Cursor Style Dropdown Popover (deferred: paints
+                                        // above the rows below, which would otherwise cover it)
                                         .children(if show_cursor_picker {
-                                            Some(
+                                            Some(deferred(
                                                 div()
                                                     .absolute()
                                                     .top(px(46.0))
@@ -745,7 +749,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 this.set_cursor_style("bar".to_string(), cx);
                                                             })),
                                                     ),
-                                            )
+                                            ))
                                         } else {
                                             None
                                         }),
@@ -873,9 +877,10 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                     cx.notify();
                                                 })),
                                         )
-                                        // Scrollback Dropdown Popover
+                                        // Scrollback Dropdown Popover (deferred: paints
+                                        // above everything below, incl. the next section)
                                         .children(if show_scrollback_picker {
-                                            Some(
+                                            Some(deferred(
                                                 div()
                                                     .absolute()
                                                     .top(px(46.0))
@@ -907,7 +912,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 this.set_scrollback(val, cx);
                                                             }))
                                                     })),
-                                            )
+                                            ))
                                         } else {
                                             None
                                         }),
