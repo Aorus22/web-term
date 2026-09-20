@@ -2,6 +2,7 @@
 
 use gpui::*;
 use gpui_component::input::Input;
+use gpui_component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_component::Sizable;
 use webterm_backend_client::SftpFileInfo;
 
@@ -490,16 +491,15 @@ fn render_pane(
                 } else {
                     None
                 })
+                .children(render_parent_row(
+                    &state.current_path,
+                    pane,
+                    is_dark,
+                    is_interactive,
+                    cx,
+                ))
                 .children(if !state.is_loading && state.error.is_none() {
-                    Some(render_file_rows(
-                        &visible_files,
-                        &state.selected,
-                        &state.current_path,
-                        pane,
-                        is_dark,
-                        is_interactive,
-                        cx,
-                    ))
+                    Some(render_file_rows(app, pane, is_dark, cx))
                 } else {
                     None
                 }),
@@ -599,10 +599,10 @@ fn render_table_header(
                     }),
                 ),
         )
-        // 2. Date Modified Column (130px)
+        // 2. Date Modified Column (150px)
         .child(
             div()
-                .w(px(130.0))
+                .w(px(150.0))
                 .flex_shrink_0()
                 .flex()
                 .flex_row()
@@ -641,10 +641,10 @@ fn render_table_header(
                     }),
                 ),
         )
-        // 3. Size Column (80px)
+        // 3. Size Column (100px)
         .child(
             div()
-                .w(px(80.0))
+                .w(px(100.0))
                 .flex_shrink_0()
                 .flex()
                 .flex_row()
@@ -688,24 +688,24 @@ fn render_table_header(
 }
 
 /// Render list of file rows for a pane matching DirectoryBrowser.tsx 1:1.
-fn render_file_rows(
-    files: &[SftpFileInfo],
-    selected: &std::collections::HashSet<String>,
+/// Fixed file-row height: uniform_list measures one row and reuses that size
+/// for every other row, so all rows must be exactly this tall (chat-list
+/// pattern from WA-Bot — only visible rows are built).
+const SFTP_ROW_H: f32 = 44.0;
+
+/// Parent navigation row (".."), rendered as a fixed header above the
+/// virtualized list so it stays reachable while scrolling. `None` in root.
+fn render_parent_row(
     current_path: &str,
     pane: SftpActivePane,
     is_dark: bool,
     is_interactive: bool,
     cx: &mut Context<AppState>,
-) -> AnyElement {
+) -> Option<AnyElement> {
     let hover_bg = if is_dark {
         rgb(0x27272a)
     } else {
         rgb(0xf1f5f9)
-    };
-    let selected_bg = if is_dark {
-        rgb(0x1e3a5f)
-    } else {
-        rgb(0xbae6fd)
     };
     let text_color = if is_dark {
         rgb(0xf4f4f5)
@@ -718,251 +718,388 @@ fn render_file_rows(
         rgb(0x64748b)
     };
 
-    let pane_u64 = match pane {
-        SftpActivePane::Left => 0u64,
-        SftpActivePane::Right => 1u64,
-    };
-
     let is_root = current_path.is_empty()
         || current_path == "/"
         || current_path == "."
         || (current_path.len() <= 3 && current_path.chars().nth(1) == Some(':'));
-
-    let mut rows: Vec<AnyElement> = Vec::new();
-
-    // 1. Parent navigation row "⤴ .." when not in root
-    if !is_root {
-        rows.push(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .px_3()
-                .h(px(40.0))
-                .cursor(if is_interactive {
-                    CursorStyle::PointingHand
-                } else {
-                    CursorStyle::Arrow
-                })
-                .id("sftp-08").hover(|s| if is_interactive { s.bg(hover_bg) } else { s })
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_2p5()
-                        .child(
-                            svg()
-                                .data(crate::icons::CORNER_LEFT_UP_SVG)
-                                .size(px(16.0))
-                                .text_color(muted_text),
-                        )
-                        .child(div().text_sm().text_color(text_color).child("..")),
-                )
-                .child(div().w(px(130.0)).flex_shrink_0())
-                .child(div().w(px(80.0)).flex_shrink_0())
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, ev: &MouseDownEvent, _window, cx| {
-                        if !is_interactive {
-                            return;
-                        }
-                        this.sftp_focus_pane(pane, cx);
-                        if ev.click_count >= 2 {
-                            this.sftp_navigate_up(pane, cx);
-                        }
-                    }),
-                )
-                .into_any_element(),
-        );
+    if is_root {
+        return None;
     }
 
-    // 2. File and Directory rows
-    for (idx, file) in files.iter().enumerate() {
-        let is_selected = selected.contains(&file.name);
-        let is_dir = file.is_dir;
-        let file_name = file.name.clone();
-        let file_name_right = file.name.clone();
-        let is_drive_item = is_dir && file.name.len() == 2 && file.name.ends_with(':');
-        let target_path = if is_dir {
-            if (current_path == "/" || current_path.is_empty()) && is_drive_item {
-                format!("{}/", file.name)
+    Some(
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .px_3()
+            .h(px(SFTP_ROW_H))
+            .flex_shrink_0()
+            .cursor(if is_interactive {
+                CursorStyle::PointingHand
             } else {
-                join_path(current_path, &file.name)
+                CursorStyle::Arrow
+            })
+            .id(ElementId::NamedInteger("sftp-parent-row".into(), pane as u64))
+            .hover(|s| {
+                if is_interactive {
+                    s.bg(hover_bg)
+                } else {
+                    s
+                }
+            })
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_2p5()
+                    .child(
+                        svg()
+                            .data(crate::icons::CORNER_LEFT_UP_SVG)
+                            .size(px(16.0))
+                            .text_color(muted_text),
+                    )
+                    .child(div().text_sm().text_color(text_color).child("..")),
+            )
+            .child(div().w(px(150.0)).flex_shrink_0())
+            .child(div().w(px(100.0)).flex_shrink_0())
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, ev: &MouseDownEvent, _window, cx| {
+                    if !is_interactive {
+                        return;
+                    }
+                    this.sftp_focus_pane(pane, cx);
+                    if ev.click_count >= 2 {
+                        this.sftp_navigate_up(pane, cx);
+                    }
+                }),
+            )
+            .into_any_element(),
+    )
+}
+
+/// Single file/directory row. Height must stay exactly SFTP_ROW_H.
+#[allow(clippy::too_many_arguments)]
+fn render_sftp_row(
+    file: &SftpFileInfo,
+    idx: usize,
+    selected: &std::collections::HashSet<String>,
+    current_path: &str,
+    pane: SftpActivePane,
+    pane_u64: u64,
+    hover_bg: Rgba,
+    selected_bg: Rgba,
+    text_color: Rgba,
+    muted_text: Rgba,
+    is_interactive: bool,
+    cx: &mut Context<AppState>,
+) -> AnyElement {
+    let is_selected = selected.contains(&file.name);
+    let is_dir = file.is_dir;
+    let file_name = file.name.clone();
+    let file_name_right = file.name.clone();
+    let is_drive_item = is_dir && file.name.len() == 2 && file.name.ends_with(':');
+    let target_path = if is_dir {
+        if (current_path == "/" || current_path.is_empty()) && is_drive_item {
+            format!("{}/", file.name)
+        } else {
+            join_path(current_path, &file.name)
+        }
+    } else {
+        String::new()
+    };
+
+    let formatted_size = if is_dir {
+        "- -".to_string()
+    } else {
+        format_file_size(file.size)
+    };
+
+    let formatted_date = crate::app_state::format_date_modified(&file.mod_time);
+    let formatted_perm = crate::app_state::format_permissions(file.mode, is_dir);
+
+    let drag_filenames = if selected.contains(&file.name) && selected.len() > 1 {
+        selected.iter().cloned().collect()
+    } else {
+        vec![file.name.clone()]
+    };
+
+    div()
+        .id(ElementId::NamedInteger(
+            "sftp-row".into(),
+            (pane_u64 << 32) | (idx as u64),
+        ))
+        // Full list width: uniform_list items are laid out as roots with
+        // auto (content) width, so without this the name cell never gets
+        // bounded and dates shift with filename length.
+        .w_full()
+        .on_drag(
+            SftpDraggedItem {
+                source_pane: pane,
+                filenames: drag_filenames,
+            },
+            move |dragged: &SftpDraggedItem, _offset, _window, cx: &mut App| {
+                let label = if dragged.filenames.len() == 1 {
+                    dragged.filenames[0].clone()
+                } else {
+                    format!("{} items", dragged.filenames.len())
+                };
+                cx.new(|_| SftpDragPreview { label })
+            },
+        )
+        .flex()
+        .flex_row()
+        .items_center()
+        .px_3()
+        .h(px(SFTP_ROW_H))
+        .cursor(if is_interactive {
+            CursorStyle::PointingHand
+        } else {
+            CursorStyle::Arrow
+        })
+        .bg(if is_selected {
+            selected_bg
+        } else {
+            rgba(0x00000000)
+        })
+        .hover(|s| {
+            if is_interactive {
+                s.bg(hover_bg)
+            } else {
+                s
             }
-        } else {
-            String::new()
-        };
-
-        let formatted_size = if is_dir {
-            "- -".to_string()
-        } else {
-            format_file_size(file.size)
-        };
-
-        let formatted_date = crate::app_state::format_date_modified(&file.mod_time);
-        let formatted_perm = crate::app_state::format_permissions(file.mode, is_dir);
-
-        let drag_filenames = if selected.contains(&file.name) && selected.len() > 1 {
-            selected.iter().cloned().collect()
-        } else {
-            vec![file.name.clone()]
-        };
-
-        rows.push(
-            div()
-                .id(ElementId::NamedInteger(
-                    "sftp-row".into(),
-                    (pane_u64 << 32) | (idx as u64),
-                ))
-                .on_drag(
-                    SftpDraggedItem {
-                        source_pane: pane,
-                        filenames: drag_filenames,
-                    },
-                    move |dragged: &SftpDraggedItem, _offset, _window, cx: &mut App| {
-                        let label = if dragged.filenames.len() == 1 {
-                            dragged.filenames[0].clone()
-                        } else {
-                            format!("{} items", dragged.filenames.len())
-                        };
-                        cx.new(|_| SftpDragPreview { label })
-                    },
-                )
-                .flex()
-                .flex_row()
-                .items_center()
-                .px_3()
-                .h(px(44.0))
-                .cursor(if is_interactive {
-                    CursorStyle::PointingHand
-                } else {
-                    CursorStyle::Arrow
-                })
-                .bg(if is_selected {
-                    selected_bg
-                } else {
-                    rgba(0x00000000)
-                })
-                .hover(|s| if is_interactive { s.bg(hover_bg) } else { s })
-                // Column 1: Icon + Name + Permissions (flex-1)
+        })
+                // Column 1: Icon + Name + Permissions (flex-1, padded so long
+                // truncated names never touch the date column)
                 .child(
                     div()
                         .flex_1()
                         .min_w_0()
                         .overflow_hidden()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_2p5()
-                        .child(if is_dir {
-                            if is_drive_item {
-                                svg()
-                                    .data(crate::icons::DRIVE_SVG)
-                                    .size(px(16.0))
-                                    .text_color(rgb(0xf59e0b))
-                            } else {
-                                svg()
-                                    .data(crate::icons::BLUE_FOLDER_SVG)
-                                    .size(px(16.0))
-                                    .text_color(rgb(0x3b82f6))
-                            }
-                        } else {
-                            svg()
-                                .data(crate::icons::FILE_SVG)
-                                .size(px(16.0))
-                                .text_color(muted_text)
-                        })
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .min_w_0()
-                                .overflow_hidden()
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(FontWeight::NORMAL)
-                                        .text_color(text_color)
-                                        .truncate()
-                                        .child(file_name.clone()),
-                                )
-                                .child(
-                                    div().text_xs().text_color(muted_text).child(formatted_perm),
-                                ),
-                        ),
-                )
-                // Column 2: Date Modified (130px)
+                        .pr_3()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2p5()
+                .child(if is_dir {
+                    if is_drive_item {
+                        svg()
+                            .data(crate::icons::DRIVE_SVG)
+                            .size(px(16.0))
+                            .text_color(rgb(0xf59e0b))
+                    } else {
+                        svg()
+                            .data(crate::icons::BLUE_FOLDER_SVG)
+                            .size(px(16.0))
+                            .text_color(rgb(0x3b82f6))
+                    }
+                } else {
+                    svg()
+                        .data(crate::icons::FILE_SVG)
+                        .size(px(16.0))
+                        .text_color(muted_text)
+                })
                 .child(
                     div()
-                        .w(px(130.0))
+                        .flex()
+                        .flex_col()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::NORMAL)
+                                .text_color(text_color)
+                                .truncate()
+                                .child(file_name.clone()),
+                        )
+                        .child(
+                            div().text_xs().text_color(muted_text).child(formatted_perm),
+                        ),
+                ),
+        )
+                // Column 2: Date Modified (150px, mono so digits align)
+                .child(
+                    div()
+                        .w(px(150.0))
                         .flex_shrink_0()
                         .text_xs()
+                        .font_family("JetBrains Mono")
                         .text_color(muted_text)
                         .child(formatted_date),
                 )
-                // Column 3: Size (80px, centered)
+                // Column 3: Size (100px, centered, mono so digits align)
                 .child(
                     div()
-                        .w(px(80.0))
+                        .w(px(100.0))
                         .flex_shrink_0()
                         .text_xs()
+                        .font_family("JetBrains Mono")
                         .text_color(muted_text)
                         .text_center()
                         .child(formatted_size),
                 )
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
-                        if !is_interactive {
-                            return;
-                        }
-                        this.sftp_focus_pane(pane, cx);
-                        if let Some(ref fh) = this.sftp_manager.focus_handle {
-                            window.focus(fh, cx);
-                        }
-                        if is_dir && ev.click_count >= 2 {
-                            this.sftp_navigate(pane, target_path.clone(), cx);
-                        } else {
-                            let multi = ev.modifiers.control || ev.modifiers.shift;
-                            this.sftp_toggle_selection(pane, file_name.clone(), multi, cx);
-                        }
-                    }),
-                )
-                .on_mouse_down(
-                    MouseButton::Right,
-                    cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
-                        if !is_interactive {
-                            return;
-                        }
-                        let x = ev.position.x / px(1.0);
-                        let y = ev.position.y / px(1.0);
-                        this.sftp_select_single(pane, file_name_right.clone(), cx);
-                        if let Some(ref fh) = this.sftp_manager.focus_handle {
-                            window.focus(fh, cx);
-                        }
-                        this.sftp_open_context_menu(
-                            pane,
-                            file_name_right.clone(),
-                            is_dir,
-                            (x, y),
-                            cx,
-                        );
-                    }),
-                )
-                .into_any_element(),
-        );
-    }
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                if !is_interactive {
+                    return;
+                }
+                this.sftp_focus_pane(pane, cx);
+                if let Some(ref fh) = this.sftp_manager.focus_handle {
+                    window.focus(fh, cx);
+                }
+                if is_dir && ev.click_count >= 2 {
+                    this.sftp_navigate(pane, target_path.clone(), cx);
+                } else {
+                    let multi = ev.modifiers.control || ev.modifiers.shift;
+                    this.sftp_toggle_selection(pane, file_name.clone(), multi, cx);
+                }
+            }),
+        )
+        .on_mouse_down(
+            MouseButton::Right,
+            cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                if !is_interactive {
+                    return;
+                }
+                let x = ev.position.x / px(1.0);
+                let y = ev.position.y / px(1.0);
+                this.sftp_select_single(pane, file_name_right.clone(), cx);
+                if let Some(ref fh) = this.sftp_manager.focus_handle {
+                    window.focus(fh, cx);
+                }
+                this.sftp_open_context_menu(
+                    pane,
+                    file_name_right.clone(),
+                    is_dir,
+                    (x, y),
+                    cx,
+                );
+            }),
+        )
+        .into_any_element()
+}
+
+/// Virtualized file list: only visible rows are built, no matter how large
+/// the directory is (chat-list pattern from WA-Bot).
+fn render_file_rows(
+    app: &AppState,
+    pane: SftpActivePane,
+    is_dark: bool,
+    cx: &mut Context<AppState>,
+) -> AnyElement {
+    let pane_u64 = match pane {
+        SftpActivePane::Left => 0u64,
+        SftpActivePane::Right => 1u64,
+    };
+    let count = app.sftp_pane(pane).visible_files().len();
+    let list_handle = app.sftp_pane(pane).list_scroll.clone();
+    let muted = app.muted_text();
+    let primary = app.primary_color();
 
     div()
-        .id(ElementId::NamedInteger("sftp-file-list".into(), pane_u64))
-        .flex()
-        .flex_col()
+        .relative()
         .size_full()
-        .overflow_y_scroll()
-        .children(rows)
+        .overflow_hidden()
+        .child(
+            uniform_list(
+                ElementId::NamedInteger("sftp-file-list".into(), pane_u64),
+                count,
+                cx.processor(
+                    move |this: &mut AppState,
+                          range: std::ops::Range<usize>,
+                          _window: &mut Window,
+                          cx: &mut Context<AppState>| {
+                        let pane_state = this.sftp_pane(pane);
+                        let files = pane_state.visible_files();
+                        let selected = pane_state.selected.clone();
+                        let current_path = pane_state.current_path.clone();
+                        let any_popover_open = pane_state.show_source_picker
+                            || pane_state.show_actions_menu
+                            || pane_state.show_drive_picker
+                            || this.sftp_manager.context_menu.is_some()
+                            || this.sftp_manager.modal.is_some();
+                        let is_interactive = !any_popover_open;
+                        let dark = this.is_dark();
+                        let hover_bg = if dark {
+                            rgb(0x27272a)
+                        } else {
+                            rgb(0xf1f5f9)
+                        };
+                        let selected_bg = if dark {
+                            rgb(0x1e3a5f)
+                        } else {
+                            rgb(0xbae6fd)
+                        };
+                        let text_color = if dark {
+                            rgb(0xf4f4f5)
+                        } else {
+                            rgb(0x0f172a)
+                        };
+                        let muted_text = if dark {
+                            rgb(0xa1a1aa)
+                        } else {
+                            rgb(0x64748b)
+                        };
+                        range
+                            .filter_map(|idx| {
+                                files.get(idx).map(|file| {
+                                    render_sftp_row(
+                                        file,
+                                        idx,
+                                        &selected,
+                                        &current_path,
+                                        pane,
+                                        pane_u64,
+                                        hover_bg,
+                                        selected_bg,
+                                        text_color,
+                                        muted_text,
+                                        is_interactive,
+                                        cx,
+                                    )
+                                })
+                            })
+                            .collect()
+                    },
+                ),
+            )
+            .w_full()
+            .h_full()
+            .track_scroll(&list_handle),
+        )
+        .child(
+            // Explicit per-pane id: the default id is the call-site location,
+            // which would be identical for both panes and misroute drags.
+            Scrollbar::vertical(&list_handle)
+                .id(ElementId::NamedInteger(
+                    "sftp-scrollbar".into(),
+                    pane_u64,
+                ))
+                .mode(ScrollbarMode::Hover)
+                .styles(|s| {
+                    s.track(|t| t.bg(Hsla::from(rgba(0x00000000))))
+                        .thumb(|th| {
+                            th.bg(Hsla::from(muted.opacity(0.35)))
+                                .radius(px(3.0))
+                                .width(px(6.0))
+                        })
+                        .thumb_hover(|th| {
+                            th.bg(Hsla::from(muted.opacity(0.65)))
+                                .radius(px(4.0))
+                                .width(px(8.0))
+                        })
+                        .thumb_active(|th| {
+                            th.bg(Hsla::from(primary.opacity(0.8)))
+                                .radius(px(4.0))
+                                .width(px(8.0))
+                        })
+                }),
+        )
         .into_any_element()
 }
 

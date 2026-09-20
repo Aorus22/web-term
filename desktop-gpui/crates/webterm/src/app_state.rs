@@ -587,6 +587,9 @@ pub struct SftpPaneState {
     pub show_path_picker: bool,
     pub history: Vec<String>,
     pub history_index: usize,
+    /// Virtualized scroll state for the file list (uniform_list only builds
+    /// visible rows — chat-list pattern from WA-Bot).
+    pub list_scroll: UniformListScrollHandle,
 }
 
 impl SftpPaneState {
@@ -614,6 +617,7 @@ impl SftpPaneState {
             show_path_picker: false,
             history: vec![p],
             history_index: 0,
+            list_scroll: UniformListScrollHandle::new(),
         }
     }
 

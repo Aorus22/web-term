@@ -361,7 +361,6 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                     .collect();
                                                             let rows: Vec<&[&'static crate::theme::ThemePreset]> =
                                                                 presets.chunks(THEME_GRID_COLS).collect();
-                                                            let card_bg = this.card_bg();
                                                             let border_color = this.border_color();
                                                             let text_color = this.text_color();
                                                             let muted_text = this.muted_text();
