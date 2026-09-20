@@ -108,8 +108,15 @@ async fn test_sftp_supervisor_e2e_filesystem_lifecycle() {
 
     // 5. Upload a file via sftp_upload
     let file_payload = b"Hello from WebTerm SFTP Integration Test!".to_vec();
+    let backend_transfer_id = format!("wt-it-{}", std::process::id());
     let tx_id = client
-        .sftp_upload("local", &test_dir_str, "sample.txt", file_payload.clone())
+        .sftp_upload(
+            "local",
+            &test_dir_str,
+            "sample.txt",
+            file_payload.clone(),
+            &backend_transfer_id,
+        )
         .await
         .expect("sftp_upload should succeed");
     assert!(

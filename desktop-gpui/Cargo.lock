@@ -7813,6 +7813,7 @@ dependencies = [
  "gpui-component",
  "gpui-pre",
  "gpui-pre-platform",
+ "libc",
  "parking_lot",
  "raw-window-handle",
  "rfd",

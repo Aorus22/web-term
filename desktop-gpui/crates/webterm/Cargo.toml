@@ -33,3 +33,5 @@ raw-window-handle = "=0.6.2"
 tokio-tungstenite = { workspace = true }
 futures-util = { workspace = true }
 tempfile = { workspace = true }
+# Used by chaos_test to SIGKILL the backend child on unix.
+libc = { workspace = true }
