@@ -1099,6 +1099,9 @@ pub struct AppState {
     /// Virtualized scroll state for the Settings theme-preset grid
     /// (uniform_list only renders visible rows).
     pub settings_themes_scroll: UniformListScrollHandle,
+    /// Last known window viewport, refreshed every render. Used to keep
+    /// cursor-anchored popups (context menus) inside the window.
+    pub viewport_size: Size<Pixels>,
     /// Editable form inputs, initialized once the window exists (see
     /// `init_form_inputs`, called from main.rs right after the window opens).
     pub form_inputs: Option<FormInputs>,
@@ -1192,6 +1195,7 @@ impl AppState {
             sidebar_closing: false,
             settings_scroll: ScrollHandle::default(),
             settings_themes_scroll: UniformListScrollHandle::new(),
+            viewport_size: size(px(1280.0), px(720.0)),
             form_inputs: None,
         }
     }
@@ -1395,8 +1399,12 @@ impl AppState {
         let last_req = active_tab.last_connect_req.clone();
 
         if session_type == "local" {
-            let cwd = last_req.and_then(|r| r.cwd);
-            self.open_local_tab_with_cwd(cwd, cx);
+            let fallback_cwd = last_req.and_then(|r| r.cwd);
+            self.duplicate_local_tab_with_live_cwd(
+                active_tab.session_id.clone(),
+                fallback_cwd,
+                cx,
+            );
         } else if let Some(req) = last_req {
             self.open_ssh_tab(req, &title, cx);
         } else if let Some(conn_id) = active_tab.connection_id.clone() {
@@ -1404,6 +1412,61 @@ impl AppState {
         } else {
             self.open_local_tab(cx);
         }
+    }
+
+    /// Duplicate a local tab preserving the shell's *current* directory.
+    ///
+    /// Asks the backend for the live cwd (`GET /api/sessions` exposes it via
+    /// `/proc`), falling back to the connect-request cwd when the backend is
+    /// unreachable or has no record of the session.
+    pub fn duplicate_local_tab_with_live_cwd(
+        &mut self,
+        backend_session_id: Option<String>,
+        fallback_cwd: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        let client = match self.client.clone() {
+            Some(c) => c,
+            None => {
+                self.open_local_tab_with_cwd(fallback_cwd, cx);
+                return;
+            }
+        };
+
+        let view_weak = cx.entity().downgrade();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
+
+        TOKIO_RT.spawn(async move {
+            let live_cwd = client
+                .list_sessions()
+                .await
+                .ok()
+                .and_then(|sessions| {
+                    backend_session_id.as_ref().and_then(|sid| {
+                        sessions.iter().find(|s| &s.id == sid).and_then(|s| {
+                            s.cwd.clone().filter(|c| !c.is_empty())
+                        })
+                    })
+                })
+                .or(fallback_cwd);
+            let _ = tx.send(live_cwd);
+        });
+
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view_weak = view_weak.clone();
+            let cx_handle = cx.clone();
+            async move {
+                let cwd = rx.recv().await.flatten();
+                cx_handle.update(|cx: &mut App| {
+                    if let Some(app) = view_weak.upgrade() {
+                        app.update(cx, |this, cx| {
+                            this.open_local_tab_with_cwd(cwd, cx);
+                        });
+                    }
+                });
+            }
+        })
+        .detach();
     }
 
     /// Parse and submit quick connect text (e.g. user@host[:port] or saved connection match).
@@ -2872,7 +2935,9 @@ impl AppState {
         .detach();
     }
 
-    /// Restore detached sessions from backend or open a default local tab.
+    /// Restore detached sessions from backend, or show the new-tab page
+    /// when there is nothing to restore (web client parity: first launch
+    /// does not spawn a local shell).
     pub fn restore_sessions_or_default(&mut self, cx: &mut Context<Self>) {
         let client = match self.client.clone() {
             Some(c) => c,
@@ -2931,7 +2996,9 @@ impl AppState {
                         app.update(cx, |this, cx| {
                             if to_attach.is_empty() {
                                 if this.session_manager.is_empty() {
-                                    this.open_local_tab(cx);
+                                    this.show_new_tab_popover = false;
+                                    this.show_hosts_catalog = false;
+                                    this.active_view = View::NewTab;
                                 }
                             } else {
                                 for (session_id, title, stype, conn_id) in to_attach {
@@ -5585,6 +5652,7 @@ impl AppState {
 
 impl Render for AppState {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.viewport_size = window.viewport_size();
         let key_secret = self.settings.encryption_key.as_deref();
 
         // CSD window frame (Zed-style): transparent shadow padding around the

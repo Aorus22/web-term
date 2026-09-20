@@ -2848,15 +2848,18 @@ pub fn render_sftp_context_menu(
     let raw_x = (menu.position.0 - 4.0).max(8.0);
     let raw_y = (menu.position.1 - 4.0).max(8.0);
 
-    // If near right window edge, flip to left of cursor so it never gets clipped
-    let x = if raw_x + menu_w > 1200.0 {
+    // Flip near window edges using the real viewport so the menu never
+    // gets clipped (previously hardcoded 1200x720 guesses).
+    let vw: f32 = app.viewport_size.width.into();
+    let vh: f32 = app.viewport_size.height.into();
+    let x = if raw_x + menu_w > vw {
         (raw_x - menu_w).max(8.0)
     } else {
         raw_x
     };
 
     // If near bottom window edge, flip upwards so it never gets pushed off
-    let y = if raw_y + menu_h > 720.0 {
+    let y = if raw_y + menu_h > vh {
         (raw_y - menu_h).max(8.0)
     } else {
         raw_y

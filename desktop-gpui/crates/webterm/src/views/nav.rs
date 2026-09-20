@@ -833,7 +833,15 @@ pub fn render_terminal_context_menu(
     app: &mut AppState,
     cx: &mut Context<AppState>,
 ) -> Option<AnyElement> {
-    let (x, y) = app.terminal_context_menu?;
+    let (raw_x, raw_y) = app.terminal_context_menu?;
+    // Flip near window edges so the menu never sinks out of view.
+    // Footprint is estimated (7 rows + 2 separators + padding).
+    let vw: f32 = app.viewport_size.width.into();
+    let vh: f32 = app.viewport_size.height.into();
+    const MENU_W: f32 = 190.0;
+    const MENU_H: f32 = 240.0;
+    let x = raw_x.clamp(8.0, (vw - MENU_W - 8.0).max(8.0));
+    let y = raw_y.clamp(8.0, (vh - MENU_H - 8.0).max(8.0));
     let is_dark = app.is_dark();
     let text_color = app.text_color();
     let muted_text = app.muted_text();

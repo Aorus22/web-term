@@ -227,7 +227,7 @@ pub fn render_tab_strip(
                                     .cursor_pointer()
                                     .id("tab_strip-05").hover(|s| s.bg(hover_bg))
                                     .child(
-                                        svg().data(COPY_SVG).size(px(16.0)).text_color(muted_text),
+                                        svg().data(COPY_SVG).size(px(18.0)).text_color(muted_text),
                                     )
                                     .child(
                                         div()
@@ -267,7 +267,7 @@ pub fn render_tab_strip(
                                     .cursor_pointer()
                                     .id("tab_strip-06").hover(|s| s.bg(hover_bg))
                                     .child(
-                                        svg().data(PLUS_SVG).size(px(16.0)).text_color(muted_text),
+                                        svg().data(PLUS_SVG).size(px(18.0)).text_color(muted_text),
                                     )
                                     .child(
                                         div()
