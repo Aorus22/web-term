@@ -324,6 +324,36 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                 .w_full()
                                                 .h(px(THEME_GRID_H))
                                                 .overflow_hidden()
+                                                // gpui hands a wheel event to every
+                                                // scrollable under the cursor (its scroll
+                                                // listener never stops propagation), so
+                                                // the page behind would scroll along with
+                                                // this grid. Hold the wheel here while the
+                                                // grid still has room, then hand it back
+                                                // to the page at either end.
+                                                .on_scroll_wheel(cx.listener(
+                                                    |this, event: &ScrollWheelEvent, window, cx| {
+                                                        let (offset, max_offset) = {
+                                                            let scroll =
+                                                                this.settings_themes_scroll.0.borrow();
+                                                            let base = &scroll.base_handle;
+                                                            (base.offset(), base.max_offset())
+                                                        };
+                                                        let delta_y = event
+                                                            .delta
+                                                            .pixel_delta(window.line_height())
+                                                            .y;
+                                                        // offset.y runs from 0 (top) to
+                                                        // -max_offset.y (bottom).
+                                                        let has_room = (delta_y < Pixels::ZERO
+                                                            && offset.y > -max_offset.y)
+                                                            || (delta_y > Pixels::ZERO
+                                                                && offset.y < Pixels::ZERO);
+                                                        if has_room {
+                                                            cx.stop_propagation();
+                                                        }
+                                                    },
+                                                ))
                                                 .child(
                                                     uniform_list(
                                                         "settings-theme-grid",
