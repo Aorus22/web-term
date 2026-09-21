@@ -509,13 +509,19 @@ impl TerminalView {
             let mode = term.mode();
             let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
 
-            if let Some(bytes) = mouse_button_report(event.button, true, pt, mouse_mods, mode) {
-                drop(term);
-                self.write_to_pty(&bytes);
-            } else if event.button == MouseButton::Left {
+            if event.button == MouseButton::Left {
+                // Plain left-drag always selects locally, even when the
+                // hosted app enabled mouse reporting (e.g. opencode, vim,
+                // htop). TUI mouse clicks are intentionally sacrificed for
+                // this: click forwarding would eat the gesture instead.
                 let sel_type = selection_type_from_clicks(event.click_count);
                 term.start_selection(pt, side, sel_type);
                 self.is_selecting = true;
+            } else if let Some(bytes) =
+                mouse_button_report(event.button, true, pt, mouse_mods, mode)
+            {
+                drop(term);
+                self.write_to_pty(&bytes);
             }
         }
 
@@ -540,6 +546,11 @@ impl TerminalView {
                 term.update_selection(pt, side);
                 cx.notify();
             } else if let Some(button) = event.pressed_button {
+                // Left-drag is always local selection (see on_mouse_down);
+                // never forward left-button drags to the PTY.
+                if button == MouseButton::Left {
+                    return;
+                }
                 let mode = term.mode();
                 let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
                 if let Some(bytes) = mouse_button_report(button, true, pt, mouse_mods, mode) {
@@ -551,7 +562,10 @@ impl TerminalView {
     }
 
     fn on_mouse_up(&mut self, event: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if self.last_bounds.lock().is_some() {
+        // Left-button release ends the local selection; it is never
+        // forwarded to the PTY (see on_mouse_down). Other buttons keep
+        // their mouse-reporting behavior for TUI apps.
+        if event.button != MouseButton::Left && self.last_bounds.lock().is_some() {
             let (pt, _) = self.pixel_to_term_point(event.position, window);
 
             let term = self.terminal.lock();
