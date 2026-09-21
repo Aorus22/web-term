@@ -7,7 +7,7 @@ use crate::colors::ColorPalette;
 use crate::event::GpuiEventProxy;
 use alacritty_terminal::grid::Dimensions;
 use alacritty_terminal::index::{Column, Line, Point as AlacPoint};
-use alacritty_terminal::term::cell::{Cell, Flags};
+use alacritty_terminal::term::cell::{Cell, Flags, LineLength};
 use alacritty_terminal::term::{Term, TermMode};
 use alacritty_terminal::vte::ansi::CursorShape;
 use gpui::{
@@ -337,12 +337,16 @@ impl TerminalRenderer {
                 ));
             }
 
-            // Paint selection highlight quads
+            // Paint selection highlight quads, trimmed to actual line
+            // content (Ghostty parity): trailing empty cells are not part
+            // of the copy (see line_length), so don't paint them either.
+            // Wrapped rows report full length, keeping their highlight full.
+            let content_end = grid[line].line_length().0.min(num_cols);
             if let Some(ref sel) = selection_range {
                 let mut sel_start: Option<usize> = None;
                 for col in 0..num_cols {
                     let pt = AlacPoint::new(line, Column(col));
-                    if sel.contains(pt) {
+                    if col < content_end && sel.contains(pt) {
                         if sel_start.is_none() {
                             sel_start = Some(col);
                         }
@@ -370,7 +374,7 @@ impl TerminalRenderer {
                 if let Some(start) = sel_start {
                     let x = origin.x + self.cell_width * (start as f32);
                     let y = origin.y + self.cell_height * (line_idx as f32);
-                    let width = self.cell_width * ((num_cols - start) as f32);
+                    let width = self.cell_width * ((content_end - start) as f32);
                     let rect = Bounds {
                         origin: Point { x, y },
                         size: Size {
