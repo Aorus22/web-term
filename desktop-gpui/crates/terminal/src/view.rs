@@ -8,8 +8,8 @@ use crate::event::TerminalEvent;
 use crate::input::keystroke_to_bytes;
 use crate::input::wrap_paste_payload;
 use crate::mouse::{
-    modifiers_to_mouse_code, mouse_button_report, pixel_to_cell_with_side, scroll_report,
-    selection_type_from_clicks,
+    modifiers_to_mouse_code, mouse_button_report, mouse_drag_report,
+    pixel_to_cell_with_side, scroll_report, selection_type_from_clicks,
 };
 use crate::render::TerminalRenderer;
 use crate::terminal::Terminal;
@@ -90,6 +90,13 @@ impl TerminalView {
                                         if let Some(ref cb) = this.bell_callback {
                                             cb();
                                         }
+                                    }
+                                    TerminalEvent::ClipboardStore(text) => {
+                                        // OSC52 copy from the hosted app
+                                        // (e.g. opencode's own selection).
+                                        cx.write_to_clipboard(
+                                            ClipboardItem::new_string(text.clone()),
+                                        );
                                     }
                                     _ => {}
                                 }
@@ -520,19 +527,23 @@ impl TerminalView {
             let mode = term.mode();
             let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
 
-            if event.button == MouseButton::Left {
-                // Plain left-drag always selects locally, even when the
-                // hosted app enabled mouse reporting (e.g. opencode, vim,
-                // htop). TUI mouse clicks are intentionally sacrificed for
-                // this: click forwarding would eat the gesture instead.
+            // Shift forces local selection (standard bypass for when the
+            // hosted app grabbed the mouse). Otherwise mouse events go to
+            // the PTY when the app enabled mouse reporting (e.g. opencode
+            // implements its own selectable zones + OSC52 copy), and only
+            // plain-shell clicks fall through to local selection.
+            let report = if event.modifiers.shift {
+                None
+            } else {
+                mouse_button_report(event.button, true, pt, mouse_mods, mode)
+            };
+            if let Some(bytes) = report {
+                drop(term);
+                self.write_to_pty(&bytes);
+            } else if event.button == MouseButton::Left {
                 let sel_type = selection_type_from_clicks(event.click_count);
                 term.start_selection(pt, side, sel_type);
                 self.is_selecting = true;
-            } else if let Some(bytes) =
-                mouse_button_report(event.button, true, pt, mouse_mods, mode)
-            {
-                drop(term);
-                self.write_to_pty(&bytes);
             }
         }
 
@@ -557,14 +568,13 @@ impl TerminalView {
                 term.update_selection(pt, side);
                 cx.notify();
             } else if let Some(button) = event.pressed_button {
-                // Left-drag is always local selection (see on_mouse_down);
-                // never forward left-button drags to the PTY.
-                if button == MouseButton::Left {
+                // Shift-held drags never go to the PTY (see on_mouse_down).
+                if event.modifiers.shift {
                     return;
                 }
                 let mode = term.mode();
                 let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
-                if let Some(bytes) = mouse_button_report(button, true, pt, mouse_mods, mode) {
+                if let Some(bytes) = mouse_drag_report(button, pt, mouse_mods, mode) {
                     drop(term);
                     self.write_to_pty(&bytes);
                 }
@@ -573,10 +583,10 @@ impl TerminalView {
     }
 
     fn on_mouse_up(&mut self, event: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
-        // Left-button release ends the local selection; it is never
-        // forwarded to the PTY (see on_mouse_down). Other buttons keep
-        // their mouse-reporting behavior for TUI apps.
-        if event.button != MouseButton::Left && self.last_bounds.lock().is_some() {
+        // Release goes to the PTY when the press did (app-owned gesture).
+        // Gestures owned by local selection (is_selecting) or Shift-bypassed
+        // never forward the release.
+        if !self.is_selecting && !event.modifiers.shift && self.last_bounds.lock().is_some() {
             let (pt, _) = self.pixel_to_term_point(event.position, window);
 
             let term = self.terminal.lock();

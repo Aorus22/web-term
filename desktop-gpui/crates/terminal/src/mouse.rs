@@ -80,10 +80,52 @@ pub fn modifiers_to_mouse_code(modifiers: &Modifiers) -> u8 {
     code
 }
 
-/// Generate SGR (1006) mouse button report escape sequences.
+/// Generate SGR (1006) mouse button press/release escape sequences.
+///
+/// Release is encoded with button code 3 (`\x1b[<3;x;ym`) per the SGR
+/// spec — strict parsers (e.g. bubbletea/opencode) reject releases that
+/// echo the press button code.
 pub fn mouse_button_report(
     button: MouseButton,
     pressed: bool,
+    point: AlacPoint,
+    modifiers: u8,
+    mode: TermMode,
+) -> Option<Vec<u8>> {
+    if !mode
+        .intersects(TermMode::MOUSE_REPORT_CLICK | TermMode::MOUSE_MOTION | TermMode::MOUSE_DRAG)
+    {
+        return None;
+    }
+
+    let button_code = if pressed {
+        match button {
+            MouseButton::Left => 0,
+            MouseButton::Middle => 1,
+            MouseButton::Right => 2,
+            _ => return None,
+        }
+    } else {
+        // Release: button 3 regardless of which button was released.
+        3
+    };
+
+    let button_value = button_code | modifiers;
+    let col = point.column.0 + 1;
+    let row = point.line.0 + 1;
+    let action = if pressed { b'M' } else { b'm' };
+
+    let sequence = format!("\x1b[<{};{};{}{}", button_value, col, row, action as char);
+    Some(sequence.into_bytes())
+}
+
+/// Generate SGR (1006) mouse drag-motion escape sequences.
+///
+/// Motion while a button is held must set bit 32 on top of the button
+/// code (`\x1b[<32;x;yM` for left-drag); without it strict parsers see
+/// repeated presses instead of a drag and drop the gesture.
+pub fn mouse_drag_report(
+    button: MouseButton,
     point: AlacPoint,
     modifiers: u8,
     mode: TermMode,
@@ -101,12 +143,11 @@ pub fn mouse_button_report(
         _ => return None,
     };
 
-    let button_value = button_code | modifiers;
+    let button_value = button_code | 32 | modifiers;
     let col = point.column.0 + 1;
     let row = point.line.0 + 1;
-    let action = if pressed { b'M' } else { b'm' };
 
-    let sequence = format!("\x1b[<{};{};{}{}", button_value, col, row, action as char);
+    let sequence = format!("\x1b[<{};{};{}M", button_value, col, row);
     Some(sequence.into_bytes())
 }
 
@@ -228,8 +269,25 @@ mod tests {
         let press = mouse_button_report(MouseButton::Left, true, pt, 0, mode).unwrap();
         assert_eq!(String::from_utf8(press).unwrap(), "\x1b[<0;10;5M");
 
+        // SGR release always uses button code 3.
         let release = mouse_button_report(MouseButton::Left, false, pt, 0, mode).unwrap();
-        assert_eq!(String::from_utf8(release).unwrap(), "\x1b[<0;10;5m");
+        assert_eq!(String::from_utf8(release).unwrap(), "\x1b[<3;10;5m");
+    }
+
+    #[test]
+    fn test_mouse_drag_report_sets_motion_bit() {
+        let pt = AlacPoint::new(Line(4), Column(9));
+        let mode = TermMode::MOUSE_REPORT_CLICK;
+
+        // Left-drag motion: button 0 + motion bit 32.
+        let drag = mouse_drag_report(MouseButton::Left, pt, 0, mode).unwrap();
+        assert_eq!(String::from_utf8(drag).unwrap(), "\x1b[<32;10;5M");
+
+        // No reporting mode -> no drag events.
+        assert_eq!(
+            mouse_drag_report(MouseButton::Left, pt, 0, TermMode::empty()),
+            None
+        );
     }
 
     #[test]

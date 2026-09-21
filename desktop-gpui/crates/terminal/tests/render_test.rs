@@ -299,7 +299,7 @@ fn test_mouse_reporting_and_coordinates() {
     );
     assert_eq!(
         String::from_utf8(sgr_release.unwrap()).unwrap(),
-        "\x1b[<0;11;3m"
+        "\x1b[<3;11;3m"
     );
 
     let sel_type = selection_type_from_clicks(1);
