@@ -1339,21 +1339,26 @@ impl AppState {
 
     /// Escape closes the topmost overlay (popover > menus > dialogs >
     /// sheets), matching the web client's dismissal behavior.
-    pub fn handle_escape(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Returns true if the key was consumed (overlay dismissed or ESC
+    /// forwarded to the terminal).
+    /// When no overlay is open and a terminal is visible, forwards ESC
+    /// (`\x1b`) to the active terminal so vim/helix/fzf keep working —
+    /// otherwise the global `escape` binding would swallow it silently.
+    pub fn handle_escape(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.terminal_context_menu.is_some() {
             self.terminal_context_menu = None;
             cx.notify();
-            return;
+            return true;
         }
         if self.show_new_tab_popover {
             self.show_new_tab_popover = false;
             cx.notify();
-            return;
+            return true;
         }
         if self.sftp_manager.context_menu.is_some() {
             self.sftp_manager.context_menu = None;
             cx.notify();
-            return;
+            return true;
         }
         if self.sftp_manager.left_pane.show_actions_menu
             || self.sftp_manager.right_pane.show_actions_menu
@@ -1361,52 +1366,52 @@ impl AppState {
             self.sftp_manager.left_pane.show_actions_menu = false;
             self.sftp_manager.right_pane.show_actions_menu = false;
             cx.notify();
-            return;
+            return true;
         }
         if self.sftp_manager.modal.is_some() {
             self.sftp_close_modal(cx);
-            return;
+            return true;
         }
         if self.delete_key_target.is_some() || self.key_delete_warning.is_some() {
             self.cancel_delete_key_modal(cx);
-            return;
+            return true;
         }
         if self.delete_connection_target.is_some() {
             self.cancel_delete_connection_modal(cx);
-            return;
+            return true;
         }
         if self.delete_forward_target.is_some() {
             self.close_delete_forward_modal(cx);
-            return;
+            return true;
         }
         if self.pending_close_tab.is_some() {
             self.cancel_close_tab(cx);
-            return;
+            return true;
         }
         if self.connection_modal.is_some() || self.connection_sheet_closing {
             self.close_connection_modal(cx);
-            return;
+            return true;
         }
         if self.edit_key_modal.is_some() || self.edit_key_sheet_closing {
             self.close_edit_key_modal(cx);
-            return;
+            return true;
         }
         if self.show_add_key_modal || self.add_key_sheet_closing {
             self.close_add_key_modal(cx);
-            return;
+            return true;
         }
         if self.forward_modal.is_some() || self.forward_sheet_closing {
             self.close_forward_modal(cx);
-            return;
+            return true;
         }
         if self.pending_passphrase_conn.is_some() {
             self.cancel_passphrase(window, cx);
-            return;
+            return true;
         }
         if self.show_font_dialog {
             self.show_font_dialog = false;
             cx.notify();
-            return;
+            return true;
         }
         if self.show_theme_mode_picker
             || self.show_cursor_style_picker
@@ -1418,7 +1423,24 @@ impl AppState {
             self.show_scrollback_picker = false;
             self.show_font_dialog_picker = false;
             cx.notify();
+            return true;
         }
+        // No overlay consumed: forward ESC to the visible terminal, if any.
+        // (TerminalView::on_key_down deliberately ignores Escape so the
+        // byte is delivered exactly once, via this path.)
+        if self.active_view == View::Hosts && !self.show_hosts_catalog {
+            if let Some(view) = self
+                .session_manager
+                .active_tab()
+                .and_then(|t| t.view.clone())
+            {
+                view.update(cx, |v, _cx| {
+                    v.write_to_pty(b"\x1b");
+                });
+                return true;
+            }
+        }
+        false
     }
 
     /// Toggle new tab launcher popover on the plus button.

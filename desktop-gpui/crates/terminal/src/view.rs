@@ -437,6 +437,13 @@ impl TerminalView {
     }
 
     fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        // Escape is owned by the global `EscapeOverlays` action (see
+        // AppState::handle_escape), which forwards it to the PTY when no
+        // overlay is open. Sending it here too would deliver it twice.
+        if event.keystroke.key.eq_ignore_ascii_case("escape") {
+            return;
+        }
+
         // Clipboard shortcuts:
         // Ctrl+Shift+C or Cmd+C -> Copy
         let is_copy = (event.keystroke.modifiers.control
