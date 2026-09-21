@@ -1310,14 +1310,17 @@ impl AppState {
         self.settings.glass_enabled
     }
 
+    pub fn glass_backdrop(&self) -> webterm_settings::GlassBackdrop {
+        self.settings.glass_backdrop
+    }
+
     /// The persisted glass fill alpha, clamped to the readable window.
     pub fn glass_opacity(&self) -> f32 {
         crate::glass::clamp_opacity(self.settings.glass_opacity)
     }
 
     /// Toggle the Liquid Glass material and re-apply the window backdrop, so a
-    /// compositor that supports real backdrop blur (KWin/Hyprland) starts or
-    /// stops blurring with it.
+    /// compositor that can blur starts or stops frosting with it.
     pub fn set_glass_enabled(
         &mut self,
         enabled: bool,
@@ -1326,7 +1329,21 @@ impl AppState {
     ) {
         self.settings.glass_enabled = enabled;
         let _ = self.settings.save();
-        crate::glass::apply_backdrop_material(window, enabled);
+        crate::glass::apply_backdrop_material(window, enabled, self.settings.glass_backdrop);
+        cx.notify();
+    }
+
+    /// Choose what the window asks a compositor to paint behind the glass; see
+    /// [`crate::glass::desired_backdrop`].
+    pub fn set_glass_backdrop(
+        &mut self,
+        backdrop: webterm_settings::GlassBackdrop,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.settings.glass_backdrop = backdrop;
+        let _ = self.settings.save();
+        crate::glass::apply_backdrop_material(window, self.settings.glass_enabled, backdrop);
         cx.notify();
     }
 

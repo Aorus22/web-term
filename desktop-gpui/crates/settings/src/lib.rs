@@ -31,6 +31,22 @@ pub enum Theme {
     System,
 }
 
+/// What the window asks the compositor to paint behind the glass.
+///
+/// `Blurred` is the frosted backdrop that makes the material read as glass;
+/// `Translucent` keeps the plain transparent backdrop the CSD frame relied on
+/// before the material existed. The compositor decides whether it can blur at
+/// all (GNOME gained `ext-background-effect-v1` in Mutter 51, KWin in 6.7), so
+/// choosing explicitly here beats guessing from the session: where no blur is
+/// available the two look identical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum GlassBackdrop {
+    #[default]
+    Blurred,
+    Translucent,
+}
+
 /// Window dimensions and layout state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct WindowState {
@@ -90,6 +106,12 @@ fn default_glass_opacity() -> f32 {
     0.85
 }
 
+/// Frosted, because a compositor that cannot blur falls back to the same pixels
+/// `Translucent` would produce, so this never makes a session look worse.
+fn default_glass_backdrop() -> GlassBackdrop {
+    GlassBackdrop::Blurred
+}
+
 /// Desktop settings store holding UI preferences and encryption key custody.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DesktopSettings {
@@ -119,6 +141,8 @@ pub struct DesktopSettings {
     pub glass_enabled: bool,
     #[serde(default = "default_glass_opacity")]
     pub glass_opacity: f32,
+    #[serde(default = "default_glass_backdrop")]
+    pub glass_backdrop: GlassBackdrop,
     #[serde(default)]
     pub window_state: Option<WindowState>,
     #[serde(default)]
@@ -145,6 +169,7 @@ impl Default for DesktopSettings {
             scrollback: default_scrollback(),
             glass_enabled: default_glass_enabled(),
             glass_opacity: default_glass_opacity(),
+            glass_backdrop: default_glass_backdrop(),
             window_state: None,
             last_backend_url: None,
             open_sessions: Vec::new(),

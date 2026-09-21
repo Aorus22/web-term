@@ -27,6 +27,12 @@ desktop-tauri/node_modules
 !run-tauri.sh
 !desktop-tauri/
 
+# Local gpui blur patch (desktop-gpui/scripts/patch-gpui.sh). Both are generated
+# on demand and are not part of the tree: a checkout without them builds stock
+# gpui with a translucent-only window.
+/.cargo/config.toml
+desktop-gpui/vendor/
+
 # OS
 .DS_Store
 Thumbs.db

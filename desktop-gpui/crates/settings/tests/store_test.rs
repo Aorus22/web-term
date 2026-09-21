@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use webterm_settings::paths;
-use webterm_settings::{is_valid_64_hex, DesktopSettings, Theme, WindowState};
+use webterm_settings::{is_valid_64_hex, DesktopSettings, GlassBackdrop, Theme, WindowState};
 
 #[test]
 fn test_roundtrip_persist() {
@@ -44,6 +44,63 @@ fn test_corrupt_file_recovery() {
 
     let bak_file = settings_file.with_extension("json.bak");
     assert!(bak_file.exists(), "corrupt file should be preserved as settings.json.bak");
+}
+
+#[test]
+fn test_glass_fields_roundtrip() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path();
+
+    let mut settings = DesktopSettings::load_from(base).unwrap();
+    // Defaults must be the glass look the material shipped with.
+    assert!(settings.glass_enabled);
+    assert_eq!(settings.glass_backdrop, GlassBackdrop::Blurred);
+
+    settings.glass_enabled = false;
+    settings.glass_opacity = 0.68;
+    settings.glass_backdrop = GlassBackdrop::Translucent;
+    settings.save().unwrap();
+
+    let loaded = DesktopSettings::load_from(base).unwrap();
+    assert!(!loaded.glass_enabled);
+    assert_eq!(loaded.glass_opacity, 0.68);
+    assert_eq!(loaded.glass_backdrop, GlassBackdrop::Translucent);
+}
+
+#[test]
+fn test_settings_without_glass_fields_keep_loading() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path();
+
+    paths::ensure_dirs_with_base(base).unwrap();
+    let settings_file = paths::settings_path_with_base(base);
+    // A file written before the glass material existed: no glass keys at all.
+    fs::write(
+        &settings_file,
+        r#"{"theme":"light","font_size":13.0,"scrollback":4000}"#,
+    )
+    .unwrap();
+
+    let loaded = DesktopSettings::load_from(base).unwrap();
+    assert_eq!(loaded.theme, Theme::Light);
+    assert_eq!(loaded.scrollback, 4000);
+    assert!(loaded.glass_enabled, "missing key must fall back to the glass default");
+    assert_eq!(loaded.glass_opacity, 0.85);
+    assert_eq!(loaded.glass_backdrop, GlassBackdrop::Blurred);
+    assert!(
+        !settings_file.with_extension("json.bak").exists(),
+        "a pre-glass file is not corrupt and must not be quarantined"
+    );
+}
+
+#[test]
+fn test_backdrop_serialises_by_name() {
+    // The value in settings.json is user-visible and hand-editable, so it must
+    // stay a name rather than a number across serde changes.
+    let json = serde_json::to_string(&GlassBackdrop::Translucent).unwrap();
+    assert_eq!(json, "\"translucent\"");
+    let parsed: GlassBackdrop = serde_json::from_str("\"blurred\"").unwrap();
+    assert_eq!(parsed, GlassBackdrop::Blurred);
 }
 
 #[test]

@@ -85,8 +85,14 @@ run_appimage_tool() {
 log "Building Go backend (release)"
 (cd "$ROOT/be" && go build -ldflags "-s -w" -o "$GPUI_DIR/target/release/$BACKEND_NAME" ./cmd/server)
 
+# The glass backdrop needs a locally patched gpui (see scripts/patch-gpui.sh).
+log "Applying the gpui backdrop-blur patch"
+"$SCRIPT_DIR/patch-gpui.sh"
+
 log "Building release binary (cargo build --release -p webterm)"
-cargo build --release --manifest-path "$GPUI_DIR/Cargo.toml" --package webterm
+# Cargo only sees the patched crate when it runs from the repository root,
+# where patch-gpui.sh writes the generated .cargo/config.toml.
+(cd "$ROOT" && cargo build --release --manifest-path "$GPUI_DIR/Cargo.toml" --package webterm)
 BIN="$GPUI_DIR/target/release/$BIN_NAME"
 [[ -x "$BIN" ]] || fail "release binary missing: $BIN"
 BACKEND_BIN="$GPUI_DIR/target/release/$BACKEND_NAME"

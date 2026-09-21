@@ -178,35 +178,62 @@ fn test_app_state_glass_style_tracks_the_setting_and_the_theme() {
 }
 
 #[test]
-fn test_glass_backdrop_is_opt_in_per_compositor() {
-    // `backdrop_blur_available` only reports true for the Wayland compositors
-    // that implement org_kde_kwin_blur; the rest of the world gets the plain
-    // transparent backdrop the CSD frame already uses.
-    let wayland = std::env::var_os("WAYLAND_DISPLAY");
-    let desktop = std::env::var("XDG_CURRENT_DESKTOP").ok();
+fn test_backdrop_setting_decides_the_window_material() {
+    use gpui::WindowBackgroundAppearance::{Blurred, Transparent};
+    use webterm_settings::GlassBackdrop;
+
+    // The setting is the choice, and the patched gpui asks the compositor for
+    // the blur: `Blurred` on a Wayland session, nothing else.
+    assert_eq!(
+        glass::desired_backdrop(true, GlassBackdrop::Blurred, true),
+        Blurred
+    );
+    assert_eq!(
+        glass::desired_backdrop(true, GlassBackdrop::Translucent, true),
+        Transparent
+    );
+
+    // X11, macOS and Windows have no protocol to ask a compositor for a blur,
+    // so they keep the transparent backdrop the CSD frame relies on — even
+    // when the setting says Frost.
+    assert_eq!(
+        glass::desired_backdrop(true, GlassBackdrop::Blurred, false),
+        Transparent
+    );
+
+    // Turning the material off restores the plain window regardless.
+    assert_eq!(
+        glass::desired_backdrop(false, GlassBackdrop::Blurred, true),
+        Transparent
+    );
+
+    // Both choices the Settings page offers are reachable, and they name the
+    // two backdrop states rather than two labels for one.
+    let labels: Vec<&str> = glass::BACKDROP_STEPS.iter().map(|(label, _)| *label).collect();
+    assert_eq!(labels, vec!["Frost", "Translucent"]);
+    assert!(glass::BACKDROP_STEPS
+        .iter()
+        .any(|(_, backdrop)| *backdrop == GlassBackdrop::Blurred));
+}
+
+#[test]
+fn test_wayland_session_is_read_from_the_environment() {
+    let saved = std::env::var_os("WAYLAND_DISPLAY");
 
     std::env::remove_var("WAYLAND_DISPLAY");
-    std::env::set_var("XDG_CURRENT_DESKTOP", "KDE");
-    assert!(!glass::backdrop_blur_available(), "X11/KDE must not claim blur");
+    assert!(!glass::wayland_session(), "an X11 session has no blur path");
 
-    if wayland.is_some() {
-        std::env::set_var("WAYLAND_DISPLAY", "wayland-0");
-        std::env::set_var("XDG_CURRENT_DESKTOP", "GNOME");
-        assert!(!glass::backdrop_blur_available(), "GNOME has no blur protocol");
-        std::env::set_var("XDG_CURRENT_DESKTOP", "Hyprland");
-        assert!(glass::backdrop_blur_available());
-        std::env::set_var("XDG_CURRENT_DESKTOP", "KDE");
-        assert!(glass::backdrop_blur_available());
-    }
+    std::env::set_var("WAYLAND_DISPLAY", "wayland-9");
+    assert!(glass::wayland_session());
 
-    // Restore whatever the test runner had.
-    match wayland {
+    // An empty value is what a stripped environment leaves behind; gpui's own
+    // compositor guess treats it as absent, and so does this.
+    std::env::set_var("WAYLAND_DISPLAY", "");
+    assert!(!glass::wayland_session());
+
+    match saved {
         Some(v) => std::env::set_var("WAYLAND_DISPLAY", v),
         None => std::env::remove_var("WAYLAND_DISPLAY"),
-    }
-    match desktop {
-        Some(v) => std::env::set_var("XDG_CURRENT_DESKTOP", v),
-        None => std::env::remove_var("XDG_CURRENT_DESKTOP"),
     }
 }
 
@@ -217,14 +244,24 @@ fn test_glass_settings_roundtrip_and_legacy_defaults() {
     let mut settings = DesktopSettings::load_from(&base).expect("should load defaults");
     assert!(settings.glass_enabled, "glass is on by default");
     assert_eq!(settings.glass_opacity, glass::DEFAULT_OPACITY);
+    assert_eq!(
+        settings.glass_backdrop,
+        webterm_settings::GlassBackdrop::Blurred,
+        "frost is the default backdrop"
+    );
 
     settings.glass_enabled = false;
     settings.glass_opacity = 0.68;
+    settings.glass_backdrop = webterm_settings::GlassBackdrop::Translucent;
     settings.save_to(&base).expect("should save");
 
     let reloaded = DesktopSettings::load_from(&base).expect("should reload");
     assert!(!reloaded.glass_enabled);
     assert_eq!(reloaded.glass_opacity, 0.68);
+    assert_eq!(
+        reloaded.glass_backdrop,
+        webterm_settings::GlassBackdrop::Translucent
+    );
 
     // A file written before the material existed has no glass keys at all and
     // must still load — with the defaults, not with a deserialization error
@@ -235,11 +272,16 @@ fn test_glass_settings_roundtrip_and_legacy_defaults() {
     let obj = json.as_object_mut().expect("object");
     obj.remove("glass_enabled");
     obj.remove("glass_opacity");
+    obj.remove("glass_backdrop");
     std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).expect("write legacy");
 
     let legacy = DesktopSettings::load_from(&base).expect("legacy file must load");
     assert!(legacy.glass_enabled);
     assert_eq!(legacy.glass_opacity, glass::DEFAULT_OPACITY);
+    assert_eq!(
+        legacy.glass_backdrop,
+        webterm_settings::GlassBackdrop::Blurred
+    );
     // The unrelated fields survived the round trip, i.e. nothing was reset.
     assert_eq!(legacy.theme, SettingsTheme::Dark);
     assert!(legacy.theme_preset == "default-dark");

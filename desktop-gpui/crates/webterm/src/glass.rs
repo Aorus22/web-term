@@ -14,10 +14,10 @@
 //! # What this deliberately is not
 //!
 //! GPUI 0.3.3 has no `backdrop-filter`: there is no way to blur what is behind
-//! an element, and `WindowBackgroundAppearance::Blurred` only does anything on
-//! Wayland compositors that expose `org_kde_kwin_blur` (KWin, Hyprland) — GNOME
-//! ignores it. So on GNOME the glass is a genuine translucent tint over the
-//! desktop, not a frosted blur. Two things follow, and both are load-bearing:
+//! an *element*, so the surfaces above stay translucent tints rather than
+//! frosted panes. The *window* can be blurred, because that is a compositor's
+//! job — see [`desired_backdrop`] and the `gpui-pre-linux` patch under
+//! `desktop-gpui/patches/`. Two things follow, and both are load-bearing:
 //!
 //! 1. Overlay surfaces (dialogs, sheets, menus, toasts) sit over the app's own
 //!    content rather than over the desktop. A translucent panel over terminal
@@ -30,9 +30,12 @@
 //! Turning the feature off must restore the previous pixels exactly, so the
 //! opaque path here returns the theme's own values and the plain elevation
 //! stack — no rim, no polarity ink.
+//!
+//! Operator-facing documentation, including how to check the blur on a
+//! compositor that implements it: `desktop-gpui/docs/liquid-glass.md`.
 
 use gpui::{hsla, px, BoxShadow, Hsla, Rgba, Window};
-use webterm_settings::DesktopSettings;
+use webterm_settings::{DesktopSettings, GlassBackdrop};
 
 /// Alpha of the overlay fill, i.e. the value the Settings control writes.
 pub const DEFAULT_OPACITY: f32 = 0.85;
@@ -52,6 +55,13 @@ const CHROME_FLOOR: f32 = 0.45;
 
 /// Settings presets, strongest glass last. Labels are what the UI shows.
 pub const INTENSITY_STEPS: [(&str, f32); 3] = [("Subtle", 0.94), ("Medium", 0.85), ("Bold", 0.68)];
+
+/// The backdrop choices the Settings page offers, in the order it shows them,
+/// so the page and its tests agree on the labels.
+pub const BACKDROP_STEPS: [(&str, GlassBackdrop); 2] = [
+    ("Frost", GlassBackdrop::Blurred),
+    ("Translucent", GlassBackdrop::Translucent),
+];
 
 /// Which side of the window a glass surface lives on. They do not share an
 /// alpha because what shows through them differs: chrome is over the desktop,
@@ -197,47 +207,59 @@ pub fn shade_ink(is_dark: bool) -> Hsla {
     }
 }
 
-/// Whether the compositor can blur what is behind the window.
+/// Whether this is a Wayland session, the only Linux backend that can carry a
+/// backdrop blur at all.
 ///
-/// Only the KDE blur protocol (`org_kde_kwin_blur`, implemented by KWin and
-/// Hyprland) can do this, and gpui's Wayland backend is the only one that binds
-/// it — X11 and GNOME sessions get nothing. Asking the platform would be
-/// better, but gpui exposes no query, so this reads the desktop session the way
-/// the compositor itself identifies it.
-pub fn backdrop_blur_available() -> bool {
-    if std::env::var_os("WAYLAND_DISPLAY").is_none() {
-        return false;
-    }
-    let desktop = std::env::var("XDG_CURRENT_DESKTOP")
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    desktop.contains("kde") || desktop.contains("hyprland")
+/// X11 has no client-side protocol to ask for one, and neither do macOS and
+/// Windows through gpui, so those keep the backdrop they already had.
+pub fn wayland_session() -> bool {
+    std::env::var_os("WAYLAND_DISPLAY").is_some_and(|display| !display.is_empty())
 }
 
-/// Pick the window backdrop for the current glass setting.
+/// The backdrop the window should ask for, given the glass settings.
 ///
-/// `Transparent` is what the CSD frame already relies on (rounded corners show
-/// real desktop); `Blurred` is the same thing plus a backdrop blur where the
-/// compositor implements one. On GNOME the two are identical, so this never
-/// makes the window worse — it only upgrades sessions that can frost it.
+/// `Blurred` is the frost. The patched `gpui-pre-linux` (see
+/// `desktop-gpui/patches/`) binds `ext-background-effect-v1` — the protocol
+/// implemented by KWin 6.7+, Mutter 51+ (GNOME 51) and Hyprland — and keeps
+/// KDE's older `org_kde_kwin_blur` as the fallback, so this asks the compositor
+/// for a blur and lets it decide. Where nothing implements either protocol,
+/// gpui hands over the same transparent surface it would for `Transparent`, so
+/// asking costs nothing and the setting has no wrong answer to guess at.
 ///
-/// Only Linux is touched: X11 has no blur protocol to bind (so it lands on the
-/// `Transparent` the window already had), and macOS/Windows keep whatever
-/// backdrop the window was created with rather than have this repo's CI — which
-/// covers neither — guess at theirs.
-pub fn apply_backdrop_material(window: &mut Window, glass_enabled: bool) {
+/// `Transparent` is what the CSD frame has always relied on: rounded corners
+/// show the real desktop instead of a fused rectangle.
+pub fn desired_backdrop(
+    glass_enabled: bool,
+    backdrop: GlassBackdrop,
+    wayland: bool,
+) -> gpui::WindowBackgroundAppearance {
+    use gpui::WindowBackgroundAppearance;
+    if !glass_enabled || !wayland {
+        return WindowBackgroundAppearance::Transparent;
+    }
+    match backdrop {
+        GlassBackdrop::Blurred => WindowBackgroundAppearance::Blurred,
+        GlassBackdrop::Translucent => WindowBackgroundAppearance::Transparent,
+    }
+}
+
+/// Apply [`desired_backdrop`] to a window.
+///
+/// Only Linux is routed through it: on macOS and Windows the window keeps
+/// whatever backdrop it was created with rather than have this repo's CI —
+/// which covers neither — guess at theirs.
+pub fn apply_backdrop_material(window: &mut Window, glass_enabled: bool, backdrop: GlassBackdrop) {
     #[cfg(target_os = "linux")]
     {
-        let appearance = if glass_enabled && backdrop_blur_available() {
-            gpui::WindowBackgroundAppearance::Blurred
-        } else {
-            gpui::WindowBackgroundAppearance::Transparent
-        };
-        window.set_background_appearance(appearance);
+        window.set_background_appearance(desired_backdrop(
+            glass_enabled,
+            backdrop,
+            wayland_session(),
+        ));
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (window, glass_enabled);
+        let _ = (window, glass_enabled, backdrop);
     }
 }
 

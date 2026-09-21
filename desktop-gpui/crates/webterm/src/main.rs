@@ -99,10 +99,15 @@ fn main() {
                 }
             }
 
-            // Liquid Glass: keep the transparent backdrop the CSD frame relies
-            // on, upgraded to a real frost where the compositor implements one
-            // (KWin/Hyprland on Wayland). A no-op everywhere else.
-            glass::apply_backdrop_material(window, settings.glass_enabled);
+            // Liquid Glass: the transparent backdrop the CSD frame relies on,
+            // upgraded to a real frost where the compositor implements a blur
+            // protocol — the patched gpui binds ext-background-effect-v1, so
+            // that now includes GNOME 51+. A no-op everywhere else.
+            glass::apply_backdrop_material(
+                window,
+                settings.glass_enabled,
+                settings.glass_backdrop,
+            );
 
             window_state::observe(window, settings_for_observe, cx);
 

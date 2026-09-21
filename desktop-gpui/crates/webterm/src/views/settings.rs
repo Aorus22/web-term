@@ -8,6 +8,8 @@
 //! - WINDOW section:
 //!   - Liquid Glass switch (translucent window chrome).
 //!   - Glass Intensity presets (Subtle / Medium / Bold).
+//!   - Backdrop choice (Frost / Translucent), i.e. whether the window asks the
+//!     compositor to blur what is behind it.
 //! - TERMINAL section (omitting web-only terminal type & engine):
 //!   - Font pill button opening Terminal Font dialog.
 //!   - Cursor Style dropdown ("block", "underline", "bar").
@@ -18,7 +20,7 @@
 //!   pinned instead of scrolling with this page.
 
 use crate::app_state::AppState;
-use crate::glass::INTENSITY_STEPS;
+use crate::glass::{BACKDROP_STEPS, INTENSITY_STEPS};
 use gpui::*;
 use gpui_component::input::Input;
 use gpui_component::scroll::{Scrollbar, ScrollbarMode};
@@ -93,6 +95,7 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let cursor_blink_active = app.cursor_blink;
     let glass_active = app.glass_enabled();
     let glass_opacity = app.glass_opacity();
+    let glass_backdrop = app.glass_backdrop();
     let font_display = format!(
         "{} {:.0}px",
         app.terminal_font_family, app.terminal_font_size
@@ -731,6 +734,74 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                                                 MouseButton::Left,
                                                                 cx.listener(move |this, _, _window, cx| {
                                                                     this.set_glass_opacity(opacity, cx);
+                                                                }),
+                                                            )
+                                                    },
+                                                )),
+                                        ),
+                                )
+                                // Divider
+                                .child(div().h(px(1.0)).bg(border_color).w_full())
+                                // Row 3: Backdrop — what the compositor is asked
+                                // to paint behind the glass.
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .justify_between()
+                                        .px_4()
+                                        .py_3()
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_col()
+                                                .child(
+                                                    div()
+                                                        .text_sm()
+                                                        .font_weight(FontWeight::MEDIUM)
+                                                        .text_color(text_color)
+                                                        .child("Backdrop"),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(muted_text)
+                                                        .child("Frost needs compositor blur (GNOME 51+, KWin 6.7+, Hyprland); without one it looks the same as Translucent"),
+                                                ),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_1()
+                                                .children(BACKDROP_STEPS.iter().map(
+                                                    |(label, backdrop)| {
+                                                        let backdrop = *backdrop;
+                                                        let active = backdrop == glass_backdrop;
+                                                        div()
+                                                            .px_3()
+                                                            .py_1p5()
+                                                            .rounded_md()
+                                                            .bg(if active { primary_color } else { tag_bg })
+                                                            .text_xs()
+                                                            .font_weight(FontWeight::MEDIUM)
+                                                            .text_color(if active {
+                                                                primary_fg
+                                                            } else {
+                                                                text_color
+                                                            })
+                                                            .cursor_pointer()
+                                                            .id(ElementId::Name(
+                                                                format!("settings-backdrop-{label}").into(),
+                                                            ))
+                                                            .hover(|s| s.opacity(0.9))
+                                                            .child(*label)
+                                                            .on_mouse_down(
+                                                                MouseButton::Left,
+                                                                cx.listener(move |this, _, window, cx| {
+                                                                    this.set_glass_backdrop(backdrop, window, cx);
                                                                 }),
                                                             )
                                                     },
