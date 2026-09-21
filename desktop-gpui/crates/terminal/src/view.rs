@@ -6,6 +6,7 @@
 use crate::colors::ColorPalette;
 use crate::event::TerminalEvent;
 use crate::input::keystroke_to_bytes;
+use crate::input::wrap_paste_payload;
 use crate::mouse::{
     modifiers_to_mouse_code, mouse_button_report, pixel_to_cell_with_side, scroll_report,
     selection_type_from_clicks,
@@ -336,10 +337,20 @@ impl TerminalView {
     }
 
     /// Paste text from system clipboard into terminal input.
+    ///
+    /// When the hosted app enabled bracketed paste (private mode 2004,
+    /// e.g. opencode, vim, helix), the payload is wrapped in
+    /// `\x1b[200~...\x1b[201~` markers so the app treats it as a single
+    /// paste instead of fast keystrokes. Otherwise bytes go raw.
     pub fn paste_clipboard(&self, cx: &mut Context<Self>) -> bool {
         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
             if !text.is_empty() {
-                self.write_to_pty(text.as_bytes());
+                let bracketed = self
+                    .terminal
+                    .lock()
+                    .mode()
+                    .contains(alacritty_terminal::term::TermMode::BRACKETED_PASTE);
+                self.write_to_pty(&wrap_paste_payload(&text, bracketed));
                 return true;
             }
         }

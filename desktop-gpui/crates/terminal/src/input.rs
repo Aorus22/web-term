@@ -153,6 +153,27 @@ pub fn keystroke_to_bytes(keystroke: &Keystroke, mode: TermMode) -> Option<Vec<u
     None
 }
 
+/// Build the byte payload for a clipboard paste.
+///
+/// When the hosted app enabled bracketed paste (private mode 2004),
+/// wraps the text in `\x1b[200~...\x1b[201~` markers so the app treats
+/// it as a single paste instead of fast keystrokes. Raw ESC bytes are
+/// stripped from the payload first so clipboard content cannot break
+/// out of the markers and smuggle escape sequences to the PTY (same
+/// policy as the web client). Without bracketed mode the text goes
+/// through untouched.
+pub fn wrap_paste_payload(text: &str, bracketed: bool) -> Vec<u8> {
+    if !bracketed {
+        return text.as_bytes().to_vec();
+    }
+    let safe = text.replace('\x1b', "");
+    let mut out = Vec::with_capacity(safe.len() + 12);
+    out.extend_from_slice(b"\x1b[200~");
+    out.extend_from_slice(safe.as_bytes());
+    out.extend_from_slice(b"\x1b[201~");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,6 +302,28 @@ mod tests {
         assert_eq!(
             keystroke_to_bytes(&ctrl_d, TermMode::empty()),
             Some(vec![0x04])
+        );
+    }
+
+    #[test]
+    fn test_paste_raw_without_bracketed_mode() {
+        assert_eq!(wrap_paste_payload("echo hi\n", false), b"echo hi\n");
+    }
+
+    #[test]
+    fn test_paste_wrapped_with_bracketed_mode() {
+        assert_eq!(
+            wrap_paste_payload("a\nb\n", true),
+            b"\x1b[200~a\nb\n\x1b[201~"
+        );
+    }
+
+    #[test]
+    fn test_paste_strips_esc_to_prevent_breakout() {
+        // Embedded \x1b[201~ must not be able to close the markers early.
+        assert_eq!(
+            wrap_paste_payload("x\x1b[201~y", true),
+            b"\x1b[200~x[201~y\x1b[201~"
         );
     }
 
