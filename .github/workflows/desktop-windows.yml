@@ -1,0 +1,80 @@
+name: Test (Windows)
+
+# Windows responsibility: the native leg of the GPUI client. Linux is covered by
+# test-linux.yml (inside docker/Dockerfile.test), packaging by build-appimage.yml.
+#
+# No GTK headers are needed here: the desktop-theme probe is Linux-only, and
+# crates/webterm/Cargo.toml gates the `gtk` / `x11rb` dependencies on
+# `cfg(target_os = "linux")`. Before that split, gtk-sys's build script called
+# `system_deps::probe()` and killed the build on any machine without GTK3.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'be/**'
+      - 'desktop-gpui/**'
+      - '.github/workflows/desktop-windows.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'be/**'
+      - 'desktop-gpui/**'
+      - '.github/workflows/desktop-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go toolchain
+        uses: actions/setup-go@v7
+        with:
+          # Matches the golang:1.27-bookworm sidecar in docker/Dockerfile.build
+          # and docker/Dockerfile.test.
+          go-version: '1.27.x'
+          cache-dependency-path: be/go.sum
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-gpui
+
+      - name: Run Go tests
+        run: |
+          cd be
+          go test ./...
+
+      - name: Build Go backend fixture
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "desktop-gpui/test-support")) { New-Item -ItemType Directory -Path "desktop-gpui/test-support" }
+          cd be
+          go build -o ../desktop-gpui/test-support/backend.exe ./cmd/server
+
+      - name: Run workspace tests
+        run: cargo test --workspace --manifest-path desktop-gpui/Cargo.toml
+        env:
+          # Absolute on purpose: cargo runs each test binary from its own crate
+          # directory, so a repo-relative path never resolves for the supervisor
+          # and chaos tests and they skip their live checks silently.
+          TEST_BACKEND_PATH: ${{ github.workspace }}/desktop-gpui/test-support/backend.exe
+
+      - name: Build workspace release
+        run: cargo build --workspace --manifest-path desktop-gpui/Cargo.toml --release

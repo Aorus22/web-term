@@ -22,6 +22,11 @@ pub enum SettingsError {
 }
 
 /// UI theme preference.
+///
+/// `Gtk` follows the running desktop's own GTK palette (user CSS first, then
+/// the GTK3 theme engine) — see `webterm::gtk_theme`. It is a distinct variant
+/// rather than a flag on `System` because it is not a light/dark *choice*: the
+/// desktop palette decides its own polarity at runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
@@ -29,6 +34,43 @@ pub enum Theme {
     Dark,
     Light,
     System,
+    Gtk,
+}
+
+impl Theme {
+    /// User-facing name, shared by Settings and the theme card caption.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Theme::Dark => "Dark",
+            Theme::Light => "Light",
+            Theme::System => "System",
+            Theme::Gtk => "Desktop (GTK)",
+        }
+    }
+
+    /// Canonical config string (matches the serde representation).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Theme::Dark => "dark",
+            Theme::Light => "light",
+            Theme::System => "system",
+            Theme::Gtk => "gtk",
+        }
+    }
+
+    /// Parse a persisted value, tolerating the spellings a hand-edited
+    /// `settings.json` plausibly carries. Unknown values fall back to the
+    /// default rather than failing the whole load.
+    pub fn parse(value: &str) -> Option<Theme> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "dark" => Some(Theme::Dark),
+            "light" => Some(Theme::Light),
+            "system" | "auto" => Some(Theme::System),
+            // `desktop` / `desktop-gtk` are the labels users see and may type.
+            "gtk" | "desktop" | "desktop-gtk" | "desktop (gtk)" => Some(Theme::Gtk),
+            _ => None,
+        }
+    }
 }
 
 /// Window dimensions and layout state.
@@ -251,4 +293,58 @@ impl DesktopSettings {
 /// Validate 64 lowercase hex characters.
 pub fn is_valid_64_hex(key: &str) -> bool {
     key.len() == 64 && key.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn theme_serializes_lowercase_and_round_trips() {
+        for (theme, wire) in [
+            (Theme::Dark, "\"dark\""),
+            (Theme::Light, "\"light\""),
+            (Theme::System, "\"system\""),
+            (Theme::Gtk, "\"gtk\""),
+        ] {
+            assert_eq!(serde_json::to_string(&theme).unwrap(), wire);
+            let parsed: Theme = serde_json::from_str(wire).unwrap();
+            assert_eq!(parsed, theme);
+        }
+    }
+
+    /// Configs written before `Gtk` existed must keep parsing unchanged.
+    #[test]
+    fn legacy_settings_files_still_load() {
+        let legacy = r#"{"theme":"system","theme_preset":"nord-dark","font_size":15.0}"#;
+        let settings: DesktopSettings = serde_json::from_str(legacy).unwrap();
+        assert_eq!(settings.theme, Theme::System);
+        assert_eq!(settings.theme_preset, "nord-dark");
+        assert_eq!(settings.font_size, 15.0);
+        // Fields absent from the old file keep their serde defaults.
+        assert_eq!(settings.scrollback, 1000);
+        assert_eq!(settings.cursor_style, "block");
+        assert!(settings.glass_enabled);
+    }
+
+    #[test]
+    fn gtk_theme_loads_from_settings_json() {
+        let settings: DesktopSettings = serde_json::from_str(r#"{"theme":"gtk"}"#).unwrap();
+        assert_eq!(settings.theme, Theme::Gtk);
+        assert_eq!(settings.theme.label(), "Desktop (GTK)");
+        assert_eq!(settings.theme.as_str(), "gtk");
+    }
+
+    #[test]
+    fn theme_parse_accepts_known_spellings_and_rejects_junk() {
+        assert_eq!(Theme::parse("dark"), Some(Theme::Dark));
+        assert_eq!(Theme::parse("SYSTEM"), Some(Theme::System));
+        assert_eq!(Theme::parse("auto"), Some(Theme::System));
+        assert_eq!(Theme::parse("gtk"), Some(Theme::Gtk));
+        assert_eq!(Theme::parse("desktop"), Some(Theme::Gtk));
+        assert_eq!(Theme::parse("desktop-gtk"), Some(Theme::Gtk));
+        assert_eq!(Theme::parse(" Desktop (GTK) "), Some(Theme::Gtk));
+        assert_eq!(Theme::parse("solarized"), None);
+        assert_eq!(Theme::parse(""), None);
+    }
 }

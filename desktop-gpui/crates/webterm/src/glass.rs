@@ -30,6 +30,17 @@
 //! Turning the feature off must restore the previous pixels exactly, so the
 //! opaque path here returns the theme's own values and the plain elevation
 //! stack — no rim, no polarity ink.
+//!
+//! # Interaction with the CSD frame outline
+//!
+//! The 1px frame outline painted by `AppState::render` is the **outermost**
+//! border: it is drawn last, on top of every leaf, and it traces the rounded
+//! card with the theme's `border_color()`. Where a glass hairline happens to
+//! coincide with a window edge (the sidebar's rim, the tab strip's top edge)
+//! the frame outline wins, so the window still reads as one card on a bright
+//! wallpaper — which is the whole point of it. The glass hairline and inset rim
+//! stay meaningful for the surfaces *inside* that frame: sheets, dialogs, menus
+//! and toasts all keep their own translucent edge.
 
 use gpui::{hsla, px, BoxShadow, Hsla, Rgba, Window};
 use webterm_settings::DesktopSettings;

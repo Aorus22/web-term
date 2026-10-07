@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+
+# WebTerm — TEST environment (Go backend + Rust workspace).
+#
+# Same system-header set as docker/Dockerfile.build (the workspace links gpui and
+# the GTK theme probe, so compiling the tests needs the exact same libs), plus the
+# Go toolchain minus the AppImage packaging extras. Go is here on purpose: this is
+# the image the Linux CI leg runs, and that leg is responsible for
+#
+#   * `go test ./...` for the backend, and
+#   * building `desktop-gpui/test-support/backend`, the fixture the supervisor /
+#     SFTP / chaos integration tests shell out to (they skip themselves when it
+#     is absent).
+#
+# Both then run inside this image, so the live tests exercise a backend built by
+# the same glibc as the test process.
+#
+#   docker build -f docker/Dockerfile.test -t webterm-test .
+#   docker run --rm -v "$PWD:/src" -w /src/be webterm-test go test ./...
+#   docker run --rm -v "$PWD:/src" -w /src/desktop-gpui webterm-test \
+#     cargo test --workspace --locked
+#
+# GitHub Actions: .github/workflows/test-linux.yml
+
+FROM golang:1.27-bookworm AS go-src
+
+FROM rust:1.98-slim-bookworm
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential pkg-config ca-certificates \
+      clang libclang-dev \
+      libfontconfig1-dev libfreetype-dev \
+      libx11-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+      libwayland-dev libvulkan-dev \
+      libgtk-3-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Go toolchain — backend tests + the live-test fixture.
+COPY --from=go-src /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+RUN go version && cargo --version
+
+WORKDIR /src

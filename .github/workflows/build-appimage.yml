@@ -1,0 +1,195 @@
+name: Build AppImage
+
+# The AppImages are produced by docker/Dockerfile.build via
+# docker/build-appimage.sh, so CI and a local run use byte-identical toolchains
+# (see docker/README.md).
+#
+# Two variants come out of one build, because the client links GTK3 for the
+# desktop-theme probe:
+#
+#   WebTerm-GPUI_<version>_x86_64.AppImage       lean; GTK3 comes from the host
+#   WebTerm-GPUI_<version>_x86_64-gtk.AppImage   GTK3 bundled; runs anywhere
+#
+# What each ref gets:
+#   master   -> Actions artifact + rolling "latest" GitHub Release
+#   v* tag   -> versioned GitHub Release
+#   PR       -> Actions artifact only (nothing is published)
+#
+# The rolling release keeps a stable download URL per variant:
+#   https://github.com/<owner>/<repo>/releases/download/latest/WebTerm-GPUI_<version>_x86_64.AppImage
+#   https://github.com/<owner>/<repo>/releases/download/latest/WebTerm-GPUI_<version>_x86_64-gtk.AppImage
+#
+# No `paths:` filter on purpose: a `v*` tag push must always produce a release,
+# and the script itself decides what to rebuild.
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-appimage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  appimage:
+    name: Linux x86_64 AppImage
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache cargo / go downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/go/pkg/mod
+          key: build-caches-${{ runner.os }}-${{ hashFiles('desktop-gpui/Cargo.lock', 'be/go.sum') }}
+          restore-keys: |
+            build-caches-${{ runner.os }}-
+
+      - name: Build builder image
+        run: docker build -f docker/Dockerfile.build -t webterm-build .
+
+      - name: Build AppImage
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v "$HOME/.cargo/registry:/usr/local/cargo/registry" \
+            -v "$HOME/.cargo/git:/usr/local/cargo/git" \
+            -v "$HOME/go/pkg/mod:/root/go/pkg/mod" \
+            -w /src \
+            webterm-build bash docker/build-appimage.sh
+
+      # Checks the end-user contract per variant, from the artifacts themselves:
+      # the lean AppImage must not carry libgtk-3.so.0, the -gtk one must.
+      - name: Verify variants
+        run: |
+          set -euo pipefail
+          ls -l desktop-gpui/dist
+          cat desktop-gpui/dist/SHA256SUMS.txt
+
+          work="$(mktemp -d)"
+          echo
+          for image in "$PWD"/desktop-gpui/dist/WebTerm-GPUI_*.AppImage; do
+            name="$(basename "$image")"
+            if [[ "$name" == *-gtk.AppImage ]]; then
+              want_gtk=yes
+            else
+              want_gtk=no
+            fi
+
+            rm -rf "${work:?}/squashfs-root"
+            ( cd "$work" && "$image" --appimage-extract >/dev/null )
+
+            has_gtk=no
+            if [[ -e "$work/squashfs-root/usr/lib/libgtk-3.so.0" ]]; then
+              has_gtk=yes
+            fi
+            libs="$(find "$work/squashfs-root/usr/lib" -maxdepth 1 \( -type f -o -type l \) | wc -l)"
+
+            printf '%-44s libs=%-4s gtk-bundled=%-4s expected=%s\n' "$name" "$libs" "$has_gtk" "$want_gtk"
+            if [[ "$has_gtk" != "$want_gtk" ]]; then
+              echo "variant contract broken: $name has gtk-bundled=$has_gtk, expected $want_gtk" >&2
+              exit 1
+            fi
+          done
+
+      # The build container runs as root, so the mount-backed caches come back
+      # root-owned (cargo also unpacks registry sources read-only) and the
+      # actions/cache post step would then fail to tar them. Hand them back.
+      - name: Fix cache ownership
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo" "$HOME/go" || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: WebTerm-GPUI-AppImage-${{ github.sha }}
+          path: |
+            desktop-gpui/dist/WebTerm-GPUI_*.AppImage
+            desktop-gpui/dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      # A master push keeps the rolling `latest` release current, a v* tag
+      # publishes that tag. Same assets either way, so a download URL stays
+      # valid across merges.
+      - name: Publish release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Both variants travel together, so a release download never depends on
+          # which artifact the workflow happened to pick.
+          mapfile -t APPIMAGES < <(ls desktop-gpui/dist/WebTerm-GPUI_*.AppImage)
+          if [[ "${#APPIMAGES[@]}" -ne 2 ]]; then
+            echo "expected 2 AppImage variants, found ${#APPIMAGES[@]}" >&2
+            exit 1
+          fi
+
+          LEAN=""
+          BUNDLED=""
+          for image in "${APPIMAGES[@]}"; do
+            case "$(basename "$image")" in
+              *-gtk.AppImage) BUNDLED="$image" ;;
+              *) LEAN="$image" ;;
+            esac
+          done
+          if [[ -z "$LEAN" || -z "$BUNDLED" ]]; then
+            echo "expected one lean and one -gtk AppImage, got: ${APPIMAGES[*]}" >&2
+            exit 1
+          fi
+
+          VERSION="$(basename "${LEAN}" | sed -E 's/^WebTerm-GPUI_([0-9.]+)_.*/\1/')"
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            TITLE="WebTerm GPUI ${TAG}"
+            # The tag is what triggered this run, so it already exists.
+            CREATE_ARGS=(--verify-tag)
+          else
+            TAG="latest"
+            TITLE="WebTerm GPUI - latest from master"
+            # Rolling tag: create it on the first master build, then just move
+            # the assets along on later ones.
+            CREATE_ARGS=(--target "${GITHUB_SHA}")
+          fi
+
+          {
+            echo "AppImage v${VERSION} built from \`${GITHUB_SHA:0:7}\` on \`${GITHUB_REF_NAME}\`."
+            echo
+            echo "| asset | variant | needs GTK3 on the host | sha256 |"
+            echo "| --- | --- | --- | --- |"
+            echo "| \`$(basename "${LEAN}")\` | lean | yes | \`$(sha256sum "${LEAN}" | cut -d' ' -f1)\` |"
+            echo "| \`$(basename "${BUNDLED}")\` | GTK3 bundled | no | \`$(sha256sum "${BUNDLED}" | cut -d' ' -f1)\` |"
+            echo
+            echo "Download:"
+            echo
+            echo '```bash'
+            echo "gh release download ${TAG} --repo ${GITHUB_REPOSITORY} --pattern '*.AppImage'"
+            echo '```'
+          } > notes.md
+
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${APPIMAGES[@]}" desktop-gpui/dist/SHA256SUMS.txt --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --title "${TITLE}" --notes-file notes.md
+          else
+            gh release create "${TAG}" "${APPIMAGES[@]}" desktop-gpui/dist/SHA256SUMS.txt \
+              --repo "${GITHUB_REPOSITORY}" --title "${TITLE}" --notes-file notes.md "${CREATE_ARGS[@]}"
+          fi
+
+          gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json url,assets \
+            --jq '.url, (.assets[] | "  " + .name + "  " + (.size | tostring) + " bytes")'

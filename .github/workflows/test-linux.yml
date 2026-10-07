@@ -1,0 +1,106 @@
+name: Test (Linux)
+
+# Linux responsibility. All of it runs inside docker/Dockerfile.test, so CI and a
+# local run share one toolchain (see docker/README.md):
+#
+#   1. `go test ./...`                    -> the backend
+#   2. build test-support/backend         -> the fixture the supervisor / SFTP /
+#                                            chaos tests spawn (they skip without it)
+#   3. `cargo test --workspace --locked`  -> the GPUI workspace, all 7 live checks on
+#                                            (TEST_BACKEND_PATH, absolute)
+#
+# Windows lives in desktop-windows.yml and packaging in build-appimage.yml, so no
+# test runs twice.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'be/**'
+      - 'desktop-gpui/**'
+      - 'docker/**'
+      - '.github/workflows/test-linux.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'be/**'
+      - 'desktop-gpui/**'
+      - 'docker/**'
+      - '.github/workflows/test-linux.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Go + Rust (docker test image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache cargo / go downloads and builds
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: test-linux-${{ runner.os }}-${{ hashFiles('desktop-gpui/Cargo.lock', 'be/go.sum') }}
+          restore-keys: |
+            test-linux-${{ runner.os }}-
+
+      - name: Build test image
+        run: docker build -f docker/Dockerfile.test -t webterm-test .
+
+      - name: Go tests
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v "$HOME/go/pkg/mod:/root/go/pkg/mod" \
+            -v "$HOME/.cache/go-build:/root/.cache/go-build" \
+            -w /src/be \
+            webterm-test go test ./...
+
+      - name: Build live-test backend fixture
+        run: |
+          # The fixture is gitignored, so a fresh clone does not have it: without
+          # this step the integration tests quietly skip themselves.
+          mkdir -p desktop-gpui/test-support
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v "$HOME/go/pkg/mod:/root/go/pkg/mod" \
+            -v "$HOME/.cache/go-build:/root/.cache/go-build" \
+            -w /src/be \
+            webterm-test go build -o ../desktop-gpui/test-support/backend ./cmd/server
+
+      - name: Rust workspace tests
+        env:
+          # Absolute in-container path on purpose. Each test crate has its own
+          # candidate list relative to *its* directory (cargo runs test binaries
+          # from the crate root), so auto-discovery only finds the fixture for
+          # some of them: 4 of the 7 live checks silently skip without this.
+          TEST_BACKEND_PATH: /src/desktop-gpui/test-support/backend
+        run: |
+          docker run --rm \
+            -e TEST_BACKEND_PATH \
+            -v "$PWD:/src" \
+            -v "$HOME/.cargo/registry:/usr/local/cargo/registry" \
+            -v "$HOME/.cargo/git:/usr/local/cargo/git" \
+            -w /src/desktop-gpui \
+            webterm-test cargo test --workspace --locked
+
+      # The container runs as root, so the mount-backed caches come back
+      # root-owned (cargo also unpacks registry sources read-only) and the
+      # actions/cache post step would then fail to tar them. Hand them back.
+      - name: Fix cache ownership
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" "$HOME/.cargo" "$HOME/go" "$HOME/.cache" || true

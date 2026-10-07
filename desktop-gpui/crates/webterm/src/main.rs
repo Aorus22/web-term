@@ -7,7 +7,9 @@ use std::sync::Arc;
 use webterm::actions;
 use webterm::app_state::AppState;
 use webterm::bundle::resolve_backend_path;
+use webterm::csd;
 use webterm::glass;
+use webterm::gtk_theme;
 use webterm::theme;
 use webterm::window_state;
 use webterm_settings::DesktopSettings;
@@ -17,6 +19,15 @@ fn main() {
     // 0. Enter Tokio runtime context so all Tokio primitives (timers, channels, reqwest)
     // work across the main GPUI thread and foreground async tasks.
     let _tokio_guard = webterm::app_state::TOKIO_RT.enter();
+
+    // 0a. GTK has to be initialized on this (main) thread *before* any theme is
+    // resolved and before any other GTK consumer. The probe reuses this to read
+    // the desktop palette; when it fails the app keeps its built-in presets.
+    if gtk_theme::init() {
+        // Warm the cache so the first frame already carries desktop colours
+        // when `Desktop (GTK)` is the persisted mode.
+        let _ = gtk_theme::palette();
+    }
 
     // 1. Headless bootstrap: load settings, ensure encryption key, resolve paths
     let mut settings = DesktopSettings::load().unwrap_or_default();
@@ -51,7 +62,7 @@ fn main() {
 
         // Initialize gpui-component subsystem and keybindings
         gpui_component::init(cx);
-        theme::apply_theme(settings.theme, cx);
+        theme::apply_theme(settings.theme, &settings.theme_preset, cx);
         actions::bind_tab_keys(cx);
 
         let window_options = WindowOptions {
@@ -75,7 +86,10 @@ fn main() {
         };
 
         let settings_for_observe = settings_arc.clone();
-        let _ = cx.open_window(window_options, move |window, cx| {
+        let handle = cx.open_window(window_options, move |window, cx| {
+            // X11 takes the window name from here; the CSD extents locator
+            // matches on it (Wayland uses the same value via set_window_title).
+            window.set_window_title(csd::MAIN_WINDOW_TITLE);
             #[cfg(target_os = "windows")]
             {
                 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -109,6 +123,8 @@ fn main() {
             let app_state = cx.new(|_cx| AppState::new(settings, spawn_opts));
             app_state.update(cx, |this, cx| {
                 this.start_supervisor(cx);
+                // ~1 s desktop-theme watcher (no-op when GTK is unavailable).
+                this.watch_gtk_theme(cx);
             });
             // Input states need a Window; create them before first render.
             app_state.update(cx, |this, cx| {
@@ -116,5 +132,15 @@ fn main() {
             });
             app_state
         });
+
+        // 0b. Advertise the CSD shadow margin so mutter stops drawing its own
+        // square shadow behind the rounded corners (X11 only, best-effort,
+        // retried in the background until the X window exists).
+        if let Ok(handle) = handle {
+            let scale_factor = handle
+                .update(cx, |_, window, _| window.scale_factor())
+                .unwrap_or(1.0);
+            csd::advertise_frame_extents(csd::MAIN_WINDOW_TITLE, scale_factor);
+        }
     });
 }

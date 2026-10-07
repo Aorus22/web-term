@@ -2,6 +2,7 @@
 
 use gpui::*;
 use parking_lot::Mutex;
+#[cfg(target_os = "windows")]
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::sync::Arc;
 use webterm_settings::{DesktopSettings, WindowState};
@@ -157,21 +158,37 @@ pub fn restore(settings: &DesktopSettings) -> Option<WindowBounds> {
 }
 
 /// Helper to extract WindowState from current Window state.
+///
+/// # CSD frame extents
+///
+/// When [`crate::csd::extents_active`] the compositor grew the client by
+/// `2 * WINDOW_SHADOW_MARGIN` and moved its origin out by the top-left extent
+/// (`_GTK_FRAME_EXTENTS` semantics). Geometry is persisted in **card**
+/// coordinates — the frame the user actually sees and the size the window
+/// request must carry — so both are converted back here. On Wayland (or when
+/// the property was never written) the correction is zero and the values are
+/// the plain client bounds, exactly as before.
 pub fn extract_window_state(
     window: &Window,
     prev_state: Option<&WindowState>,
 ) -> Option<WindowState> {
     let bounds = window.bounds();
-    let current_width = (bounds.size.width / px(1.0)) as u32;
-    let current_height = (bounds.size.height / px(1.0)) as u32;
+    let margin = crate::csd::WINDOW_SHADOW_MARGIN;
+    let inset = if crate::csd::extents_active() {
+        margin
+    } else {
+        0.0
+    };
+    let current_width = ((bounds.size.width / px(1.0)) - 2.0 * inset).max(0.0) as u32;
+    let current_height = ((bounds.size.height / px(1.0)) - 2.0 * inset).max(0.0) as u32;
 
     // Degenerate geometry guard
     if current_width == 0 || current_height == 0 {
         return None;
     }
 
-    let x = (bounds.origin.x / px(1.0)) as i32;
-    let y = (bounds.origin.y / px(1.0)) as i32;
+    let x = (bounds.origin.x / px(1.0)) as i32 + inset as i32;
+    let y = (bounds.origin.y / px(1.0)) as i32 + inset as i32;
 
     // Guard against Windows minimized coordinates (-32000 or -25600)
     if x <= -10000 || y <= -10000 {
