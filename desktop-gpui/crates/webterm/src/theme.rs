@@ -3044,8 +3044,9 @@ mod tests {
             0x5b648e
         );
         assert_eq!(readable_muted(0x5c6370, &[0x353a44, 0x282c34], 0xabb2bf), 0x707784);
-        // A colour far off the floor still converges (worst case: fg itself).
-        assert_eq!(readable_muted(0x202020, &[0x202020], 0xffffff), 0xffffff);
+        // A colour pinned to its own surface still converges — to the first
+        // 5% blend that clears the floor (t=0.30), never further than needed.
+        assert_eq!(readable_muted(0x202020, &[0x202020], 0xffffff), 0x636363);
     }
 
     #[test]
