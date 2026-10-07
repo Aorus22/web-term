@@ -119,6 +119,28 @@ pub fn mouse_button_report(
     Some(sequence.into_bytes())
 }
 
+/// Generate SGR (1006) mouse hover (no-button motion) escape sequences.
+///
+/// Only sent when the app enabled any-motion tracking (1003): button 3
+/// + motion bit 32 (`\x1b[<35;x;yM`). Powers hover effects in TUIs like
+/// opencode's session list.
+pub fn mouse_hover_report(
+    point: AlacPoint,
+    modifiers: u8,
+    mode: TermMode,
+) -> Option<Vec<u8>> {
+    if !mode.intersects(TermMode::MOUSE_MOTION) {
+        return None;
+    }
+
+    let button_value = 3 | 32 | modifiers;
+    let col = point.column.0 + 1;
+    let row = point.line.0 + 1;
+
+    let sequence = format!("\x1b[<{};{};{}M", button_value, col, row);
+    Some(sequence.into_bytes())
+}
+///
 /// Generate SGR (1006) mouse drag-motion escape sequences.
 ///
 /// Motion while a button is held must set bit 32 on top of the button
@@ -288,6 +310,25 @@ mod tests {
             mouse_drag_report(MouseButton::Left, pt, 0, TermMode::empty()),
             None
         );
+    }
+
+    #[test]
+    fn test_mouse_hover_report_format_and_gating() {
+        let pt = AlacPoint::new(Line(4), Column(9));
+
+        // Hover requires any-motion tracking (1003).
+        assert_eq!(
+            mouse_hover_report(pt, 0, TermMode::empty()),
+            None
+        );
+        assert_eq!(
+            mouse_hover_report(pt, 0, TermMode::MOUSE_REPORT_CLICK),
+            None
+        );
+
+        // Button 3 + motion bit 32, no button actually held.
+        let hover = mouse_hover_report(pt, 0, TermMode::MOUSE_MOTION).unwrap();
+        assert_eq!(String::from_utf8(hover).unwrap(), "\x1b[<35;10;5M");
     }
 
     #[test]

@@ -8,7 +8,7 @@ use crate::event::TerminalEvent;
 use crate::input::keystroke_to_bytes;
 use crate::input::wrap_paste_payload;
 use crate::mouse::{
-    modifiers_to_mouse_code, mouse_button_report, mouse_drag_report,
+    modifiers_to_mouse_code, mouse_button_report, mouse_drag_report, mouse_hover_report,
     pixel_to_cell_with_side, scroll_report, selection_type_from_clicks,
 };
 use crate::render::TerminalRenderer;
@@ -42,6 +42,9 @@ pub struct TerminalView {
     focus_handle: FocusHandle,
     padding: Edges<Pixels>,
     is_selecting: bool,
+    /// Last cell a hover report was sent for (dedupe: plain mouse movement
+    /// must not flood the PTY when any-motion tracking is on).
+    last_hover_cell: Option<AlacPoint>,
     scrollbar_drag: Option<ScrollbarDrag>,
     /// Fractional pixel remainder from smooth-scroll (touchpad) deltas that
     /// were too small to form a whole line. Without this, sub-cell-height
@@ -133,6 +136,7 @@ impl TerminalView {
             focus_handle,
             padding: Edges::all(px(4.0)),
             is_selecting: false,
+            last_hover_cell: None,
             scrollbar_drag: None,
             scroll_remainder_px: 0.0,
             last_bounds: Arc::new(Mutex::new(None)),
@@ -577,6 +581,18 @@ impl TerminalView {
                 if let Some(bytes) = mouse_drag_report(button, pt, mouse_mods, mode) {
                     drop(term);
                     self.write_to_pty(&bytes);
+                }
+            } else if !event.modifiers.shift {
+                // No button held: hover motion for apps with any-motion
+                // tracking (1003). Deduplicated per cell.
+                if self.last_hover_cell != Some(pt) {
+                    self.last_hover_cell = Some(pt);
+                    let mode = term.mode();
+                    let mouse_mods = modifiers_to_mouse_code(&event.modifiers);
+                    if let Some(bytes) = mouse_hover_report(pt, mouse_mods, mode) {
+                        drop(term);
+                        self.write_to_pty(&bytes);
+                    }
                 }
             }
         }

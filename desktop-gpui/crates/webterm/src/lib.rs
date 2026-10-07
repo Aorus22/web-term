@@ -3,7 +3,9 @@
 pub mod actions;
 pub mod app_state;
 pub mod bundle;
+pub mod csd;
 pub mod glass;
+pub mod gtk_theme;
 pub mod icons;
 pub mod session;
 pub mod theme;

@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1
+
+# WebTerm — AppImage BUILD environment (Linux x86_64).
+#
+# This image carries the toolchain + system headers ONLY; the source tree is
+# never copied in. Callers mount the repo at /src and run the repo's own build
+# script, so the same image serves CI and a local one-off:
+#
+#   docker build -f docker/Dockerfile.build -t webterm-build .
+#   docker run --rm -v "$PWD:/src" -w /src webterm-build \
+#     bash docker/build-appimage.sh
+#
+# Result: both AppImage variants in the host tree, plus checksums — see
+# docker/README.md for the lean vs GTK3-bundled split. GitHub Actions does
+# exactly this (.github/workflows/build-appimage.yml).
+#
+# Base is Debian bookworm on purpose: its glibc (2.36) is OLDER than the target
+# desktops' (Fedora/Ubuntu), which is the safe direction for a portable
+# AppImage — the binary only needs symbols that already existed at build time.
+
+# Sidecar: pinned by tag, and only its toolchain is copied into the builder.
+FROM golang:1.27-bookworm AS go-src
+
+FROM rust:1.98-slim-bookworm AS build
+
+ARG DEBIAN_FRONTEND=noninteractive
+# Bumped here, not in the repo script: the script honours these two env vars, so
+# pinning the URLs in one place keeps the tool versions reproducible.
+ARG LINUXDEPLOY_URL=https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+ARG APPIMAGETOOL_URL=https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+
+# System build deps, in three groups:
+#   1. toolchain plumbing — pkg-config drives every `-sys` crate.
+#   2. clang/libclang — `gpui-pre` runs bindgen at build time, which loads
+#      libclang.
+#   3. window/GL/font stack — the GTK3 dev headers (the client links the `gtk`
+#      crate for the desktop-theme probe), fontconfig + freetype for text, and
+#      the X11/Wayland/Vulkan headers gpui links against.
+# `squashfs-tools` is not optional: desktop-gpui/scripts/build-appimage.sh
+# pre-flights `mksquashfs` before it does any work.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential pkg-config ca-certificates curl file \
+      clang libclang-dev \
+      libfontconfig1-dev libfreetype-dev \
+      libx11-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+      libwayland-dev libvulkan-dev \
+      libgtk-3-dev \
+      squashfs-tools \
+ && rm -rf /var/lib/apt/lists/*
+
+# Go toolchain — builds the `webterm-backend` sidecar the AppImage ships.
+COPY --from=go-src /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# Pin the two AppImage helpers into the image instead of letting the build fetch
+# them from GitHub mid-run. The repo script downloads through LINUXDEPLOY_URL /
+# APPIMAGETOOL_URL and runs each tool with `--appimage-extract-and-run` (no FUSE
+# in containers), so a `file://` URL is all it takes to swap in these copies.
+# The `--version` calls below fail the image build if a tool cannot execute
+# headless, which is where a broken CI run would otherwise show up 20 minutes in.
+RUN curl -fsSL -o /opt/linuxdeploy-x86_64.AppImage "${LINUXDEPLOY_URL}" \
+ && curl -fsSL -o /opt/appimagetool-x86_64.AppImage "${APPIMAGETOOL_URL}" \
+ && chmod +x /opt/linuxdeploy-x86_64.AppImage /opt/appimagetool-x86_64.AppImage \
+ && /opt/linuxdeploy-x86_64.AppImage --appimage-extract-and-run --version \
+ && /opt/appimagetool-x86_64.AppImage --appimage-extract-and-run --version
+
+ENV LINUXDEPLOY_URL=file:///opt/linuxdeploy-x86_64.AppImage \
+    APPIMAGETOOL_URL=file:///opt/appimagetool-x86_64.AppImage
+
+RUN go version && cargo --version
+
+WORKDIR /src

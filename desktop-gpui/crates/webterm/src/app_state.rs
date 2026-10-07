@@ -15,6 +15,7 @@ use webterm_supervisor::{BackendInfo, BackendStatus, SpawnOptions, Supervisor};
 use crate::session::{SessionStatus, TerminalSessionManager, TerminalTab};
 use crate::views::{nav::render_nav_shell, status::render_status_page};
 use gpui_component::input::{InputEvent, InputState, TextareaState};
+use gpui_component::ThemeMode;
 
 /// Editable text input entities shared by every form in the app.
 ///
@@ -1028,6 +1029,13 @@ pub struct AppState {
     pub backend_status: BackendStatus,
     pub client: Option<BackendClient>,
     pub theme: SettingsTheme,
+    /// Resolved desktop (GTK) palette, as a `ThemePreset`, when GTK mode is
+    /// selected and the probe succeeded. Render paths read this instead of
+    /// touching GTK (see `crate::gtk_theme` for the threading contract).
+    pub gtk_preset: Option<crate::theme::ThemePreset>,
+    /// Platform light/dark polarity used when GTK mode is selected but no
+    /// palette could be resolved (headless / GTK unavailable).
+    pub gtk_fallback_dark: bool,
     pub active_view: View,
     pub settings: DesktopSettings,
     pub spawn_opts: Option<SpawnOptions>,
@@ -1132,6 +1140,10 @@ impl AppState {
             backend_status: BackendStatus::Starting,
             client: None,
             theme,
+            // `main` warms the probe before the view exists, so the first
+            // render already has desktop colours when GTK mode is persisted.
+            gtk_preset: crate::gtk_theme::cached_palette().map(|p| p.to_preset()),
+            gtk_fallback_dark: true,
             active_view: View::Hosts,
             settings,
             spawn_opts,
@@ -1200,14 +1212,152 @@ impl AppState {
         }
     }
 
-    /// Retrieve the currently active ThemePreset.
-    pub fn current_theme(&self) -> &'static crate::theme::ThemePreset {
+    /// Retrieve the currently active `ThemePreset`.
+    ///
+    /// In **Desktop (GTK)** mode this is the resolved desktop palette (owned by
+    /// `self`, hence the plain `&` return); when the GTK probe failed it falls
+    /// back to a concrete preset by platform polarity so the UI still renders —
+    /// the Settings card says why.
+    pub fn current_theme(&self) -> &crate::theme::ThemePreset {
+        if self.theme == SettingsTheme::Gtk {
+            if let Some(preset) = self.gtk_preset.as_ref() {
+                return preset;
+            }
+            return crate::theme::find_theme_preset(if self.gtk_fallback_dark {
+                "default-dark"
+            } else {
+                "default-light"
+            });
+        }
         crate::theme::find_theme_preset(&self.settings.theme_preset)
     }
 
     /// Derive the terminal ColorPalette for the currently active theme preset.
     pub fn current_terminal_palette(&self) -> webterm_terminal::ColorPalette {
         crate::theme::terminal_palette_for_preset(self.current_theme())
+    }
+
+    /// Re-probe GTK (main thread only) and cache the result for this mode.
+    ///
+    /// Never called from render: `set_theme` and the ~1 s watcher are the only
+    /// entry points.
+    fn refresh_gtk_preset(&mut self, cx: &mut App) {
+        self.gtk_fallback_dark = ThemeMode::from(cx.window_appearance()).is_dark();
+        if self.theme == SettingsTheme::Gtk {
+            match crate::gtk_theme::palette() {
+                Some(palette) => self.gtk_preset = Some(palette.to_preset()),
+                None => {
+                    // No palette: drop any stale cache so `apply_theme` uses the
+                    // platform polarity instead of repainting last-known-good.
+                    crate::gtk_theme::invalidate_cache();
+                    self.gtk_preset = None;
+                }
+            }
+        } else {
+            self.gtk_preset = None;
+        }
+    }
+
+    /// Push the active palette into every open terminal view.
+    fn propagate_terminal_palette(&mut self, cx: &mut Context<Self>) {
+        let palette = self.current_terminal_palette();
+        for session in self.session_manager.tabs_mut() {
+            if let Some(ref view) = session.view {
+                let palette = palette.clone();
+                view.update(cx, |this, cx| {
+                    this.set_palette(palette, cx);
+                });
+            }
+        }
+    }
+
+    /// Caption for the Desktop (GTK) settings card: which theme was detected,
+    /// or the explicit fallback note when there is none.
+    pub fn gtk_theme_caption(&self) -> String {
+        if crate::gtk_theme::cached_palette().is_some() {
+            match crate::gtk_theme::cached_name() {
+                Some(name) if !name.is_empty() => {
+                    format!("Following the {name} desktop theme")
+                }
+                _ => "Following your GTK configuration".to_string(),
+            }
+        } else {
+            "GTK theme not detected — falling back to the system light/dark preference".to_string()
+        }
+    }
+
+    /// Poll the desktop theme about once a second and re-resolve on change.
+    ///
+    /// The cache key includes the user CSS mtime, so editing
+    /// `~/.config/gtk-4.0/gtk.css` repaints within ~1 s without a restart. GTK
+    /// is only ever touched from this main-thread loop — never from render.
+    pub fn watch_gtk_theme(&mut self, cx: &mut Context<Self>) {
+        if !crate::gtk_theme::is_available() {
+            return;
+        }
+        let view = cx.entity().downgrade();
+        cx.spawn(move |_view, cx: &mut AsyncApp| {
+            let view = view.clone();
+            let cx_handle = cx.clone();
+            async move {
+                let mut last_key = crate::gtk_theme::current_key();
+                loop {
+                    cx_handle
+                        .background_executor()
+                        .timer(std::time::Duration::from_millis(1000))
+                        .await;
+                    let key = crate::gtk_theme::current_key();
+                    if key == last_key {
+                        continue;
+                    }
+                    last_key = key;
+                    let alive = cx_handle.update(|cx: &mut App| {
+                        if let Some(app) = view.upgrade() {
+                            app.update(cx, |this, cx| {
+                                this.apply_desktop_theme(cx);
+                            });
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    if !alive {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Re-resolve the desktop palette and, when GTK mode is active, repaint
+    /// every window with it.
+    fn apply_desktop_theme(&mut self, cx: &mut Context<Self>) {
+        let palette = crate::gtk_theme::palette();
+        self.gtk_preset = palette.map(|palette| palette.to_preset());
+
+        if self.theme != SettingsTheme::Gtk {
+            // Keep the cache warm but leave the painted theme alone; the app is
+            // on a concrete preset/filter right now. Still repaint, so an open
+            // Settings page shows the new desktop preview immediately.
+            cx.notify();
+            return;
+        }
+
+        match palette {
+            Some(palette) => crate::theme::apply_gtk_to_component(&palette, cx),
+            None => {
+                // The probe lost the theme: drop the stale cache so the
+                // fallback below really uses the platform polarity, and keep
+                // the mode selected so it recovers when GTK comes back.
+                crate::gtk_theme::invalidate_cache();
+                self.gtk_preset = None;
+                crate::theme::apply_theme(SettingsTheme::Gtk, &self.settings.theme_preset, cx);
+            }
+        }
+        self.propagate_terminal_palette(cx);
+        cx.refresh_windows();
+        cx.notify();
     }
 
     /// Set a new theme preset, synchronize settings, update terminal palette, and trigger live redraw.
@@ -1220,19 +1370,14 @@ impl AppState {
             SettingsTheme::Light
         };
         self.settings.theme = self.theme;
+        // Leaving GTK mode: drop the desktop palette so `current_theme()` and
+        // the terminal stop reading it.
+        self.gtk_preset = None;
         let _ = self.settings.save();
 
-        crate::theme::apply_theme(self.theme, cx);
+        crate::theme::apply_theme(self.theme, &self.settings.theme_preset, cx);
 
-        let palette = self.current_terminal_palette();
-        for session in self.session_manager.tabs_mut() {
-            if let Some(ref view) = session.view {
-                let p = palette.clone();
-                view.update(cx, |this, cx| {
-                    this.set_palette(p, cx);
-                });
-            }
-        }
+        self.propagate_terminal_palette(cx);
 
         cx.notify();
     }
@@ -3588,28 +3733,30 @@ impl AppState {
     pub fn set_theme(&mut self, theme: SettingsTheme, cx: &mut Context<Self>) {
         self.theme = theme;
         self.settings.theme = self.theme;
-        let current_preset = self.current_theme();
-        if theme == SettingsTheme::Dark && !current_preset.is_dark {
+        // Resolve the desktop palette *before* reading the active preset, so GTK
+        // mode paints the right polarity on the very first frame after the click.
+        self.refresh_gtk_preset(cx);
+        let current_is_dark = self.current_theme().is_dark;
+        if theme == SettingsTheme::Dark && !current_is_dark {
             self.settings.theme_preset = "default-dark".to_string();
-        } else if theme == SettingsTheme::Light && current_preset.is_dark {
+        } else if theme == SettingsTheme::Light && current_is_dark {
             self.settings.theme_preset = "default-light".to_string();
         }
         let _ = self.settings.save();
 
-        crate::theme::apply_theme(self.theme, cx);
+        crate::theme::apply_theme(self.theme, &self.settings.theme_preset, cx);
 
-        let palette = self.current_terminal_palette();
-
-        for session in self.session_manager.tabs_mut() {
-            if let Some(ref view) = session.view {
-                let p = palette.clone();
-                view.update(cx, |this, cx| {
-                    this.set_palette(p, cx);
-                });
-            }
-        }
+        self.propagate_terminal_palette(cx);
 
         cx.notify();
+    }
+
+    /// Switch to the desktop (GTK) palette.
+    ///
+    /// When the probe is unavailable the mode is still persisted: it keeps
+    /// retrying (~1 s watcher) and the Settings card explains the fallback.
+    pub fn set_gtk_theme(&mut self, cx: &mut Context<Self>) {
+        self.set_theme(SettingsTheme::Gtk, cx);
     }
 
     /// Toggle theme between Dark and Light.
@@ -5745,9 +5892,23 @@ impl Render for AppState {
             BackendStatus::Ready => render_nav_shell(self, framed, cx),
             _ => {
                 let status = self.backend_status.clone();
+                // Status pages follow the same accessors as the shell, so
+                // Desktop (GTK) is applied from the very first frame.
+                let status_colors = crate::views::status::StatusColors {
+                    background: self.bg_color(),
+                    foreground: self.text_color(),
+                    muted_foreground: self.muted_text(),
+                    card: self.card_bg(),
+                    muted: self.muted_bg(),
+                    border: self.border_color(),
+                    destructive: self.destructive_color(),
+                    primary: self.primary_color(),
+                    primary_foreground: self.primary_fg(),
+                };
                 render_status_page(
                     &status,
                     key_secret,
+                    status_colors,
                     |this, _ev, _window, cx| {
                         this.start_supervisor(cx);
                     },
@@ -5757,13 +5918,21 @@ impl Render for AppState {
         };
 
         if !framed {
-            return div().size_full().child(content);
+            // Maximized / tiled: the frame is a plain rectangle, so the same
+            // 1px outline is kept — just without any corner radius, so it
+            // cannot leave a rounded sliver against the screen edge.
+            return div()
+                .size_full()
+                .border_1()
+                .border_color(self.border_color())
+                .child(content);
         }
 
         let tiling = match window.window_decorations() {
             Decorations::Client { tiling } => tiling,
             _ => Tiling::default(),
         };
+        let border_color = self.border_color();
         div().relative().size_full().child(
             div()
                 .relative()
@@ -5804,9 +5973,28 @@ impl Render for AppState {
                 .child(
                     div()
                         .size_full()
-                        .shadow_xl()
+                        // Our own shadow, painted into the transparent margin.
+                        // gpui rounds the shadow with the card's corners; the
+                        // compositor's square one is suppressed by the
+                        // `_GTK_FRAME_EXTENTS` we advertise (see crate::csd).
+                        .shadow(crate::csd::window_shadow())
                         .child(content),
                 ),
+        )
+        // 1px outline tracing the rounded card. It has to be a sibling painted
+        // *after* the content (a parent's border would sit under its children's
+        // opaque backgrounds), and it carries no mouse handler, so it never
+        // steals a press from the resize zones.
+        .child(
+            div()
+                .absolute()
+                .top(SHADOW_PADDING)
+                .left(SHADOW_PADDING)
+                .right(SHADOW_PADDING)
+                .bottom(SHADOW_PADDING)
+                .rounded(FRAME_ROUNDING)
+                .border_1()
+                .border_color(border_color),
         )
         // Resize zones attach to the outer window box (not the padded middle)
         // so the bands sit on the true window edges. Painted last = on top.
@@ -5814,8 +6002,9 @@ impl Render for AppState {
     }
 }
 
-/// Transparent margin around the panel so the compositor/app shadow has room.
-const SHADOW_PADDING: Pixels = px(12.0);
+/// Transparent margin around the panel so our own shadow has room, and the
+/// inset mutter treats as the frame once `_GTK_FRAME_EXTENTS` is advertised.
+const SHADOW_PADDING: Pixels = px(crate::csd::WINDOW_SHADOW_MARGIN);
 /// Width of the resize hit band at window edges (must stay within padding).
 const RESIZE_HIT: f32 = 6.0;
 /// Corner rounding for CSD leaves (mirrors Zed's 10px).

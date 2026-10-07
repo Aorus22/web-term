@@ -28,6 +28,14 @@ tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 raw-window-handle = "=0.6.2"
+dirs = { workspace = true }
+
+# Linux-only: the GTK theme probe needs the GTK3 dev headers, and the CSD frame
+# extents are an X11 (mutter/KWin) concept. Keeping these out of the other
+# targets means a Windows/macOS build never has to find libgtk-3.so.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = { workspace = true }
+x11rb = { workspace = true }
 
 [dev-dependencies]
 tokio-tungstenite = { workspace = true }

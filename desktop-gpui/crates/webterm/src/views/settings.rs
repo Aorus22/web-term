@@ -35,6 +35,149 @@ const THEME_ROW_H: f32 = 112.0;
 /// Four rows visible; the rest scrolls inside the grid region.
 const THEME_GRID_H: f32 = 448.0;
 
+/// The `Desktop (GTK)` option: a card with a live preview of the resolved
+/// desktop palette and a caption naming the detected theme.
+///
+/// `preview` is [`crate::gtk_theme::cached_palette`] — cached `Copy` data, so
+/// this render never touches GTK. When it is `None` the card shows the explicit
+/// "not detected" fallback note instead of a preview.
+fn render_desktop_theme_row(
+    active: bool,
+    preview: Option<crate::theme::GtkPalette>,
+    caption: String,
+    text_color: Rgba,
+    muted_text: Rgba,
+    primary_fg: Rgba,
+    border_color: Rgba,
+    secondary_bg: Rgba,
+    primary_color: Rgba,
+    cx: &mut Context<AppState>,
+) -> AnyElement {
+    let dot = |color: Rgba| div().size(px(8.0)).rounded_full().bg(color);
+
+    let swatch: AnyElement = match preview {
+        Some(palette) => div()
+            .h(px(56.0))
+            .w_full()
+            .rounded_md()
+            .p_2()
+            .flex()
+            .flex_col()
+            .justify_between()
+            .bg(rgb(palette.background))
+            .border_1()
+            .border_color(rgb(palette.border))
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .gap_1()
+                    .child(dot(rgb(palette.primary)))
+                    .child(dot(rgb(palette.success)))
+                    .child(dot(rgb(palette.warning)))
+                    .child(dot(rgb(palette.destructive))),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(
+                        div()
+                            .h(px(6.0))
+                            .w(px(160.0))
+                            .rounded_full()
+                            .bg(rgb(palette.card)),
+                    )
+                    .child(
+                        div()
+                            .h(px(4.0))
+                            .w(px(100.0))
+                            .rounded_full()
+                            .bg(rgb(palette.muted_foreground)),
+                    ),
+            )
+            .into_any_element(),
+        None => div()
+            .h(px(56.0))
+            .w_full()
+            .rounded_md()
+            .p_2()
+            .flex()
+            .items_center()
+            .bg(secondary_bg)
+            .border_1()
+            .border_color(border_color)
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(muted_text)
+                    .child("No GTK palette detected on this session"),
+            )
+            .into_any_element(),
+    };
+
+    div().px_4().py_4().child(
+        div()
+            .id("settings-desktop-theme")
+            .flex()
+            .flex_col()
+            .gap_3()
+            .p_3()
+            .rounded_lg()
+            .border_1()
+            .border_color(if active { primary_color } else { border_color })
+            .bg(secondary_bg)
+            .cursor_pointer()
+            .hover(|s| s.border_color(primary_color))
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_0p5()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(text_color)
+                                    .child("Desktop (GTK)"),
+                            )
+                            .child(div().text_xs().text_color(muted_text).child(caption)),
+                    )
+                    .child(
+                        div()
+                            .px_2()
+                            .py_1()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(if active { primary_color } else { border_color })
+                            .bg(if active {
+                                primary_color
+                            } else {
+                                rgba(0x00000000)
+                            })
+                            .text_xs()
+                            .text_color(if active { primary_fg } else { text_color })
+                            .child(if active { "Active" } else { "Follow desktop" }),
+                    ),
+            )
+            .child(swatch)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _window, cx| {
+                    this.set_gtk_theme(cx);
+                }),
+            ),
+    )
+    .into_any_element()
+}
+
 /// Render the settings page matching Electron 1:1.
 pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> AnyElement {
     let card_bg = app.card_bg();
@@ -42,11 +185,19 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
     let text_color = app.text_color();
     let muted_text = app.muted_text();
     let tag_bg = app.muted_bg();
+    let secondary_bg = app.secondary_bg();
     let primary_color = app.primary_color();
     let primary_fg = app.primary_fg();
     let accent_color = app.accent_color();
     let accent_fg = app.accent_fg();
     let theme_mode = app.theme_mode_filter.clone();
+
+    // Desktop (GTK) row: the resolved palette drives a live preview, and the
+    // caption names the detected theme (or explains the fallback). This is
+    // plain cached data — no GTK access from the render path.
+    let gtk_active = app.theme == webterm_settings::Theme::Gtk;
+    let gtk_preview = crate::gtk_theme::cached_palette();
+    let gtk_caption = app.gtk_theme_caption();
 
     // Filter presets according to theme mode
     let filtered_presets: Vec<&'static crate::theme::ThemePreset> = crate::theme::THEME_PRESETS
@@ -292,6 +443,23 @@ pub fn render_settings_view(app: &mut AppState, cx: &mut Context<AppState>) -> A
                                             None
                                         }),
                                 )
+                                // Divider Line
+                                .child(div().h(px(1.0)).bg(border_color).w_full())
+                                // Row 1b: Desktop (GTK) — follow the running
+                                // desktop palette, with a live preview of the
+                                // colours the probe resolved.
+                                .child(render_desktop_theme_row(
+                                    gtk_active,
+                                    gtk_preview,
+                                    gtk_caption,
+                                    text_color,
+                                    muted_text,
+                                    primary_fg,
+                                    border_color,
+                                    secondary_bg,
+                                    primary_color,
+                                    cx,
+                                ))
                                 // Divider Line
                                 .child(div().h(px(1.0)).bg(border_color).w_full())
                                 // Row 2: Color Theme Cards Grid

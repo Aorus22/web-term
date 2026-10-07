@@ -13,6 +13,25 @@
 use gpui::*;
 use webterm_supervisor::BackendStatus;
 
+/// Theme colours for the full-window status pages.
+///
+/// These used to be hardcoded zinc literals, which made `Desktop (GTK)` look
+/// half-applied the moment the backend was still starting (or had failed): the
+/// status page kept painting zinc while the shell followed the desktop. The
+/// caller resolves them through the app's own accessors.
+#[derive(Clone, Copy)]
+pub struct StatusColors {
+    pub background: Rgba,
+    pub foreground: Rgba,
+    pub muted_foreground: Rgba,
+    pub card: Rgba,
+    pub muted: Rgba,
+    pub border: Rgba,
+    pub destructive: Rgba,
+    pub primary: Rgba,
+    pub primary_foreground: Rgba,
+}
+
 /// Redact encryption key material and secret tokens from stderr lines.
 ///
 /// Keeps at most 10 newest lines and replaces key material with `[REDACTED]`.
@@ -53,6 +72,7 @@ pub fn redact_key_material(text: &str, key_secret: Option<&str>) -> Vec<String> 
 pub fn render_status_page<V: 'static>(
     status: &BackendStatus,
     key_secret: Option<&str>,
+    colors: StatusColors,
     on_retry: impl Fn(&mut V, &MouseDownEvent, &mut Window, &mut Context<V>) + 'static + Clone,
     cx: &mut Context<V>,
 ) -> AnyElement {
@@ -64,17 +84,23 @@ pub fn render_status_page<V: 'static>(
                 .size_full()
                 .items_center()
                 .justify_center()
-                .bg(rgb(0x18181b))
-                .text_color(rgb(0xf4f4f5))
+                .bg(colors.background)
+                .text_color(colors.foreground)
                 .child(
                     div()
                         .text_xl()
                         .font_weight(FontWeight::SEMIBOLD)
                         .child("Starting backend…"),
                 )
-                .child(div().text_sm().text_color(rgb(0xa1a1aa)).mt_2().child(
-                    "Initializing Go server, capturing handshake port and verifying readiness",
-                ))
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(colors.muted_foreground)
+                        .mt_2()
+                        .child(
+                            "Initializing Go server, capturing handshake port and verifying readiness",
+                        ),
+                )
                 .into_any_element()
         }
         BackendStatus::Failed {
@@ -90,17 +116,17 @@ pub fn render_status_page<V: 'static>(
                 .size_full()
                 .items_center()
                 .justify_center()
-                .bg(rgb(0x18181b))
-                .text_color(rgb(0xf4f4f5))
+                .bg(colors.background)
+                .text_color(colors.foreground)
                 .p_8()
                 .child(
                     div()
                         .flex()
                         .flex_col()
                         .w(px(700.0))
-                        .bg(rgb(0x27272a))
+                        .bg(colors.card)
                         .border_1()
-                        .border_color(rgb(0xef4444))
+                        .border_color(colors.destructive)
                         .rounded_lg()
                         .p_6()
                         .shadow_lg()
@@ -108,27 +134,27 @@ pub fn render_status_page<V: 'static>(
                             div()
                                 .text_xl()
                                 .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(0xef4444))
+                                .text_color(colors.destructive)
                                 .child("Backend Startup Failed"),
                         )
                         .child(
                             div()
                                 .mt_2()
                                 .text_sm()
-                                .text_color(rgb(0xf4f4f5))
+                                .text_color(colors.foreground)
                                 .child(format!("Reason: {}", reason)),
                         )
                         .child(
                             div()
                                 .mt_4()
                                 .p_3()
-                                .bg(rgb(0x09090b))
+                                .bg(colors.muted)
                                 .border_1()
-                                .border_color(rgb(0x3f3f46))
+                                .border_color(colors.border)
                                 .rounded_md()
                                 .text_xs()
                                 .font_family("JetBrains Mono")
-                                .text_color(rgb(0xd4d4d8))
+                                .text_color(colors.foreground)
                                 .children(redacted_lines.into_iter().map(|line| div().child(line))),
                         )
                         .child(
@@ -141,8 +167,9 @@ pub fn render_status_page<V: 'static>(
                                     div()
                                         .px_4()
                                         .py_2()
-                                        .bg(rgb(0x3f3f46))
-                                        .id("status-01").hover(|s| s.bg(rgb(0x52525b)))
+                                        .bg(colors.muted)
+                                        .id("status-01")
+                                        .hover(|s| s.bg(colors.border))
                                         .rounded_md()
                                         .cursor_pointer()
                                         .text_sm()
@@ -155,12 +182,14 @@ pub fn render_status_page<V: 'static>(
                                     div()
                                         .px_4()
                                         .py_2()
-                                        .bg(rgb(0x2563eb))
-                                        .id("status-02").hover(|s| s.bg(rgb(0x1d4ed8)))
+                                        .bg(colors.primary)
+                                        .id("status-02")
+                                        .hover(|s| s.bg(colors.primary))
                                         .rounded_md()
                                         .cursor_pointer()
                                         .text_sm()
                                         .font_weight(FontWeight::MEDIUM)
+                                        .text_color(colors.primary_foreground)
                                         .child("Retry")
                                         .on_mouse_down(
                                             MouseButton::Left,
@@ -183,12 +212,12 @@ pub fn render_status_page<V: 'static>(
                 .size_full()
                 .items_center()
                 .justify_center()
-                .bg(rgb(0x18181b))
-                .text_color(rgb(0xf4f4f5))
+                .bg(colors.background)
+                .text_color(colors.foreground)
                 .child(
                     div()
                         .text_lg()
-                        .text_color(rgb(0xef4444))
+                        .text_color(colors.destructive)
                         .child(format!("Backend process crashed (code: {})", code_str)),
                 )
                 .into_any_element()
